@@ -1,0 +1,13 @@
+# IDE / ОС
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Python (tools/sdk-ref/phpref.py)
+__pycache__/
+*.pyc
+
+# Временные выгрузки генераторов справочников (сами справочники в stacks/*/reference/ — коммитятся)
+tools/sdk-ref/out/
+tmp/

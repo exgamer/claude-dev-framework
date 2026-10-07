@@ -1,0 +1,75 @@
+# gosdk-postgres-core
+
+`gosdk-postgres-core` — пакет для удобной и безопасной работы с PostgreSQL через **GORM** в рамках  `gosdk-db-core` `gosdk-core` приложения.
+
+- [Документация GOSDK-CORE](https://git.mpinnovations.kz/mps/go-packages/gosdk-core)
+- [Документация GOSDK-DB-CORE](https://git.mpinnovations.kz/mps/go-packages/gosdk-db-core)
+
+
+- 🧩 **Dependency Injection**
+    - [Что доступно в DI из коробки](pkg/di/DI_FUNCTIONS_README.MD)
+- 🧱 **Миграции**
+    - [Как подключить и использовать](MIGRATIONS.md)
+
+## Возможности
+
+- Registry подключений `PostgresGormRegistry`
+- Ленивое создание `*gorm.DB`
+- Singleflight при конкурентном доступе
+- Корректное закрытие всех подключений
+- Kernel для жизненного цикла приложения
+- Миграции схемы (`Migrator`, ручной накат/откат через консоль проекта, см. [MIGRATIONS.md](MIGRATIONS.md))
+- Helper-функции для бизнес-кода
+
+## Логирование запросов
+
+Для вывода логов запросов используется ENV POSTGRES_DB_LOG_LEVEL, если не указан логи выключены
+- "info"
+- "errors"
+- "warnings"
+
+
+## Установка
+
+```bash
+go get git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core
+```
+
+## Быстрый старт
+
+### Подключение kernel
+
+```go
+a := app.NewApp()
+_ = a.RegisterKernel(&app.PostgresKernel{})
+```
+
+### Получение подключения
+
+```go
+db, err := app.GetDefaultPostgresConnection(a)
+if err != nil {
+    return err
+}
+```
+
+### Именованное подключение
+
+```go
+db, err := app.GetPostgresConnection(a, "analytics")
+```
+
+### Добавление подключения
+
+```go
+cfg := &config.PostgresDbConfig{}
+_ = app.AddPostgresConnection(a, "analytics", cfg)
+```
+
+## Shutdown
+
+При остановке приложения автоматически вызывается `CloseAll()` и все соединения закрываются.
+
+## License
+
+MIT
