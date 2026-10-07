@@ -15,6 +15,7 @@
   - Go: `go build ./... && go vet ./... && go test ./... && gofmt -l internal pkg`
   - PHP: `composer csfix-validate`, `composer phpstan`, `composer test:run` (или их аналоги из `composer.json`)
 - [ ] Для проверки на живой инфраструктуре — использованы уже поднятые общие контейнеры (`docker ps`), одноразовые не поднимались; тестовые данные удалены.
+- [ ] Массовые операции, очистка, создание и изменение схемы БД (миграции) — не выполнялись без явного «да» на каждую (`core/principles.md`, «Действия с БД»).
 - [ ] Пройден `stacks/<stack>/review-findings.md` и `approaches/patterns/performance.md` (запросы, N+1, индексы, кэш), `approaches/patterns/concurrency.md` (гонки, data race).
 - [ ] Swagger обновлён при изменении API; новые env описаны; нет отладочного кода и посторонних изменений.
 - [ ] Ветка/коммиты — по `regulations/git.md`; коммит и пуш — только после подтверждения пользователя.

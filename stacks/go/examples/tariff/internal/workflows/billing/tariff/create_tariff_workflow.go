@@ -10,40 +10,47 @@ import (
 	parkingdomain "example.com/parking-service/internal/domains/handbook/parking"
 )
 
-func NewCreateTariffWorkflow(
-	parkingRepository parkingdomain.Repository,
-	tariffService *tariffdomain.Service,
-) *CreateTariffWorkflow {
+func NewCreateTariffWorkflow(txManager CreateTariffTxManager) *CreateTariffWorkflow {
 	return &CreateTariffWorkflow{
-		parkingRepository: parkingRepository,
-		tariffService:     tariffService,
+		txManager: txManager,
 	}
 }
 
 // CreateTariffWorkflow Создание тарифа с проверкой парковки: billing не знает о handbook, связь живёт здесь
 type CreateTariffWorkflow struct {
-	parkingRepository parkingdomain.Repository
-	tariffService     *tariffdomain.Service
+	txManager CreateTariffTxManager
 }
 
 func (w *CreateTariffWorkflow) Exec(ctx context.Context, params *CreateTariffParams) (*tariffdomain.Tariff, error) {
-	parking, err := w.parkingRepository.GetByID(ctx, params.ParkingID)
+	var created *tariffdomain.Tariff
+
+	err := w.txManager.Exec(ctx, func(ctx context.Context, parkingRepository parkingdomain.Repository, tariffRepository tariffdomain.Repository) error {
+		parking, err := parkingRepository.GetByID(ctx, params.ParkingID)
+		if err != nil {
+			return err
+		}
+
+		if parking == nil {
+			return exception.NewValidationException(map[string]any{"parking_id": "парковка не найдена"}, false)
+		}
+
+		if !parking.IsActive {
+			return exception.NewForbiddenException(errors.New("парковка отключена"), false)
+		}
+
+		// Новый тариф не дефолтный: дефолт назначается через SetDefaultTariffCommand
+		created, err = tariffRepository.Create(ctx, &tariffdomain.Tariff{
+			ParkingID:    params.ParkingID,
+			Name:         params.Name,
+			Currency:     params.Currency,
+			GraceMinutes: params.GraceMinutes,
+		})
+
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if parking == nil {
-		return nil, exception.NewValidationException(map[string]any{"parking_id": "парковка не найдена"}, false)
-	}
-
-	if !parking.IsActive {
-		return nil, exception.NewForbiddenException(errors.New("парковка отключена"), false)
-	}
-
-	return w.tariffService.Create(ctx, &tariffdomain.Tariff{
-		ParkingID:    params.ParkingID,
-		Name:         params.Name,
-		Currency:     params.Currency,
-		GraceMinutes: params.GraceMinutes,
-	})
+	return created, nil
 }

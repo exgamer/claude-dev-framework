@@ -28,7 +28,9 @@
 | `$this->repository->transaction(...)` / `$this->someService->getRepository()->transaction(...)` вместо внедрённого `TransactionManagerInterface` — жёсткая связка: метод тянет транзакционность через чужой репозиторий вместо явной зависимости (см. `mps-core/transactions.md`) | Command, Service |
 | `DB::transaction()` используется вместо `TransactionManagerInterface` без необходимости в SQL-специфике (см. `mps-core/transactions.md`, раздел «Как использовать») | Command, Service |
 
-Проверка атомарности (5.2, строка «Метод выполняет несколько операций записи...»): одиночный `create`/`update`/`delete` через `CRUDService` уже обёрнут в транзакцию автоматически — не флагать. Флагать только когда **несколько** независимых repository/service вызовов на запись идут подряд в одном сценарии без общей транзакции.
+Workflow (`Workflows/`) проверяется строже (O-8): любой workflow с записью — внутри `TransactionManagerInterface::run()`, включая проверки, от которых запись зависит; без транзакции — только с причиной в `design.md` (тег `workflow-without-transaction`). Одиночный `create` через `CRUDService` в workflow — не исключение.
+
+Проверка атомарности (5.2, строка «Метод выполняет несколько операций записи...»), для Service/Command домена: одиночный `create`/`update`/`delete` через `CRUDService` уже обёрнут в транзакцию автоматически — не флагать. Флагать только когда **несколько** независимых repository/service вызовов на запись идут подряд в одном сценарии без общей транзакции.
 
 ## 5.3 — Дублирование бизнес-логики между похожими обработчиками
 

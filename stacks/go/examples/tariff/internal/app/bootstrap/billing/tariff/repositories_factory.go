@@ -10,6 +10,7 @@ import (
 	tariffpostgres "example.com/parking-service/internal/infrastructure/postgres/billing/tariff"
 	parkingpostgres "example.com/parking-service/internal/infrastructure/postgres/handbook/parking"
 	tariffredis "example.com/parking-service/internal/infrastructure/redis/billing/tariff"
+	tariffworkflow "example.com/parking-service/internal/workflows/billing/tariff"
 )
 
 func newRepositoriesFactory(postgresClient *gorm.DB, redisClient *redis.Client) *repositoriesFactory {
@@ -21,6 +22,11 @@ func newRepositoriesFactory(postgresClient *gorm.DB, redisClient *redis.Client) 
 			postgresClient,
 			func(tx *gorm.DB) tariffdomain.Repository { return tariffpostgres.NewPostgresRepository(tx) },
 		),
+		CreateTariffTxManager: dbtransaction.NewManager2[parkingdomain.Repository, tariffdomain.Repository](
+			postgresClient,
+			func(tx *gorm.DB) parkingdomain.Repository { return parkingpostgres.NewPostgresRepository(tx) },
+			func(tx *gorm.DB) tariffdomain.Repository { return tariffpostgres.NewPostgresRepository(tx) },
+		),
 	}
 }
 
@@ -29,4 +35,5 @@ type repositoriesFactory struct {
 	TariffCacheRepository  tariffdomain.CacheRepository
 	ParkingRepository      parkingdomain.Repository
 	DefaultTariffTxManager tariffdomain.DefaultTariffTxManager
+	CreateTariffTxManager  tariffworkflow.CreateTariffTxManager
 }

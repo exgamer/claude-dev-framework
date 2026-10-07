@@ -18,7 +18,7 @@
 | `…/Validators/TariffDtoValidator.php` | доменные инварианты статическим валидатором (P-8) |
 | `…/Commands/SetDefaultTariffCommand.php` | **Command** — логика одного домена, вынесенная из сервиса: 2 записи в `TransactionManagerInterface::run()`, метод `execute()` |
 | `Domains/Billing/definitions.php`, `ServiceProvider.php` | биндинг сервиса домена |
-| `Workflows/Billing/Tariffs/CreateTariffWorkflow.php` | **Workflow** — междоменная логика (Billing + Catalog), `{Action}Workflow`, `execute()` (P-2) |
+| `Workflows/Billing/Tariffs/CreateTariffWorkflow.php` | **Workflow** — междоменная логика (Billing + Catalog), `{Action}Workflow`, `execute()` (P-2); транзакционен (O-8): проверка парковки и создание в одном `run()` |
 | `Entrypoints/Admin/Billing/…` | контекст Admin без `src/` (P-3, P-9); тонкий контроллер с OpenAPI; `Requests/Tariffs/{Create,Update,Index}Request` (P-5); `Responses/*Response`; `routes.php` с `ApiResponseMiddleware` |
 | `Infrastructure/Postgres/Billing/…` | тип хранилища в пути (P-10); модель с `@property`, схемой, `$casts`; репозиторий на `CRUDRepository` + `filterSearch`; `definitions.php`; миграция домена |
 | `tests/Unit/ParkingApp/Domains/Billing/Tariffs/TariffDtoValidatorTest.php` | тест в `tests/`, путь повторяет путь класса (O-3) |

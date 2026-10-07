@@ -37,7 +37,7 @@ func (m *Module) Init(a *app.App) error {
 
 	repositoriesFactory := newRepositoriesFactory(postgresClient, redisClient)
 	servicesFactory := newServicesFactory(repositoriesFactory)
-	workflowsFactory := newWorkflowsFactory(repositoriesFactory, servicesFactory)
+	workflowsFactory := newWorkflowsFactory(repositoriesFactory)
 	handlersFactory := newHandlersFactory(servicesFactory, workflowsFactory)
 
 	return tariffhttp.SetRoutes(a, handlersFactory.TariffHandler, httpmiddleware.JwtAuth(adminService))

@@ -4,11 +4,10 @@ import (
 	tariffworkflow "example.com/parking-service/internal/workflows/billing/tariff"
 )
 
-func newWorkflowsFactory(repositoriesFactory *repositoriesFactory, servicesFactory *servicesFactory) *workflowsFactory {
+func newWorkflowsFactory(repositoriesFactory *repositoriesFactory) *workflowsFactory {
 	return &workflowsFactory{
 		CreateTariffWorkflow: tariffworkflow.NewCreateTariffWorkflow(
-			repositoriesFactory.ParkingRepository,
-			servicesFactory.TariffService,
+			repositoriesFactory.CreateTariffTxManager,
 		),
 	}
 }

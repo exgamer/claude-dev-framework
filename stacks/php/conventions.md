@@ -43,7 +43,7 @@
 
 ## Транзакции и побочные эффекты
 
-16. **Несколько записей, частичное выполнение недопустимо → `TransactionManagerInterface::run()`** (биндинг: `DatabaseTransactionManager`, mock: `NoopTransactionManager`). Не `DB::transaction`, не транзакция в репозитории.
+16. **Workflow транзакционен по умолчанию** (O-8): проверки и все записи `execute()` — внутри одного `TransactionManagerInterface::run()`; без транзакции — только с причиной в «Границах транзакций» `design.md` (`approaches/patterns/transactions.md`). Service/Command домена: несколько записей, частичное выполнение недопустимо → `run()`. Биндинг: `DatabaseTransactionManager`, mock: `NoopTransactionManager`. Не `DB::transaction`, не транзакция в репозитории.
 17. **Побочные эффекты** (очередь, `Job::dispatch`, HTTP, файлы) — после фиксации записи и вне транзакции. Отложенное действие — `Job::dispatch(...)->delay(...)`, как `ActivatePlannedTariffJob`.
 
 ## HTTP и документация

@@ -27,6 +27,8 @@
 | `repository-reinvents-core-helper` | Самописная обёртка вместо готового `QueryFilters\V2`/`PaginatedQueryHelper`/`LogAwareTrait` из core |
 | `service-direct-db-query` | Прямой `DB::`/`Model::where` в сервисе вместо репозитория |
 | `service-orchestrates-foreign-repository` | Сервис оркестрирует репозиторий чужого домена напрямую, а не через его сервис |
+| `workflow-without-transaction` | Workflow пишет без `TransactionManagerInterface::run()` и без причины в `design.md` (O-8) |
+| `multi-write-without-transaction` | Service/Command домена делает несколько связанных записей без общей транзакции |
 | `service-transaction-not-via-manager` | `DB::transaction()`/`$repo->transaction()` вместо `TransactionManagerInterface` |
 | `service-method-name-mismatch` | Имя метода не соответствует тому, что он реально делает |
 | `service-status-branching-duplicated` | Ветвление по статусам (`if`/`elseif`) продублировано в нескольких методах вместо state machine |

@@ -130,6 +130,7 @@ internal/
         └── {domain}/
             └── {module}/
                 ├── {конкретное_действие}_workflow.go
+                ├── tx_manager.go               ← если workflow пишет (O-8)
                 └── dto.go
 ```
 
@@ -223,6 +224,7 @@ main()
 **Cross-domain Workflow:**
 - [ ] `internal/workflows/{domain}/{module}/{конкретное_действие}_workflow.go`
 - [ ] `internal/workflows/{domain}/{module}/dto.go`
+- [ ] `internal/workflows/{domain}/{module}/tx_manager.go` — если workflow пишет (O-8); реализация `dbtransaction.NewManager*` в `repositories_factory.go`
 - [ ] `app/bootstrap/{module}/workflows_factory.go` (не `services_factory.go`)
 - [ ] Зарегистрировать workflow через DI в `module.go`
 

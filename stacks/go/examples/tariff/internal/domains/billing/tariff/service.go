@@ -52,13 +52,6 @@ func (s *Service) Paginated(ctx context.Context, search *Search) (*pagination.Pa
 	return s.repository.Paginated(ctx, search)
 }
 
-// Create Новый тариф создаётся не дефолтным: дефолт назначается отдельно через SetDefaultTariffCommand
-func (s *Service) Create(ctx context.Context, tariff *Tariff) (*Tariff, error) {
-	tariff.IsDefault = false
-
-	return s.repository.Create(ctx, tariff)
-}
-
 func (s *Service) Update(ctx context.Context, id uint, patch *Patch) (*Tariff, error) {
 	if _, err := s.GetByID(ctx, id); err != nil {
 		return nil, err

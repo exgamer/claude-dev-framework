@@ -16,7 +16,7 @@
 - Зависимости только через интерфейсы — не принимать конкретные реализации (`*PostgresRepository`)
 - Бизнес-ошибки через `AppException` (см. `exceptions.md`)
 - Тест рядом с файлом: `{конкретное_действие}_workflow_test.go`
-- Если workflow выполняет несколько операций записи через разные репозитории, которые должны выполниться атомарно — оборачивать в транзакцию (см. `../conventions.md`, правило 17, и `infra/postgres.md`, раздел "Транзакции")
+- **Транзакционен по умолчанию** (O-8): чтения для решения и все записи — внутри одного `txManager.Exec`; `TxManager` объявляется в `tx_manager.go` рядом с workflow. Внутри `fn` — только репозитории из аргументов, сервисы доменов не вызываются (пишут мимо транзакции). Без транзакции — только с причиной в `design.md`. См. `../conventions.md`, правило 17, `infra/postgres.md` ("Транзакции"), `approaches/patterns/transactions.md`. Пример — `examples/tariff/internal/workflows/billing/tariff/`
 
 ## Именование файлов
 
@@ -24,6 +24,7 @@
 |-----|------|
 | Оркестратор | `{конкретное_действие}_workflow.go` |
 | Входные/выходные данные | `dto.go` |
+| Интерфейс транзакции | `tx_manager.go` |
 
 Имя файла — конкретное действие + суффикс `_workflow`: `calculate_session_debt_workflow.go`, не `workflow.go` и не `calculate_session_debt.go` (регламент `BACKEND_ARCHITECT-GO`, решение O-1 в `core/decisions.md`).
 

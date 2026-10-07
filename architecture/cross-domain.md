@@ -18,12 +18,12 @@
 - Циклов между доменами нет. Если A нужен B и B нужен A — общая часть уходит в workflow.
 - Workflow получает репозитории и сервисы доменов через конструктор — **напрямую, без посредничества сервисов** (это агрегат, O-7); сам в хранилища не ходит.
 - Command/Query домена репозиторий чужого домена не берёт — у него только свой домен; понадобился чужой → это workflow.
-- Транзакция на запись в несколько доменов открывается в workflow, не в сервисах.
+- Workflow транзакционен по умолчанию (O-8): чтения для решения и все записи — в одной транзакции, открывает её workflow, не сервисы. Без транзакции — только с причиной в `design.md` (`approaches/patterns/transactions.md`).
 - Домен не импортирует чужие DTO/сущности для записи — workflow собирает данные и передаёт каждому домену его DTO.
 
 ## Пример (одинаковый смысл в двух стеках)
 
 Создание тарифа требует существующей парковки (Catalog) — Billing о Catalog не знает:
 
-- Go: `stacks/go/examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go` → `Exec(ctx, params)`: `parkingRepository.GetByID` → `tariffService.Create`.
-- PHP: `stacks/php/examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php` → `execute(TariffDto)`: `parkingRepository->oneById` → `tariffCrudService->create` (в `parking_app` тот же класс называется `CreateTariffCommand` — старый нейминг, P-2).
+- Go: `stacks/go/examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go` → `Exec(ctx, params)`: в одном `txManager.Exec` — `parkingRepository.GetByID` → `tariffRepository.Create`.
+- PHP: `stacks/php/examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php` → `execute(TariffDto)`: в одном `transactionManager->run()` — `parkingRepository->oneById` → `tariffCrudService->create` (в `parking_app` тот же класс называется `CreateTariffCommand` — старый нейминг, P-2).
