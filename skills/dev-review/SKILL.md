@@ -1,6 +1,6 @@
 ---
 name: dev-review
-description: "Ревьюер dev-framework: ревью Go (Go SDK) и PHP (Laravel + mps/core) по тем же правилам, что у разработчика — безопасность, архитектура, SDK, проверки за пределами дифа, MR через glab, отчёт с тегами для auto-review (глубокий аудит — /dev-security audit)"
+description: "Ревьюер dev-framework: ревью Go (Go SDK) и PHP (Laravel + mps/core) по тем же правилам, что у разработчика — безопасность, архитектура, SDK, проверки за пределами дифа, MR через glab, отчёт с тегами (глубокий аудит — /dev-security audit)"
 trigger: /dev-review
 ---
 
@@ -23,8 +23,8 @@ trigger: /dev-review
 
 ## Шаг 2 — Правила стека
 
-- Go: `{DF}/stacks/go/{structure,conventions,style,review-findings,security,review-checks}.md`, `{DF}/stacks/go/go-sdk/capabilities.md`, нужные `go-sdk/*.md`, эталон `{DF}/stacks/go/examples/tariff/`.
-- PHP: `{DF}/stacks/php/{structure,conventions,style,review-findings,security,review-checks,review-tags}.md`, `{DF}/stacks/php/mps-core/capabilities.md`, нужные `mps-core/*.md`, эталон `{DF}/stacks/php/examples/`.
+- Go: `{DF}/stacks/go/checklist.md` (первой), `{DF}/stacks/go/{structure,conventions,style,review-findings,security,review-checks}.md`, `{DF}/stacks/go/go-sdk/capabilities.md`, нужные `go-sdk/*.md`, эталон `{DF}/stacks/go/examples/tariff/`.
+- PHP: `{DF}/stacks/php/checklist.md` (первой), `{DF}/stacks/php/{structure,conventions,style,review-findings,security,review-checks,review-tags}.md`, `{DF}/stacks/php/mps-core/capabilities.md`, нужные `mps-core/*.md`, эталон `{DF}/stacks/php/examples/`.
 - Всегда: `{DF}/core/*.md`, `{DF}/architecture/*.md`, `{DF}/regulations/*.md`; локальные `.claude/dev-rules.md` проекта главнее.
 - API сверять со справочником версии проекта (`reference/`; Go — версии из `go.mod`, PHP — из `composer.lock`), при отсутствии — пересобрать `{DF}/tools/sdk-ref/`.
 
@@ -34,7 +34,7 @@ trigger: /dev-review
 - **[БЕЗОПАСНОСТЬ]** по `security.md` стека — всегда КРИТИЧНО; есть `docs/tasks/<ключ>/threats.md` — каждая мера реализована (не реализована — [БЕЗОПАСНОСТЬ] с тегом угрозы);
 - блок «Не покрыто правилами» — темы для обсуждения, не ошибки автора; каждая — строка в `docs/tasks/<ключ>/rules-log.md` (если ревью вне задачи — в `docs/tasks/<дата>-review/rules-log.md`);
 - известные споры (`{DF}/core/decisions.md`) — как спор, не как находку;
-- колонка категории в сохранённом отчёте — kebab-case тег (читает `auto-review`);
+- колонка категории в сохранённом отчёте — kebab-case тег паттерна (по нему считаются повторяющиеся ошибки);
 - отчёт — `review_result/{YYYY-MM-DD_HH-MM}_{type}.md` (или `docs/tasks/<ключ>/review.md` в цепочке `/dev`).
 
 ## Шаг 4 — Итог

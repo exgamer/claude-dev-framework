@@ -21,14 +21,14 @@
 | `$fileManager->upload(...)` / `uploadFromUrl(...)` вместо `UploadManager` | любой слой |
 | `$this->getLogger()->setMessagePrefix(...)` вместо `->for($this)` | любой слой |
 | Отсутствует `declare(strict_types=1);` | любой PHP-файл |
-| Цикл или обратная зависимость между доменами (см. граф зависимостей в `architecture.md`) | Domains |
+| Цикл или обратная зависимость между доменами (см. `architecture/cross-domain.md`) | Domains |
 | Новый HTTP-класс (Controller/Request/Response/Middleware) добавлен в `Domains/` вместо `Entrypoint/` | Domains |
 | `ServiceInterface` сложного сервиса наследует `CRUDServiceInterface` | Services |
-| Метод выполняет несколько операций записи через **разные** репозитории/сервисы (или несколько репозиторных методов подряд), где частичное выполнение недопустимо — но не обёрнут в транзакцию (см. `mps-core/transactions.md`) | Command (оркестрирующий), Service (кастомный метод с несколькими write-вызовами) |
+| Метод выполняет несколько операций записи через **разные** репозитории/сервисы (или несколько репозиторных методов подряд), где частичное выполнение недопустимо — но не обёрнут в транзакцию (см. `mps-core/transactions.md`) | Workflow (любая запись, O-8), Command, Service (кастомный метод с несколькими write-вызовами) |
 | `$this->repository->transaction(...)` / `$this->someService->getRepository()->transaction(...)` вместо внедрённого `TransactionManagerInterface` — жёсткая связка: метод тянет транзакционность через чужой репозиторий вместо явной зависимости (см. `mps-core/transactions.md`) | Command, Service |
 | `DB::transaction()` используется вместо `TransactionManagerInterface` без необходимости в SQL-специфике (см. `mps-core/transactions.md`, раздел «Как использовать») | Command, Service |
 
-Workflow (`Workflows/`) проверяется строже (O-8): любой workflow с записью — внутри `TransactionManagerInterface::run()`, включая проверки, от которых запись зависит; без транзакции — только с причиной в `design.md` (тег `workflow-without-transaction`). Одиночный `create` через `CRUDService` в workflow — не исключение.
+Workflow (`Workflows/`) с записью — всегда в транзакции, включая одиночный `create` (O-8, `approaches/patterns/transactions.md`); тег `workflow-without-transaction`.
 
 Проверка атомарности (5.2, строка «Метод выполняет несколько операций записи...»), для Service/Command домена: одиночный `create`/`update`/`delete` через `CRUDService` уже обёрнут в транзакцию автоматически — не флагать. Флагать только когда **несколько** независимых repository/service вызовов на запись идут подряд в одном сценарии без общей транзакции.
 

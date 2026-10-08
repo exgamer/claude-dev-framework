@@ -16,7 +16,7 @@
 - Зависимости только через интерфейсы — не принимать конкретные реализации (`*PostgresRepository`)
 - Бизнес-ошибки через `AppException` (см. `exceptions.md`)
 - Тест рядом с файлом: `{конкретное_действие}_workflow_test.go`
-- **Транзакционен по умолчанию** (O-8): чтения для решения и все записи — внутри одного `txManager.Exec`; `TxManager` объявляется в `tx_manager.go` рядом с workflow. Внутри `fn` — только репозитории из аргументов, сервисы доменов не вызываются (пишут мимо транзакции). Без транзакции — только с причиной в `design.md`. См. `../conventions.md`, правило 17, `infra/postgres.md` ("Транзакции"), `approaches/patterns/transactions.md`. Пример — `examples/tariff/internal/workflows/billing/tariff/`
+- **Транзакционен по умолчанию** — `TxManager` в `tx_manager.go` рядом с workflow; правило — `approaches/patterns/transactions.md` (O-8), механика — `infra/postgres.md`, пример — `examples/tariff/internal/workflows/billing/tariff/`
 
 ## Именование файлов
 

@@ -31,7 +31,7 @@
 
 ## Платёжные пути
 
-Применяй все правила из загруженных файлов (`architecture.md`, `conventions.md`, `style.md`, `review-findings.md` и SDK документации).
+Применяй все правила из загруженных файлов (`architecture/*.md`, `structure.md`, `conventions.md`, `style.md`, `review-findings.md` и SDK документации).
 
 Отдельно для платёжных путей (`workflows/**/payment`, `entrypoints/**/{kaspi,halyk,kassa24,...}`) — каждый пункт раздела «Платёжные хендлеры» из `review-findings.md` проверяй явно и пиши в отчёт результат, даже если нарушений нет: это повтор прод-инцидентов, а не стиль.
 

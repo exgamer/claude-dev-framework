@@ -4,6 +4,7 @@
 
 | Файл | Что внутри |
 |---|---|
+| `checklist.md` | **памятка**: жёсткие правила одной строкой со ссылками — разработчик и ревью проходят её первой |
 | `structure.md` | дерево подпроекта, пути, чеклист модуля, таблица соответствия Go SDK ↔ mps/core |
 | `conventions.md` | обязательные правила слоёв, данных, ошибок, транзакций, HTTP |
 | `style.md` | как автор пишет PHP: шапка класса, форма кода, имена |
@@ -16,4 +17,4 @@
 
 Эталоны кода: `superapp-api/parking_app` (основной), `superapp-api/super_app` (второй). Легаси `superapp-api/app` — не эталон.
 
-Порядок чтения разработчиком: `core/*` → `architecture/*` → `structure.md` → `conventions.md` → `style.md` → нужные файлы `mps-core/` по задаче → `review-findings.md` перед сдачей.
+Порядок чтения разработчиком — `skills/dev-php/SKILL.md`, «Шаг 1»: памятка → `core/principles.md` → `structure.md` → по задаче нужные пункты `conventions.md`/`style.md` и файлы `mps-core/`. `review-findings.md` — материал ревьюера.

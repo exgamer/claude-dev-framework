@@ -5,7 +5,7 @@
 > `workflow-takes-repository-directly` переопределён решением O-7: workflow (`Workflows/`) **может** брать репозитории любых доменов — не находка. Command/Query/Service домена с репозиторием чужого домена — тег `domain-cross-domain-access`, **[ОШИБКА]**.
 
 
-В сохранённом файле (отчёт) колонка **«Категория»/«Уязвимость»** каждой строки — это **не архитектурный слой** (`Repository`/`Service`/`Domain`...), а **конкретный, стабильный kebab-case тег самого паттерна нарушения**. По этому тегу `auto-review` считает у автора MR повторяющиеся ошибки одного типа (например, чтобы увидеть «этот разработчик регулярно делает прямые запросы в сервисе») — общий слой для этого бесполезен, а свободный текст не даёт точных совпадений.
+В сохранённом файле (отчёт) колонка **«Категория»/«Уязвимость»** каждой строки — это **не архитектурный слой** (`Repository`/`Service`/`Domain`...), а **конкретный, стабильный kebab-case тег самого паттерна нарушения**. По этому тегу считаются у автора MR повторяющиеся ошибки одного типа (например, чтобы увидеть «этот разработчик регулярно делает прямые запросы в сервисе») — общий слой для этого бесполезен, а свободный текст не даёт точных совпадений.
 
 Правила:
 - kebab-case, 2–5 английских слов, называет **паттерн**, а не файл/слой (`service-direct-db-query`, не `Service` и не «прямой запрос к БД в SessionService»);
@@ -27,7 +27,7 @@
 | `repository-cross-domain-access` | Repository обращается к таблице/репозиторию чужого домена напрямую |
 | `repository-reinvents-core-helper` | Самописная обёртка вместо готового `QueryFilters\V2`/`PaginatedQueryHelper`/`LogAwareTrait` из core |
 | `service-direct-db-query` | Прямой `DB::`/`Model::where` в сервисе вместо репозитория |
-| `service-orchestrates-foreign-repository` | Сервис оркестрирует репозиторий чужого домена напрямую, а не через его сервис |
+| ~~`service-orchestrates-foreign-repository`~~ | не используется (O-7): сервис домена не трогает чужой домен ни через репозиторий, ни через сервис — тег `domain-cross-domain-access` |
 | `workflow-without-transaction` | Workflow пишет без `TransactionManagerInterface::run()` и без причины в `design.md` (O-8) |
 | `multi-write-without-transaction` | Service/Command домена делает несколько связанных записей без общей транзакции |
 | `service-transaction-not-via-manager` | `DB::transaction()`/`$repo->transaction()` вместо `TransactionManagerInterface` |
@@ -48,7 +48,7 @@
 | `controller-missing-swagger` | Эндпоинт без Swagger-аннотации или без `404`/`500` в ответах |
 | `controller-auth-via-facade` | `Auth::id()` в глубине сервиса вместо `request()->user()` в контроллере |
 | ~~`workflow-takes-repository-directly`~~ | не используется (O-7): workflow вправе брать репозитории напрямую; для Command/Query домена — `domain-cross-domain-access` |
-| `workflow-trusts-transport-request` | Command не перевалидирует вход сам, доверяя Request (ломается при вызове из консоли/очереди) |
+| `workflow-trusts-transport-request` | Workflow или Command домена не проверяет доменные инварианты (`{E}DtoValidator`, P-8), полагаясь на Request, — ломается при вызове из консоли/очереди |
 | `domain-cross-domain-access` | Код в `Domains/` (Service, Command, Query) обращается к чужому домену — модель, репозиторий или сервис; место такого сценария — workflow (O-7) |
 | `dataobject-assembly-in-constructor` | Сложная сборка DTO из нескольких источников — в конструкторе/контроллере вместо фабрики |
 | `enum-contains-business-logic` | `match`/условие с бизнес-решением внутри enum вместо `labels()`/`values()` |
