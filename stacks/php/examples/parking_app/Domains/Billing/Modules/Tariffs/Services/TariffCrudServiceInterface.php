@@ -21,5 +21,8 @@ interface TariffCrudServiceInterface
 
     public function create(TariffDto $dto): Tariff;
 
+    /**
+     * Полная замена (PUT): в DTO — все поля тарифа.
+     */
     public function update(int $id, TariffDto $dto): Tariff;
 }

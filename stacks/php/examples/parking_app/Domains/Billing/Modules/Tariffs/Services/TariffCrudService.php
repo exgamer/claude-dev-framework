@@ -73,6 +73,7 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
 
+        // PUT — полные данные: UpdateRequest требует все поля, DTO пишется целиком (conventions.md, п. 12)
         $this->repository->updateById($id, $dto->toArrayWithSnakeKeys());
 
         return $this->findById($id);

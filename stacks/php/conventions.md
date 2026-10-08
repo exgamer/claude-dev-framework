@@ -33,7 +33,15 @@
 9. **Форма запроса — в FormRequest** (`rules()`): типы, обязательность, `gt:0` для id, `max:` для строк/массивов, `Rule::enum()`. Без запросов к БД.
 10. **Доменные инварианты — в `{E}DtoValidator::validate($dto): array`** (решение P-8; inline-проверки в сервисе/workflow, как в части `super_app`, — **[ВНИМАНИЕ]**) (статический, `final`), сервис бросает `ValidationAppException('VALIDATION ERROR', $errors)`. Формат ошибок — `['field' => ['сообщение']]`.
 11. **Между слоями — DTO, не массив.** `DataObject` с private-свойствами, геттерами и fluent-сеттерами (`return $this`). В репозиторий уходит `$dto->toArrayWithSnakeKeys()`.
-12. **Обновление отличает «не прислали» от `null`** — `sometimes|nullable` в Request, в сервисе — проверка наличия ключа, не `?? null`.
+12. **PUT — полные валидные данные** (O-10, **[ОШИБКА]**). В `UpdateRequest` каждое поле `required`, а очищаемое — `present|nullable`; сервис пишет `$dto->toArrayWithSnakeKeys()` целиком. `DataObject` отдаёт `null` и за неприсланные свойства, поэтому необязательное поле в `UpdateRequest` (`nullable`/`sometimes` без `present`) при записи DTO целиком затирает данные `null`. Обходы — список пришедших полей рядом с DTO, отслеживание пришедших полей в DTO, `array_filter(!is_null)` — не применять.
+
+    ```php
+    // плохо: запрос {name} обнулит currency и grace_minutes
+    'currency' => ['nullable', Rule::enum(CurrencyEnum::class)],
+
+    // хорошо
+    'currency' => ['present', 'nullable', Rule::enum(CurrencyEnum::class)],
+    ```
 
 ## Ошибки
 

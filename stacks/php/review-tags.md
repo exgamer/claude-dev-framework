@@ -20,6 +20,7 @@
 | `request-queries-db` | `rules()` в Request делает запрос к БД или вызывает сервис |
 | `request-business-rule-in-validation` | Бизнес-правило (не enum допустимых значений) проверяется в Request вместо сервиса |
 | `request-missing-vs-null-not-distinguished` | Не различает «поле не прислали» и «прислали null» (`sometimes`+`nullable`, `?? null` вместо `array_key_exists`) |
+| `update-request-optional-fields` | PUT: поле в `UpdateRequest` необязательно к передаче (`nullable`/`sometimes` без `present`), а сервис пишет DTO целиком — неприсланное поле затирается `null` |
 | `repository-bypasses-core-query` | `Model::query()`/`DB::table()` вместо `$this->getQuery()` |
 | `repository-missing-or-fail` | Нет `*OrFail` там, где метод гарантирует возврат ресурса |
 | `repository-returns-mapped-structure` | Repository делает `keyBy`/`map`/сборку структур вместо сырых данных |
@@ -56,6 +57,8 @@
 | `deploy-risk-flag-enabled` | Раскомментированный крон/включённый флаг — риск первого прогона на накопленных данных |
 | `mr-hygiene-lockfile-drift` | `composer.lock` не обновлён вместе с `composer.json`, либо сгенерированные файлы (`.php-cs-fixer.cache`, `storage/api-docs/*.json`) уехали в MR |
 | `ai-style-comment` | Комментарий-пересказ кода построчно, сгенерированный ИИ |
+| `dto-setter-widened-type` | Тип аргумента сеттера DTO шире типа свойства (`int\|string`, ручное приведение) «на случай строк» — ядро приводит само |
+| `comment-restates-name` | Описание метода/класса пересказывает его имя («Неудалённые здания по набору id» над `findAliveByIds`) |
 
 Если ни один тег не подходит — придумай новый в этом же формате.
 

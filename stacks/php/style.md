@@ -25,6 +25,25 @@
   ```
 - Шаблонные docblock-и вида `@package App\…`, «Реализует бизнес-логику управления…», «Обеспечивает типобезопасность…» (стиль части `super_app`) — **[ВНИМАНИЕ]**, это пересказ, а не смысл.
 - `@param`/`@return` в docblock — только если добавляют информацию сверх сигнатуры (`array<int, string[]>`, generic, `@throws`). Дублировать `@param int $id` при типизированной сигнатуре не нужно.
+- Описание метода, пересказывающее его имя (`findAliveByIds` → «Неудалённые здания по набору id»), не писать — **[ИНФО]** (`core/style.md`, «Комментарии»):
+
+    ```php
+    // плохо
+    /**
+     * Неудалённые здания по набору id.
+     *
+     * @param  array<int, int>  $ids
+     * @return array<int, Building> карта id здания => здание
+     */
+    public function findAliveByIds(array $ids): array;
+
+    // хорошо
+    /**
+     * @param  array<int, int>  $ids
+     * @return array<int, Building> карта id здания => здание
+     */
+    public function findAliveByIds(array $ids): array;
+    ```
 
 ## Классы
 
