@@ -71,7 +71,7 @@
 | Command / Query (в домене) | `{Action}Command` / `{Action}Query`, метод `execute()` | `ActivatePlannedTariffCommand` |
 | Workflow (междоменный) | `{Action}Workflow`, метод `execute()` | `CreateTariffWorkflow` |
 | Валидатор | `{Entity}DtoValidator` | `TariffDtoValidator` |
-| Enum | `{Entity}{Признак}Enum`, кейсы `UPPER_SNAKE` (P-16, как в ядре: `CurrencyEnum::KZT`) | `TariffStatusEnum::ACTIVE` |
+| Enum | `{Entity}{Признак}Enum`, кейсы `UPPER_SNAKE` (P-16, как в ядре: `CurrencyEnum::KZT`); всегда `implements Enumerable` + `use EnumerableTrait` из `mps/core` (`mps-core/enums.md`) | `TariffStatusEnum::ACTIVE` |
 | Request | `Http/Requests/{Entity}/{Create,Update,Index}Request` | `Requests/Tariffs/CreateRequest` |
 | Response | `{Entity}Response`, `{Entity}PaginatedResponse` | `TariffResponse` |
 | Job | `{Action}Job` | `ActivatePlannedTariffJob` |

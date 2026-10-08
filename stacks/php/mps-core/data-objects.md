@@ -56,6 +56,8 @@ $dto->toArrayWithCamelKeys();
 
 `fromArray()` обрабатывает типы автоматически: `BackedEnum` через `tryFrom()`, вложенный `DataObject` рекурсивно, `Carbon` из строки, неизвестные ключи — молча игнорируются.
 
+**Поле с фиксированным набором значений — сразу enum.** Свойство и аргумент сеттера типизируются enum-ом (`?TariffStatusEnum`, `setStatus(TariffStatusEnum|null $value)`), не `?string`: `fromArray()` сам превращает строку из запроса в enum через `tryFrom()`, `toArray*()` отдаёт `->value`, сравнение — `=== TariffStatusEnum::ACTIVE`, без `->value`. Неизвестное значение `tryFrom()` даёт `null` — допустимые значения проверяет Request (`Rule::enum()`).
+
 **Строки из multipart/query.** `fromArray()` вызывает сеттер из `InstanceHelper`, объявленного без `strict_types`, — PHP приводит скаляры сам: `'7'` → `?int` 7, `'2.5'` → `?float` 2.5. Поэтому тип аргумента сеттера = тип свойства (`?int`, `?float`), без `int|string` и ручного `(int)`. Нечисловая строка даёт `TypeError`, ядро пишет warning в лог и **молча пропускает поле** — формат числа проверяет Request (`integer`, `numeric`). Проверено на core 1.10.2 (AINA-2628); при обновлении ядра — тест вида «строка из формы доходит числом».
 
 **Встроенная валидация (опционально):**

@@ -17,7 +17,7 @@
 | Тег | Когда использовать |
 |---|---|
 | `request-missing-bounds` | Число/массив в Request без верхней границы (`max:`/`between:`) — DoS через тело запроса |
-| `request-queries-db` | `rules()` в Request делает запрос к БД или вызывает сервис |
+| `request-queries-db` | Request ходит в БД: `exists:`/`unique:`, `Rule::exists/unique`, своё правило или замыкание с моделью/`DB::`/репозиторием, запрос в `prepareForValidation`/`withValidator`/`after` (P-17) |
 | `request-business-rule-in-validation` | Бизнес-правило (не enum допустимых значений) проверяется в Request вместо сервиса |
 | `request-missing-vs-null-not-distinguished` | Не различает «поле не прислали» и «прислали null» (`sometimes`+`nullable`, `?? null` вместо `array_key_exists`) |
 | `update-request-optional-fields` | PUT: поле в `UpdateRequest` необязательно к передаче (`nullable`/`sometimes` без `present`), а сервис пишет DTO целиком — неприсланное поле затирается `null` |
@@ -35,6 +35,11 @@
 | `service-status-branching-duplicated` | Ветвление по статусам (`if`/`elseif`) продублировано в нескольких методах вместо state machine |
 | `service-side-effect-timing-wrong` | Побочный эффект (Storage/HTTP/очередь) не снаружи транзакции или до записи вместо после |
 | `controller-manual-response-wrapper` | Ручная обёртка `['success' => true, 'data' => ...]` вместо `JsonResponse` ядра |
+| `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`superAppApi`) |
+| `request-access-check` | Проверка доступа (здание/организация пользователя) в правилах FormRequest вместо middleware |
+| `route-middleware-not-aliased` | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` |
+| `access-check-outside-middleware` | Права/контекст (здания, организация) вычисляются в контроллере или сервисе, а не в middleware → атрибуты запроса → `RequestHelper` |
+| `controller-response-macro` | Ответ через макрос/mixin фасада (`Response::ok()`, `Response::deleted()`) вместо `response()->json(...)` |
 | `controller-missing-swagger` | Эндпоинт без Swagger-аннотации или без `404`/`500` в ответах |
 | `controller-auth-via-facade` | `Auth::id()` в глубине сервиса вместо `request()->user()` в контроллере |
 | ~~`workflow-takes-repository-directly`~~ | не используется (O-7): workflow вправе брать репозитории напрямую; для Command/Query домена — `domain-cross-domain-access` |
@@ -57,6 +62,8 @@
 | `deploy-risk-flag-enabled` | Раскомментированный крон/включённый флаг — риск первого прогона на накопленных данных |
 | `mr-hygiene-lockfile-drift` | `composer.lock` не обновлён вместе с `composer.json`, либо сгенерированные файлы (`.php-cs-fixer.cache`, `storage/api-docs/*.json`) уехали в MR |
 | `ai-style-comment` | Комментарий-пересказ кода построчно, сгенерированный ИИ |
+| `enum-not-enumerable` | Enum не реализует `MPS\Core\Enums\Enumerable` / без `EnumerableTrait` |
+| `dto-enum-as-string` | Поле DTO с фиксированным набором значений хранится строкой, а не enum (сравнения через `->value`) |
 | `dto-setter-widened-type` | Тип аргумента сеттера DTO шире типа свойства (`int\|string`, ручное приведение) «на случай строк» — ядро приводит само |
 | `comment-restates-name` | Описание метода/класса пересказывает его имя («Неудалённые здания по набору id» над `findAliveByIds`) |
 

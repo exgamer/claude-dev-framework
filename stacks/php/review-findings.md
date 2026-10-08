@@ -13,7 +13,7 @@
 
 - `id`, `*_id` → `['integer', 'gt:0']`. Ноль и отрицательные проходят `integer` и дают пустой 404/500 вместо 422.
 - У чисел **и массивов** есть верхняя граница: `max:`, `between:`, `array|max:100`. Массив без лимита = DoS через тело запроса.
-- В `rules()` нет запросов к БД и вызовов сервисов — реквест не собирает данные, только валидирует.
+- В Request нет SQL-запросов и вызовов сервисов (P-17, `conventions.md` п. 9a): ни `exists:`/`unique:`/`Rule::exists()`/`Rule::unique()`, ни своих правил и замыканий с моделью, `DB::` или репозиторием, ни запросов в `prepareForValidation()`/`withValidator()`/`after()`. Существование — в сервисе/workflow через репозиторий, уникальность — уникальный индекс + проверка в сервисе.
 - Бизнес-правила («нельзя менять статус, если оплачен») — не в Request. Но **допустимые варианты значений** (enum) — как раз в реквесте: `Rule::in(Enum::values())` / `Rule::enum(Enum::class)`.
 - PUT — полные данные (`conventions.md`, п. 12): в `UpdateRequest` поля `required` / `present|nullable`. Необязательное поле при записи DTO целиком (`updateById($id, $dto->toArrayWithSnakeKeys())`) затирается `null` — так в `super_app` были `BuildingService::update`, `AgreementTransactionService::update` (AINA-2628). Тег `update-request-optional-fields`.
 
@@ -40,9 +40,14 @@
 
 - Тонкий. Имена методов — `index / view / create / update / delete`.
 - Нет ручной обёртки `['success' => true, 'data' => ...]` — её даёт `JsonResponse` ядра.
+- **Обёртка `success/data` в Response-классе или контроллере при `superAppApi`/`ApiResponseMiddleware` на маршруте** (AINA-2628: «не надо оборачивать, это делает мидлвар») — Response отдаёт только данные; в Swagger-описании метода контроллера обёртка `success`/`data` при этом описывается (это реальный формат ответа). Тег `response-double-wrap`, [ОШИБКА].
+- **Ответ через макрос фасада** (AINA-2628, blocking: «mixin для Response не юзаем») — `Response::ok($data)` / `Response::created()` / `Response::deleted()` из `Response::mixin(new JsonResponseMixin)` провайдера проекта. Grep по `use` такую зависимость не видит. Замена — `response()->json(new {E}Response(...), Response::HTTP_CREATED)` (`conventions.md`, п. 19). Тег `controller-response-macro`, [ОШИБКА].
 - Swagger на каждый эндпоинт, с `404` и `500` в ответах (см. `swagger.md`).
 - `per_page` в пагинации задаётся явно (в `SearchRequest` и в аннотации), не «по умолчанию где-то в ядре».
 - Текущий пользователь — `request()->user` / `$request->user()`, не `Auth::id()` в глубине сервиса.
+- **Middleware в маршруте через `::class`** (AINA-2628: «давай регать как остальные мидлвары») — свой middleware подключается строковым алиасом из `bootstrap/app.php` (`$middleware->alias`), как остальные (`conventions.md`, п. 20). Тег `route-middleware-not-aliased`, [ИНФО].
+- **Проверка доступа в FormRequest** (AINA-2628, blocking: «запрос в Request»; «валидация входных данных не место для проверки доступов») — правило вида `new AccessibleBuilding()` на `building_id`: ходит в БД за правами и дублирует middleware. Доступ к `building_id` из тела/фильтра проверяет middleware контекста (403), в Request — только `['required', 'integer', 'gt:0']`. Тег `request-access-check`, [ОШИБКА].
+- **Проверка прав в сервисе/контроллере** (AINA-2628: «проверка прав не совсем зона сервиса») — резолвер доступа в контроллере, параметр `$accessibleBuildingIds` в сервисе. Права и контекст — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр (`conventions.md`, п. 19a). Тег `access-check-outside-middleware`, [ОШИБКА].
 
 ## Workflows / UseCases / Commands
 
@@ -58,6 +63,7 @@
 ## DataObjects
 
 - Наследование `DataObject`, аргумент сеттера — `$value`, сборка через `fromArray()`, даты — `Carbon`, без логики.
+- **Enum-поле DTO строкой** (AINA-2628, question: «а почему бы в DTO сразу не сложить `OneCDictionaryTypeEnum`?») — `private ?string $type` + `getType() === TypeEnum::FIXED->value`. Свойство и сеттер — enum, ядро приводит строку само (`mps-core/data-objects.md`). Тег `dto-enum-as-string`, [ВНИМАНИЕ].
 - **Тип сеттера шире свойства** (AINA-2628, blocking: «эти все типы прям нужны?») — `setQuantity(int|float|string|null $value)` с ручным `(float)` при свойстве `?float`. Строки из формы `fromArray()` приводит сам (`mps-core/data-objects.md`), сеттер — `float|null`. Тег `dto-setter-widened-type`, [ВНИМАНИЕ].
 - Сложная сборка DTO (из нескольких источников) — в фабрику, не в конструктор DTO и не в контроллер.
 - **Известное расхождение:** суффикс `DTO` (как в `data-objects.md`) vs `Dto` — в `parking_system` ревьюеры требуют `*Dto`. Внутри одного репозитория держать один вариант; при ревью не выбирать молча — назвать оба и предложить зафиксировать.
@@ -66,6 +72,7 @@
 
 - Описание класса и свойств (docblock) обязательны.
 - Логика внутри enum (`match` с бизнес-решениями, обращения к сервисам) — реджект; допустимы только `labels()`/`values()`-подобные вещи.
+- **Enum без `Enumerable`** (AINA-2628, nit: «Имплементить Enumerable из mps/core») — каждый enum: `implements \MPS\Core\Enums\Enumerable` и `use EnumerableTrait;` первой строкой тела (`mps-core/enums.md`). Тег `enum-not-enumerable`, [ИНФО].
 - Eloquent-связи (`BelongsTo`, `HasMany`) в моделях не используются — данные собираются через репозитории и `expanded`.
 - Модель лежит в домене/инфраструктуре **своей** сущности, не рядом с тем, кто её первым использовал.
 - **Известное расхождение (superapp-api):** `MPS\Core\Enums\EnumerableTrait::labels()` vs `App\Traits\EnumLabelTranslatable::getLabels()` — две конвенции, не сводить молча.

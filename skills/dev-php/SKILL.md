@@ -11,7 +11,7 @@ trigger: /dev-php
 
 ## Шаг 1 — Правила
 
-Прочитай `{DF}/core/principles.md`, `{DF}/core/style.md`, `{DF}/architecture/layers.md`, `{DF}/stacks/php/structure.md`, `conventions.md`, `style.md`, нужные `mps-core/*.md` (`data-objects.md`, `repository.md`, `service.md`, `transactions.md`, `exceptions.md`, `http.md`, `swagger.md`, `migrations.md`, `jobs.md`, `tests.md`, `rules.md`), по теме — `{DF}/approaches/patterns/*.md`. Локальные `.claude/dev-rules.md` проекта главнее.
+Прочитай `{DF}/core/principles.md`, `{DF}/core/style.md`, `{DF}/architecture/layers.md`, `{DF}/stacks/php/structure.md`, `conventions.md`, `style.md`, нужные `mps-core/*.md` (`enums.md` — если есть enum, `data-objects.md`, `repository.md`, `service.md`, `transactions.md`, `exceptions.md`, `http.md`, `swagger.md`, `migrations.md`, `jobs.md`, `tests.md`, `rules.md`), по теме — `{DF}/approaches/patterns/*.md`. Локальные `.claude/dev-rules.md` проекта главнее.
 
 ## Шаг 2 — Задача
 
