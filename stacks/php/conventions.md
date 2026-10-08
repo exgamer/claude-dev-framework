@@ -47,6 +47,28 @@
     'currency' => ['present', 'nullable', Rule::enum(CurrencyEnum::class)],
     ```
 
+12a. **Без методов-обёрток над одной проверкой или одним вызовом** (**[ВНИМАНИЕ]**). `findByIdOrFail()`, `assertValid()`, `getById()`, который только вызывает метод своего репозитория, — не заводятся: в месте использования — `get`, возвращающий `?Model`, и явная проверка с исключением; вызов валидатора — там, где нужен; внутри сервиса — репозиторий напрямую, workflow берёт репозиторий напрямую (O-7).
+
+    ```php
+    // плохо
+    $dictionary = $this->service->findByIdOrFail($id, $buildingIds);
+    $this->assertValid($dto);
+
+    // хорошо
+    $dictionary = $this->repository->getByIdInBuildings($id, $buildingIds);
+    if (! $dictionary) {
+        throw new NotFoundAppException('Запись справочника 1С не найдена');
+    }
+
+    $errors = OneCDictionaryDtoValidator::validate($dto);
+    if ($errors) {
+        throw new ValidationAppException('VALIDATION ERROR', $errors);
+    }
+    ```
+12b. **Значения-ключи — enum, не константы** (**[ВНИМАНИЕ]**). Имена атрибутов и заголовков запроса, теги кэша, ключи параметров — кейсы enum (`RequestHeaderEnum::BUILDING_ID`, с `Enumerable`). Константы в интерфейсах (репозитория, сервиса) — **[ОШИБКА]**. Имя обычного поля/фильтра (`'building_id'`, `'name'`) — строкой, как остальные поля. Приватная константа класса допустима только для настройки, которую enum не выразит (массив, значение по умолчанию: `DEFAULT_SORT = ['-id']`).
+12c. **Список: сортировка параметром + по умолчанию** (**[ВНИМАНИЕ]**). `IndexRequest` объявляет `protected array $sortAttributes` (ядро разбирает `?sort=name,-id` и проверяет поля), сервис ставит сортировку по умолчанию (`$params['sort'] ??= ['-id']`), параметр `sort` описан в Swagger. Без `ORDER BY` порядок страниц в Postgres не гарантирован.
+12d. **Фильтры `IndexRequest` = фильтры репозитория** (**[ВНИМАНИЕ]**). Каждое поле из `filterRules()` применяется в `filterSearch()` репозитория, и наоборот; поле, которое валидируется, но не фильтрует, — убрать (а не переносить из легаси «как было»).
+
 ## Ошибки
 
 13. **Только исключения ядра:** `NotFoundAppException`, `ValidationAppException`, `BadRequestAppException`, `AccessDeniedAppException`, `OperationFailedAppException`. `\Exception`, `\RuntimeException` — **[ОШИБКА]**; `new AppException(..., AppErrorTypeEnum::X)` при наличии готового класса — **[ВНИМАНИЕ]** (решение P-12).
@@ -62,7 +84,7 @@
 
 18. Каждый эндпойнт описан OpenAPI-атрибутами: `#[OA\Get|Post|Put|Delete]` на методе контроллера, `#[OA\Schema]` на Request и Response, `#[OA\Parameter]` на `IndexRequest` для query-параметров. Тег — `'{Context} {Подпроект}: {Сущность}'`.
 19. Ответ — `response()->json(new {E}Response($item), 201|200)`, удаление — `response()->json(null, 204)`, список — `PaginateResource::make($service->search($search))`. Обёртку `success/data` добавляет `ApiResponseMiddleware`; Response-классы и контроллер обёртку **не собирают** — маршрут обязан стоять под `ApiResponseMiddleware` (в `superapp-api` алиас `superAppApi`); в Swagger-атрибутах метода контроллера `success`/`data` описываются, т.к. это фактический формат ответа. **Макросы и mixin на фасадах** (`Response::ok()`, `Response::created()`, `Response::deleted()` — `Response::mixin(...)`/`macro(...)` в провайдере проекта) — **[ОШИБКА]**: скрытая глобальная зависимость без `use`, существует только при загруженном провайдере, формат ответа спрятан вне точки входа. Только `response()->json(...)` с явным кодом (`Symfony\Component\HttpFoundation\Response::HTTP_*`).
-19a. **Права и контекст запроса — в middleware, не в сервисе** (**[ОШИБКА]**). Middleware своего контекста (Admin, CRM, Mobile — у каждого свой, без `if` по гвардам) проверяет доступ (нет пользователя — 401, чужое здание/организация из заголовка **или из параметров запроса** — `building_id` в теле или фильтре — 403) и кладёт готовый контекст в `$request->attributes` — не в query/тело: клиент атрибуты не подменит, поля тела не перезаписываются. Контроллер читает контекст через статический `RequestHelper` подпроекта: методы `get*`, запрос — явным аргументом `Request $request` (как `RequestHelper::getCurrentCompanyId($request)` в catalog-service), например `RequestHelper::getBuildingIds($request)` и передаёт в сервис **как обычный фильтр** (`?array $buildingIds`, null — без ограничения). Сервис и репозиторий про права и пользователей не знают, фильтр применяется в запросе (`whereIn`), чужая запись по id — 404. `RequestHelper` без выставленного атрибута бросает исключение, а не возвращает null («нет middleware» ≠ «без ограничения»).
+19a. **Права и контекст запроса — в middleware, не в сервисе** (**[ОШИБКА]**). Middleware своего контекста (Admin, CRM, Mobile — у каждого свой, без `if` по гвардам) проверяет доступ (нет пользователя — 401, чужое здание/организация из заголовка **или из параметров запроса** — `building_id` в теле или фильтре — 403) и кладёт готовый контекст в `$request->attributes` — не в query/тело: клиент атрибуты не подменит, поля тела не перезаписываются. Контроллер читает контекст через статический `RequestHelper` подпроекта: методы `get*`, запрос — явным аргументом `Request $request` (как `RequestHelper::getCurrentCompanyId($request)` в catalog-service), например `RequestHelper::getBuildingIds($request)` и передаёт в сервис **как обычный фильтр**: в поиске — сразу параметром `SearchDataObject` в контроллере (`setParams([...$request->validated(), 'building_ids' => RequestHelper::getBuildingIds($request)])`, сервис — `search(SearchDataObject $dto)` без отдельного аргумента), в операциях по id — аргументом (`?array $buildingIds`, null — без ограничения). Сервис и репозиторий про права и пользователей не знают, фильтр применяется в запросе (`whereIn`), чужая запись по id — 404. `RequestHelper` без выставленного атрибута бросает исключение, а не возвращает null («нет middleware» ≠ «без ограничения»).
 
     ```php
     // плохо: сервис/контроллер сами вычисляют доступ

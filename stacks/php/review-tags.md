@@ -36,6 +36,11 @@
 | `service-side-effect-timing-wrong` | Побочный эффект (Storage/HTTP/очередь) не снаружи транзакции или до записи вместо после |
 | `controller-manual-response-wrapper` | Ручная обёртка `['success' => true, 'data' => ...]` вместо `JsonResponse` ядра |
 | `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`superAppApi`) |
+| `service-thin-wrapper` | Метод-обёртка над одной проверкой/вызовом (`findByIdOrFail`, `assertValid`, `getById` → свой репозиторий) |
+| `constant-not-enum` | Значение-ключ константой класса/интерфейса вместо enum |
+| `search-filter-outside-dto` | Фильтр поиска передан отдельным аргументом и вписывается в параметры внутри сервиса |
+| `list-without-default-sort` | Список без `$sortAttributes` и сортировки по умолчанию |
+| `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не применяется в `filterSearch` |
 | `request-access-check` | Проверка доступа (здание/организация пользователя) в правилах FormRequest вместо middleware |
 | `route-middleware-not-aliased` | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` |
 | `access-check-outside-middleware` | Права/контекст (здания, организация) вычисляются в контроллере или сервисе, а не в middleware → атрибуты запроса → `RequestHelper` |
