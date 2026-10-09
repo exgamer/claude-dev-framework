@@ -43,7 +43,7 @@
 | `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не применяется в `filterSearch` |
 | `request-access-check` | Проверка доступа (здание/организация пользователя) в правилах FormRequest вместо middleware |
 | `route-middleware-not-aliased` | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` |
-| `access-check-outside-middleware` | Права/контекст (здания, организация) вычисляются в контроллере или сервисе, а не в middleware → атрибуты запроса → `RequestHelper` |
+| `access-check-outside-middleware` | Права/контекст (роль или право на операцию, здания, организация) проверяются или вычисляются в контроллере или сервисе, а не в middleware на маршруте → атрибуты запроса → `RequestHelper` (для Go — тот же тег) |
 | `controller-response-macro` | Ответ через макрос/mixin фасада (`Response::ok()`, `Response::deleted()`) вместо `response()->json(...)` |
 | `controller-missing-swagger` | Эндпоинт без Swagger-аннотации или без `404`/`500` в ответах |
 | `controller-auth-via-facade` | `Auth::id()` в глубине сервиса вместо `request()->user()` в контроллере |
