@@ -12,7 +12,7 @@
 4. **Репозиторий возвращает модель.** `{E}RepositoryInterface` может возвращать Eloquent-модель `Infrastructure/Postgres/{D}/{M}/Models/{E}` (решение P-4) — сервисы и workflow работают с ней. Модель не уходит в ответ напрямую: только через `{E}Response`.
 5. **Интерфейсы:** `RepositoryInterface` — всегда; `ServiceInterface` — всегда; Command/Query — без интерфейса, пока его не подменяют в тестах и не инжектируют через границу домена.
 6. **Зависимости — через конструктор**, `private readonly`, тип — интерфейс. `app()`/`resolve()` внутри бизнес-кода запрещены.
-7. **DI — только через `definitions.php`** (домен — `Domains/{D}/definitions.php`, репозитории — `Infrastructure/Postgres/{D}/Providers/definitions.php`). `$this->app->bind()` в провайдерах — только для подпроектных портов с переопределением извне (как `ParkingAccessResolverInterface`).
+7. **DI — только через `definitions.php`** (домен — `Domains/{D}/definitions.php`, репозитории — `Infrastructure/Postgres/{D}/Providers/definitions.php`). `$this->app->bind()` в провайдерах — только для подпроектных портов с переопределением извне (как `ParkingAccessResolverInterface`). Сервис со списком реализаций (фабрика драйверов) — значение-замыкание, внутри которого собирается список: `AppHelper` вызывает callable при загрузке, поэтому `fn () => new Factory(new ZipDriver())` создаст объекты сразу — нужен вложенный `fn () => fn () => …` или фабрика через `get()` (AINA-2744).
 8. **Контексты не пересекаются.** Логика для Admin и Mobile отличается → отдельный сервис/репозиторий в контексте со своим интерфейсом; `if ($isAdmin)` и «универсальный» сервис с флагами запрещены (регламент проекта, п. 5).
 
 ## Логика, отличающаяся по контексту
@@ -71,7 +71,7 @@
 
 ## Ошибки
 
-13. **Только исключения ядра:** `NotFoundAppException`, `ValidationAppException`, `BadRequestAppException`, `AccessDeniedAppException`, `OperationFailedAppException`. `\Exception`, `\RuntimeException` — **[ОШИБКА]**; `new AppException(..., AppErrorTypeEnum::X)` при наличии готового класса — **[ВНИМАНИЕ]** (решение P-12).
+13. **Только исключения ядра:** `NotFoundAppException`, `ValidationAppException`, `BadRequestAppException`, `AccessDeniedAppException`, `OperationFailedAppException`. `\Exception`, `\RuntimeException` — **[ОШИБКА]**; `new AppException(..., AppErrorTypeEnum::X)` при наличии готового класса — **[ВНИМАНИЕ]** (решение P-12). Технический компонент, которому нужны различимые категории ошибок (архивы, файлы, интеграция), заводит `final`-наследников **готовых** классов ядра (`ArchiveNotFoundException extends NotFoundAppException`) и общий маркер-интерфейс компонента; прямой наследник `AppException` — нет (AINA-2744). Валидатор, отдающий результат вместо исключений, ловит категории компонента и `\ErrorException` (warning под Laravel), но не `\Throwable` — ошибки кода не скрываются.
 14. Сообщения для клиента — по-русски (`'Тариф не найден'`).
 15. `@throws` у каждого метода, который бросает.
 

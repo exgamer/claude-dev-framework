@@ -67,7 +67,7 @@ parking_app/                                   ← корень подпроек
 
 **Infrastructure — всегда с типом** (решение P-10): `Infrastructure/{Postgres,Redis,Http,RabbitMQ,…}/…`. `Infrastructure/{Domain}/` без типа (как `super_app/Infrastructure/Acms`, `Infrastructure/User/Models`) в новом коде — **[ВНИМАНИЕ]**.
 
-**`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` (как в `super_app`) в новом коде не заводится.
+**`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` (как в `super_app`) в новом коде не заводится. Техническая библиотека подпроекта без бизнес-логики (над расширением PHP или ФС: архивы, файлы) — `Core/{Lib}/{Services,Drivers,DTO,Enums,Exceptions}`, интерфейсы рядом с реализацией, регистрация — `Core/definitions.php` (AINA-2744).
 
 **Слой `Contexts/` из `Backend_Architecture_Reglament.md` проекта = `Entrypoints/`** (решение P-9): отдельной папки `Contexts/` нет, контекст — первый уровень внутри `Entrypoints/` (`Entrypoints/Admin/…`). Пустую `parking_app/Contexts/` образцом не считать.
 
@@ -153,5 +153,8 @@ parking_app/                                   ← корень подпроек
 | unit: сервис, валидатор, Command/Query, компонент | `tests/Unit/{Подпроект}/…`, путь повторяет путь класса: `tests/Unit/ParkingApp/Domains/Billing/Tariffs/TariffDtoValidatorTest.php` |
 | feature: HTTP через приложение, БД | `tests/Feature/{Подпроект}/{Context}/{Domain}/…`, как `tests/Feature/ParkingApp/Lpm/…` |
 | моки зависимостей | `mock` в `definitions.php` (как `NoopTransactionManager`) |
+| интеграционный без HTTP и БД (несколько процессов, реальная ФС) | рядом с unit-тестами компонента, `#[Group('integration')]`; обработчик подпроцесса — `Fixtures/` рядом (AINA-2744) |
+
+Большие тестовые данные (бомба, файл на десятки МБ) — разреженный файл (`ftruncate`) или поток, не строка в памяти: `str_repeat` на 50 МБ вместе с Laravel превышает `memory_limit` 128M и роняет весь набор (AINA-2744).
 
 Тест внутри подпроекта (`parking_app/…/Tests/`) в новом коде — **[ВНИМАНИЕ]**. Известный случай: `TariffCalculatorTest` лежит рядом с кодом, а набор «Tariff Component» в `phpunit.xml` указывает на несуществующий `parking_app/Domains/Billing/src/`, поэтому тест не запускается.
