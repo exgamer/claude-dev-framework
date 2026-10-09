@@ -23,10 +23,23 @@ trigger: /dev-review
 
 ## Шаг 2 — Правила стека
 
-- Go: `{DF}/stacks/go/checklist.md` (первой), `{DF}/stacks/go/{structure,conventions,style,review-findings,security,review-checks}.md`, `{DF}/stacks/go/go-sdk/capabilities.md`, нужные `go-sdk/*.md`, эталон `{DF}/stacks/go/examples/tariff/`.
-- PHP: `{DF}/stacks/php/checklist.md` (первой), `{DF}/stacks/php/{structure,conventions,style,review-findings,security,review-checks,review-tags}.md`, `{DF}/stacks/php/mps-core/capabilities.md`, нужные `mps-core/*.md`, эталон `{DF}/stacks/php/examples/`.
-- Всегда: `{DF}/core/*.md`, `{DF}/architecture/*.md`, `{DF}/regulations/*.md`; локальные `.claude/dev-rules.md` проекта главнее.
-- API сверять со справочником версии проекта (`reference/`; Go — версии из `go.mod`, PHP — из `composer.lock`), при отсутствии — пересобрать `{DF}/tools/sdk-ref/`.
+Правила грузятся по задетым слоям, как у разработчика, — не всё сразу (контекст ревьюера иначе 100k+ токенов).
+
+**Всегда** (`<stack>` = `go` | `php`): `{DF}/stacks/<stack>/checklist.md` (первой — памятка, по ней идёт основная проверка), `security.md`, `review-checks.md`, `{DF}/core/principles.md`, `{DF}/core/style.md`, `{DF}/core/decisions.md` (открытые споры и ключевые решения), `{DF}/stacks/<stack>/go-sdk/capabilities.md` / `mps-core/capabilities.md`; локальные `.claude/dev-rules.md` проекта главнее. PHP — ещё `review-tags.md`.
+
+**По задетому в диффе** — нужные разделы (по заголовкам, не файл целиком):
+- расположение/новые файлы → `structure.md`;
+- пункт памятки, который код задевает, → раздел `conventions.md` / `style.md` по ссылке из пункта;
+- слой/пакет SDK или ядра → `go-sdk/<слой>.md` / `mps-core/<тема>.md`;
+- платежи, HTTP-роуты, статусы/enum, транзакции, данные → соответствующие разделы `review-findings.md` (платёжные пути — раздел «Платёжные хендлеры» обязательно);
+- API/контракт, миграции, git-гигиена → `{DF}/regulations/{rest-api,entity,contracts,git}.md`;
+- граница доменов, workflow, интеграция → `{DF}/architecture/*.md`;
+- транзакции, конкурентность, производительность, кэш, outbox → `{DF}/approaches/patterns/*.md`, на которые ссылается `design.md`;
+- подозрение на расхождение формы с эталоном → соответствующий файл `{DF}/stacks/<stack>/examples/`, не весь модуль.
+
+API сверять со справочником версии проекта (`reference/`; Go — версии из `go.mod`, PHP — из `composer.lock`) — **поиском по имени класса/функции (`grep`), файл целиком не читать**; справочника нужной версии нет — пересобрать `{DF}/tools/sdk-ref/`.
+
+**Повторный круг** (в цепочке `/dev`, круг 2+): правила заново не грузить; проверяются (1) каждая находка прошлого круга — закрыта или нет, (2) только изменённый с прошлого круга код (`git diff` от состояния прошлого круга — оркестратор даёт список файлов) по тем же правилам. Отчёт — дописывается в тот же `review.md` разделом «Круг N».
 
 ## Шаг 3 — Ревью, отчёт, сохранение
 

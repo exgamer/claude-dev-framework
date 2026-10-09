@@ -17,7 +17,7 @@ trigger: /dev-security
 
 ## Шаг 1 — Процедура и правила
 
-Прочитай `{DF}/approaches/process/security.md` — чувствительные зоны, таблица вопросов модели угроз, формат `threats.md`, процедура аудита. Затем `{DF}/core/principles.md`, `{DF}/stacks/<stack>/security.md`, `{DF}/stacks/<stack>/review-findings.md`, `{DF}/architecture/integrations.md`, `{DF}/approaches/patterns/idempotency.md`, `outbox.md`; готовые механизмы — `{DF}/stacks/go/go-sdk/capabilities.md` или `{DF}/stacks/php/mps-core/capabilities.md`. Стек: `go.mod` с `gosdk-*` → Go, `composer.json` с `mps/core` → PHP.
+Прочитай `{DF}/approaches/process/security.md` — чувствительные зоны, таблица вопросов модели угроз, формат `threats.md`, процедура аудита. Затем `{DF}/core/principles.md`, `{DF}/stacks/<stack>/security.md`, `{DF}/architecture/integrations.md`, `{DF}/approaches/patterns/idempotency.md`, `outbox.md`; готовые механизмы — `{DF}/stacks/go/go-sdk/capabilities.md` или `{DF}/stacks/php/mps-core/capabilities.md`. В режиме `audit` — ещё `{DF}/stacks/<stack>/review-findings.md` (разделы про платежи, роуты, данные); в режиме `design` он не нужен. Стек: `go.mod` с `gosdk-*` → Go, `composer.json` с `mps/core` → PHP.
 
 ## Шаг 2a — `design`
 
