@@ -133,7 +133,7 @@ parking_app/                                   ← корень подпроек
 | Доменная модель | `entity.go` (чистая структура) | Eloquent-модель из Infrastructure — разрешено (решение P-4) |
 | DTO | `dto.go` | `DTO/{E}Dto.php extends DataObject` |
 | Репозиторий | интерфейс в домене, `PostgresRepository` в infra | `{E}RepositoryInterface extends CRUDRepositoryInterface`, `{E}Repository extends CRUDRepository` |
-| Маппер | `mapper.go` на каждом слое | нет: `DataObject::toArrayWithSnakeKeys()` / `fromArray()`, ответ — `JsonResource` |
+| Маппер | `mapper.go` на каждом слое | нет: запрос → DTO — `fromArray()`; DTO → колонки — явным списком внутри репозитория (`conventions.md` п. 11a); ответ — `JsonResource` |
 | Большая операция внутри домена | `domains/{d}/{m}/{action}_command.go` / `_query.go`, метод `Exec` | `Domains/{D}/Modules/{M}/Commands/{Action}Command.php` / `Queries/…Query.php`, метод `execute` |
 | Междоменная логика | `workflows/{d}/{m}/{action}_workflow.go`, метод `Exec` | `Workflows/{D}/{M}/{Action}Workflow.php`, метод `execute()` |
 | Ошибки | `exception.New*Exception` → `response.ErrorResponse` | `MPS\Core\Exceptions\*AppException` → `ApiResponseMiddleware` |

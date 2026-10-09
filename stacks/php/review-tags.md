@@ -22,9 +22,11 @@
 | `request-missing-vs-null-not-distinguished` | Не различает «поле не прислали» и «прислали null» (`sometimes`+`nullable`, `?? null` вместо `array_key_exists`) |
 | `update-request-optional-fields` | PUT: поле в `UpdateRequest` необязательно к передаче (`nullable`/`sometimes` без `present`), а сервис пишет DTO целиком — неприсланное поле затирается `null` |
 | `repository-bypasses-core-query` | `Model::query()`/`DB::table()` вместо `$this->getQuery()` |
-| `repository-missing-or-fail` | Нет `*OrFail` там, где метод гарантирует возврат ресурса |
+| `write-array-instead-of-dto` | Данные на запись передаются массивом вместо DTO/типизированных аргументов: контроллер → сервис/workflow (`$request->validated()`, `->all()`), сервис/Command/workflow → репозиторий (`create($data)`, `updateById($id, $dto->toArray…())`, литерал `['col' => $v]`) (`conventions.md` п. 11a, P-18) |
+| ~~`repository-missing-or-fail`~~ | не используется: `*OrFail`-методы не заводятся (`conventions.md` п. 12a) — сам `*OrFail` находка с тегом `service-thin-wrapper` |
 | `repository-returns-mapped-structure` | Repository делает `keyBy`/`map`/сборку структур вместо сырых данных |
-| `repository-cross-domain-access` | Repository обращается к таблице/репозиторию чужого домена напрямую |
+| `expanded-param-used` | Параметр `expanded`/`{E}ExpandEnum`/`hasExpand()` — клиент выбирает состав ответа; связанные данные — всегда, методом своего репозитория пачкой по id (`conventions.md`, «Модели и внешние системы») |
+| `repository-cross-domain-access` | Repository пишет в таблицу чужого домена, вызывает его репозиторий или несёт его бизнес-логику; read-only подзапрос (`EXISTS`/`JOIN`) с комментарием, чья таблица, — не находка (`architecture/cross-domain.md`) |
 | `repository-reinvents-core-helper` | Самописная обёртка вместо готового `QueryFilters\V2`/`PaginatedQueryHelper`/`LogAwareTrait` из core |
 | `service-direct-db-query` | Прямой `DB::`/`Model::where` в сервисе вместо репозитория |
 | ~~`service-orchestrates-foreign-repository`~~ | не используется (O-7): сервис домена не трогает чужой домен ни через репозиторий, ни через сервис — тег `domain-cross-domain-access` |
@@ -36,7 +38,7 @@
 | `service-side-effect-timing-wrong` | Побочный эффект (Storage/HTTP/очередь) не снаружи транзакции или до записи вместо после |
 | `controller-manual-response-wrapper` | Ручная обёртка `['success' => true, 'data' => ...]` вместо `JsonResponse` ядра |
 | `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`superAppApi`) |
-| `service-thin-wrapper` | Метод-обёртка над одной проверкой/вызовом (`findByIdOrFail`, `assertValid`, `getById` → свой репозиторий) |
+| `service-thin-wrapper` | Метод-обёртка над одной проверкой/вызовом в сервисе или репозитории (`findByIdOrFail`/любой `*OrFail`, `assertValid`, внутренний `getById` → свой репозиторий); публичный `findById(): ?Model` для точки входа — не находка |
 | `constant-not-enum` | Значение-ключ константой класса/интерфейса вместо enum |
 | `search-filter-outside-dto` | Фильтр поиска передан отдельным аргументом и вписывается в параметры внутри сервиса |
 | `list-without-default-sort` | Список без `$sortAttributes` и сортировки по умолчанию |
@@ -63,7 +65,9 @@
 | `n-plus-one-query` | Запрос к БД внутри цикла вместо пачки по `ids` |
 | `bulk-operation-not-chunked` | Большая выборка/массовая операция без `chunk()`/`cursor()`/батчей |
 | `in-memory-state-not-shared` | Кэш/дедупликатор/счётчик в памяти процесса — ломается при 2+ инстансах |
-| `enum-list-drift` | Новое значение enum не отражено во всех местах, где перечислен старый набор (`in:`, swagger `enum:`, словари фронта) |
+| `enum-list-drift` | Новое значение enum не отражено во всех местах, где перечислен старый набор (`in:`, swagger `enum:`, словари фронта, мапперы/allowlist/`match` по этому enum) |
+| `legacy-pattern-copied` | Из легаси или соседнего кода перенесена реализация вопреки правилу стека (слой проверки, форма класса, фильтр, валидация) — в коде или в артефакте (`threats.md`, `design.md`) (`approaches/process/legacy-refactor.md`, O-17) |
+| `scope-param-defaults-unrestricted` | Параметр скоупа в сигнатуре сервиса/репозитория с умолчанием `= null` («без ограничения») — fail-open для будущих вызовов (`security.md`, `tenant-scope-missing`) |
 | `deploy-risk-flag-enabled` | Раскомментированный крон/включённый флаг — риск первого прогона на накопленных данных |
 | `mr-hygiene-lockfile-drift` | `composer.lock` не обновлён вместе с `composer.json`, либо сгенерированные файлы (`.php-cs-fixer.cache`, `storage/api-docs/*.json`) уехали в MR |
 | `ai-style-comment` | Комментарий-пересказ кода построчно, сгенерированный ИИ |

@@ -33,20 +33,6 @@ enum YourStatusEnum: int implements Enumerable
 }
 ```
 
-## ExpandEnum
-
-Используется для управления загрузкой связей через `expanded` параметр в Repository.
-
-```php
-enum YourExpandEnum: string implements Enumerable
-{
-    use EnumerableTrait;
-
-    case RELATION = 'relation';
-    case ANOTHER  = 'another';
-}
-```
-
 ## Swagger-аннотация
 
 ```php

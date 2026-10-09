@@ -125,11 +125,11 @@ throw (new BadRequestAppException('...'))
 
 | Слой | Что допустимо |
 |---|---|
-| Repository | `NotFoundAppException` — если метод гарантирует возврат |
+| Repository | Не бросать «не найдено» — `?Model`, `NotFoundAppException` бросает вызывающий (`../conventions.md` п. 12a) |
 | Service | Любое бизнес-исключение |
 | Command | Любое бизнес-исключение |
 | Job | `OperationFailedAppException`, `NotFoundAppException` |
-| Controller | Не бросать — только передавать в Service/Command |
+| Controller | Только перевод результата сервиса в HTTP: `NotFoundAppException`, если сервис вернул `null` (решение об ответе — у точки входа; из консоли/очереди «нет записи» обрабатывается по-своему). Бизнес-исключений (`BadRequestAppException`, `ValidationAppException` по инвариантам, проверки статусов) не бросает — это логика сервиса |
 | Request | `ValidationAppException` — через `failedValidation()` |
 
 `InvalidConfigurationAppException` — только в инфраструктурном и системном коде

@@ -25,6 +25,7 @@
 ## Модели и внешние системы
 
 - **Eloquent-связей в моделях нет** (`BelongsTo`, `HasMany`…): связанные данные собираются через репозитории (тег `model-has-eloquent-relations`). Так во всех моделях `parking_app` и `super_app`.
+- **Параметра `expanded` нет** (тег `expanded-param-used`): состав ответа фиксирован эндпойнтом; связанные данные сервис дочитывает всегда методом своего репозитория пачкой по id, другой домен — workflow, другой состав — отдельный эндпойнт (`mps-core/service.md`).
 - **Клиент внешней системы — `{System}{Purpose}Gateway`** в `Infrastructure/Http/…` (`LpmIntercomGateway`, `LpmCameraGateway`), не `*Service` (тег `gateway-named-as-service`). В Go тот же слой называется `Repository` (`stacks/go/conventions.md`, п. 14) — различие стеков, не ошибка.
 - Конфиг Gateway — через конструктор; отсутствует обязательный — `InvalidConfigurationAppException`, не молчаливый дефолт.
 
@@ -33,11 +34,24 @@
 9. **Форма запроса — в FormRequest** (`rules()`): типы, обязательность, `gt:0` для id, `max:` для строк/массивов, `Rule::enum()`. Без проверки доступа (правило «здание доступно админу» и т. п. — в middleware, п. 19a): FormRequest отвечает на «данные в правильном формате?», а не «можно ли этому пользователю?».
 9a. **В Request нет SQL-запросов** (решение P-17, **[ОШИБКА]**, тег `request-queries-db`). Запрещены правила, которые ходят в БД: `exists:`, `unique:`, `Rule::exists()`, `Rule::unique()`, свои `Rule`/замыкания с `Model::`/`DB::`/репозиторием/сервисом. То же в `prepareForValidation()`, `withValidator()`, `after()`. Причины: валидация зависит от схемы БД и обходит репозиторий и домен; при вызове из консоли или очереди проверки нет; между проверкой и записью данные могут измениться. Куда переносить:
    - **существование** связанной записи — сервис/workflow через репозиторий: `NotFoundAppException` или `ValidationAppException` с ошибкой по полю (как `CreateTariffWorkflow`);
-   - **уникальность** — уникальный индекс в БД (защищает от гонки, `approaches/patterns/concurrency.md`) плюс проверка в сервисе/`{E}DtoValidator` для понятной ошибки;
+   - **уникальность** — уникальный индекс в БД (защищает от гонки, `approaches/patterns/concurrency.md`) плюс проверка в сервисе через репозиторий для понятной ошибки (валидатор в БД не ходит, п. 10);
    - **принадлежность** записи пользователю — скоуп в запросе репозитория (`security.md`).
-10. **Доменные инварианты — в `{E}DtoValidator::validate($dto): array`** (решение P-8; inline-проверки в сервисе/workflow, как в части `super_app`, — **[ВНИМАНИЕ]**) (статический, `final`), сервис бросает `ValidationAppException('VALIDATION ERROR', $errors)`. Формат ошибок — `['field' => ['сообщение']]`.
-11. **Между слоями — DTO, не массив.** `DataObject` с private-свойствами, геттерами и fluent-сеттерами (`return $this`). В репозиторий уходит `$dto->toArrayWithSnakeKeys()`.
-12. **PUT — полные валидные данные** (O-10, **[ОШИБКА]**). В `UpdateRequest` каждое поле `required`, а очищаемое — `present|nullable`; сервис пишет `$dto->toArrayWithSnakeKeys()` целиком. `DataObject` отдаёт `null` и за неприсланные свойства, поэтому необязательное поле в `UpdateRequest` (`nullable`/`sometimes` без `present`) при записи DTO целиком затирает данные `null`. Обходы — список пришедших полей рядом с DTO, отслеживание пришедших полей в DTO, `array_filter(!is_null)` — не применять.
+10. **Доменные инварианты — в `{E}DtoValidator::validate($dto): array`** (решение P-8; inline-проверки в сервисе/workflow, как в части `super_app`, — **[ВНИМАНИЕ]**) (статический, `final`, `Domains/{D}/Modules/{M}/Validators/`; не сервис — без зависимостей и БД, в DI не регистрируется, `architecture/layers.md`), сервис бросает `ValidationAppException('VALIDATION ERROR', $errors)`. Формат ошибок — `['field' => ['сообщение']]`.
+11. **Между слоями — DTO, не массив.** `DataObject` с private-свойствами, геттерами и fluent-сеттерами (`return $this`). В репозиторий уходит DTO (п. 11a).
+11a. **Данные на запись — DTO по всей цепочке, не массив** (решение P-18, **[ОШИБКА]**, тег `write-array-instead-of-dto`). Контроллер → сервис/workflow: `{E}Dto::make()->fromArray($request->validated())` (или фабрика DTO), не `$request->validated()`/`->all()`/массив аргументом. Сервис/Command/workflow → репозиторий: DTO, ни `$dto->toArray…()`, ни литерал `['col' => $v]` в вызове, ни `create()`/`update()`/`updateById()` ядра с массивом. Методы записи репозитория — с DTO (`createFromDto({E}Dto $dto)`, `updateFromDto({E} $model, {E}Dto $dto)` — модель, которую вызывающий уже нашёл и проверил (п. 12a: репозиторий «не найдено» не бросает); имена `create`/`update` заняты ядром с `array`); DTO → колонки — внутри репозитория явным списком, модель с casts — `fill()->save()` (`mps-core/rules.md`, «Запись»). Значения, которые решает сервис (статус при создании), — типизированными аргументами рядом с DTO; одно-два поля (флаг) — отдельный типизированный метод (`setDefault(int $id, bool $isDefault)`). Почему: массив обходит `$fillable` и casts, состав данных не виден в сигнатуре (AINA-2978). Эталон — `TariffController` → `TariffCrudService` → `TariffRepository`.
+
+    ```php
+    // плохо
+    $this->service->update($id, $request->validated());
+    $this->repository->updateById($id, $dto->toArrayWithSnakeKeys());
+    $this->repository->updateById($tariff->id, ['is_default' => true]);
+
+    // хорошо
+    $this->service->update($id, TariffDto::make()->fromArray($request->validated()));
+    $this->repository->updateFromDto($tariff, $dto);
+    $this->repository->setDefault($tariff->id, true);
+    ```
+12. **PUT — полные валидные данные** (O-10, **[ОШИБКА]**). В `UpdateRequest` каждое поле `required`, а очищаемое — `present|nullable`; сервис пишет DTO целиком (`updateFromDto`, п. 11a). `DataObject` отдаёт `null` и за неприсланные свойства, поэтому необязательное поле в `UpdateRequest` (`nullable`/`sometimes` без `present`) при записи DTO целиком затирает данные `null`. Обходы — список пришедших полей рядом с DTO, отслеживание пришедших полей в DTO, `array_filter(!is_null)` — не применять.
 
     ```php
     // плохо: запрос {name} обнулит currency и grace_minutes
@@ -47,7 +61,7 @@
     'currency' => ['present', 'nullable', Rule::enum(CurrencyEnum::class)],
     ```
 
-12a. **Без методов-обёрток над одной проверкой или одним вызовом** (**[ВНИМАНИЕ]**). `findByIdOrFail()`, `assertValid()`, `getById()`, который только вызывает метод своего репозитория, — не заводятся: в месте использования — `get`, возвращающий `?Model`, и явная проверка с исключением; вызов валидатора — там, где нужен; внутри сервиса — репозиторий напрямую, workflow берёт репозиторий напрямую (O-7).
+12a. **Без методов-обёрток над одной проверкой или одним вызовом** (**[ВНИМАНИЕ]**). `findByIdOrFail()` и любые `*OrFail` (в сервисе и в репозитории — нарушение SRP: поиск и реакция на отсутствие — разные ответственности; ядровые `oneByIdOrFail`/`getByUuidOrFail` тоже не вызываются — `oneById` + явная проверка), `assertValid()`, `getById()`, который только вызывает метод своего репозитория **для внутреннего использования**, — не заводятся (публичный метод сервиса, через который точка входа получает запись, — `findById(int $id): ?Model` — допустим: контроллеру репозиторий недоступен; `null` → `NotFoundAppException` бросает контроллер, `mps-core/exceptions.md`): в месте использования — `get`, возвращающий `?Model`, и явная проверка с исключением; вызов валидатора — там, где нужен; внутри сервиса — репозиторий напрямую, workflow берёт репозиторий напрямую (O-7).
 
     ```php
     // плохо
@@ -65,7 +79,7 @@
         throw new ValidationAppException('VALIDATION ERROR', $errors);
     }
     ```
-12b. **Значения-ключи — enum, не константы** (**[ВНИМАНИЕ]**). Имена атрибутов и заголовков запроса, теги кэша, ключи параметров — кейсы enum (`RequestHeaderEnum::BUILDING_ID`, с `Enumerable`). Константы в интерфейсах (репозитория, сервиса) — **[ОШИБКА]**. Имя обычного поля/фильтра (`'building_id'`, `'name'`) — строкой, как остальные поля. Приватная константа класса допустима только для настройки, которую enum не выразит (массив, значение по умолчанию: `DEFAULT_SORT = ['-id']`).
+12b. **Значения-ключи — enum, не константы** (**[ВНИМАНИЕ]**). Имена атрибутов и заголовков запроса, теги кэша, ключи параметров — кейсы enum (`RequestHeaderEnum::BUILDING_ID`, с `Enumerable`). Константы в интерфейсах (репозитория, сервиса) — **[ОШИБКА]**. Имя обычного поля/фильтра (`'building_id'`, `'name'`) — строкой, как остальные поля. Приватная константа класса допустима только для настройки, которую enum не выразит (массив, значение по умолчанию: `DEFAULT_SORT = ['-id']`), и для **morph-типа легаси** (`model_type = 'App\Models\Organization'` — значение данных, а не ключ нового кода): `private const` в репозитории с комментарием-источником (`/** Morph-тип объекта в легаси-таблицах */`), как `CategoryRepository::BUILDING_MORPH_TYPE` в `super_app`, не enum (AINA-2978).
 12c. **Список: сортировка параметром + по умолчанию** (**[ВНИМАНИЕ]**). `IndexRequest` объявляет `protected array $sortAttributes` (ядро разбирает `?sort=name,-id` и проверяет поля), сервис ставит сортировку по умолчанию (`$params['sort'] ??= ['-id']`), параметр `sort` описан в Swagger. Без `ORDER BY` порядок страниц в Postgres не гарантирован.
 12d. **Фильтры `IndexRequest` = фильтры репозитория** (**[ВНИМАНИЕ]**). Каждое поле из `filterRules()` применяется в `filterSearch()` репозитория, и наоборот; поле, которое валидируется, но не фильтрует, — убрать (а не переносить из легаси «как было»).
 

@@ -32,21 +32,19 @@ class YourController extends CRUDController
         return response()->json(YourResponse::make($result));
     }
 
+    // Запись — DTO, не массив (../conventions.md п. 11a, P-18)
     public function create(YourCreateRequest $request): JsonResponse
     {
-        $dto = (new CreateCommandDataObject())->setData($request->validated());
-        $model = $this->service->create($dto);
-        $result = $this->service->searchByModel($model);
+        $dto = YourDto::make()->fromArray($request->validated());
 
-        return response()->json(YourResponse::make($result), 201);
+        return response()->json(new YourResponse($this->service->create($dto)), Response::HTTP_CREATED);
     }
 
     public function update(int $id, YourUpdateRequest $request): JsonResponse
     {
-        $this->service->updateById($id, $request->validated());
-        $result = $this->service->searchById($id);
+        $dto = YourDto::make()->fromArray($request->validated());
 
-        return response()->json(YourResponse::make($result));
+        return response()->json(new YourResponse($this->service->update($id, $dto)));
     }
 
     public function delete(int $id): JsonResponse
@@ -83,6 +81,7 @@ class YourCreateRequest extends CommandRequest
 }
 
 // Search
+use Illuminate\Validation\Rule;
 use MPS\Core\Http\Requests\SearchRequest;
 
 class YourSearchRequest extends SearchRequest
@@ -92,11 +91,10 @@ class YourSearchRequest extends SearchRequest
         return [
             'page'     => ['integer', 'min:1'],
             'per_page' => ['integer', 'between:1,100'],
-            'id'       => ['integer'],
-            'name'     => ['string'],
-            'status'   => ['integer'],
-            'expanded' => ['array'],
-            'sort'     => ['array'],
+            'id'       => ['integer', 'gt:0'],
+            'name'     => ['string', 'max:255'],
+            'status'   => [Rule::enum(YourStatusEnum::class)],
+            'sort'     => ['array', 'max:5'],
         ];
     }
 }

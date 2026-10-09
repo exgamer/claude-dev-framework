@@ -19,7 +19,7 @@ Service/Command домена — когда одна операция затра
 и частичное выполнение недопустимо.
 
 Типичные места:
-- Оркестрирующий Command, координирующий несколько сервисов
+- Command домена с несколькими записями (`SetDefaultTariffCommand`: снять флаг со старого тарифа и поставить новому)
 - Метод Service, который вызывает несколько `repository`-методов подряд
 
 ---
@@ -76,11 +76,11 @@ final readonly class CreateAgreementCommand
     ) {
     }
 
-    public function handle(AgreementDto $dto): array
+    public function execute(AgreementDto $dto): Agreement
     {
         return $this->transactionManager->run(function () use ($dto) {
-            $agreement = $this->agreementService->create($dto)->toArray();
-            $agreement['periods'] = $this->agreementPeriodService->create(...);
+            $agreement = $this->agreementService->create($dto);
+            $this->agreementPeriodService->createForAgreement($agreement->id, $dto->getPeriods());
 
             return $agreement;
         });

@@ -45,10 +45,10 @@ class YourService extends CrudServiceDecorator implements YourServiceInterface
     }
 
     // Кастомная сигнатура — не ограничена CreateCommandDataObject
-    public function createItem(YourCreateDTO $dto): YourModel
+    public function createItem(YourDto $dto): YourModel
     {
         return $this->transactionManager->run(function () use ($dto) {
-            $model = $this->repository->create($dto->toArray());
+            $model = $this->repository->createFromDto($dto);
             $this->otherService->notify($model);
             return $model;
         });
@@ -67,34 +67,13 @@ class YourService extends CrudServiceDecorator implements YourServiceInterface
 
 ---
 
-## Expand-параметры
+## Связанные данные — без `expanded`
+
+Параметр `expanded` (и `{E}ExpandEnum`, `hasExpand()`) не используется: состав ответа эндпойнта фиксирован, клиент его не выбирает. Связанные данные, которые нужны ответу, сервис дочитывает всегда — методом **своего** репозитория пачкой по id (без N+1); данные другого домена — только workflow (O-7). Нужен другой состав — отдельный эндпойнт.
 
 ```php
-// Enum
-enum YourExpandEnum: string implements Enumerable
-{
-    use EnumerableTrait;
-
-    case RELATION = 'relation';
-    case ANOTHER  = 'another';
-}
-
-// В сервисе — afterSearch обогащает результаты
-protected function afterSearch(SearchDataObject $dto): void
-{
-    $dto->processItemsCallback(function (&$items) {
-        if (! $this->hasExpand(YourExpandEnum::RELATION->value)) {
-            return;
-        }
-
-        $ids = array_column($items, 'id');
-        $relations = $this->relationService->searchByIds($ids);
-
-        foreach ($items as &$item) {
-            $item['relation'] = $relations[$item['id']] ?? null;
-        }
-    });
-}
+$ids = array_column($items, 'id');
+$periods = $this->periodRepository->allByAgreementIds($ids);   // свой домен, одна выборка
 ```
 
 ---

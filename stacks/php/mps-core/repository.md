@@ -14,7 +14,7 @@
 | вызов `$this->otherRepository->...` | Service / Command |
 | любое решение на основе значений (не только их выборка) | Service / Command |
 
-`NotFoundAppException` — единственное допустимое исключение в Repository, если метод гарантирует возврат.
+Своих `*OrFail`-методов в репозитории нет (`../conventions.md` п. 12a, SRP: метод ищет, а что делать с отсутствием — решает вызывающий): `get…`/`oneBy…` возвращают `?Model`, `NotFoundAppException` бросает сервис/Command/workflow.
 
 ---
 
@@ -36,7 +36,6 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
     protected function filterSearch(BuilderContract $query, array &$params = []): void
     {
         $tableName = $this->getTableName();
-        $expanded  = $params['expanded'] ?? [];
 
         $query->select([
             "{$tableName}.id",
@@ -59,11 +58,6 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
                 ->setValue($name)
                 ->apply($query);
         }
-
-        // expand — загружать связи только по запросу
-        if (in_array(YourExpandEnum::RELATION->value, $expanded)) {
-            $query->with('relation');
-        }
     }
 }
 ```
@@ -71,8 +65,20 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
 **Правила filterSearch:**
 - Всегда явно указывать `select` — не `select *`
 - JOIN'ы до WHERE условий
-- Фильтры только из `MPS\Utils\Components\QueryFilters\V2\`
-- Связи только через `with()` при наличии в `expanded`
+- Фильтры только из `MPS\Utils\Components\QueryFilters\V2\` (**[ОШИБКА]**, тег `repository-reinvents-core-helper`). Исключения — только то, чего в V2 нет (AINA-2978):
+  - `whereExists`/`EXISTS`-подзапрос (связь «есть/нет записей») — условия **внутри** подзапроса через V2;
+  - `!=` и `IS NULL OR !=` — обычный `where` с биндингом (оператора в V2 нет);
+  - bool-колонка — `IntFilter` со значением `0`/`1`, не исключение.
+- Значение, которое V2 молча отбросит (не-строка в `StringFilter`, не-число в `IntFilter`), — фильтр пропадает и выборка **расширяется**. Поэтому тип значения приводится или неподходящее отсекается в сервисе до репозитория (`ValidationAppException` по ключу фильтра), а не обходится сырым `where` в репозитории.
+
+  ```php
+  // плохо: обход V2 «потому что StringFilter отбросит не-строку»
+  $query->where("{$table}.name", 'ilike', "%{$params['name']}%");
+
+  // хорошо: сервис отсёк не-строку до репозитория, репозиторий — V2
+  StringFilter::make()->setColumn("{$table}.name")->setValue($name)->apply($query);
+  ```
+- Без Eloquent-связей и `with()`: связанные данные — отдельными методами репозитория пачкой по id (`allByOrganizationIds(array $ids)`), собирает и раскладывает сервис; параметра `expanded` нет (`service.md`, «Связанные данные — без `expanded`»; `../conventions.md`, «Модели и внешние системы»)
 
 ---
 
@@ -84,12 +90,13 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
 - Выборку данных по фильтрам
 - Запись / обновление / удаление
 - JOIN-ы и агрегации на уровне SQL
+- Запись принимает DTO или типизированные аргументы (`createFromDto`, `updateFromDto`, `setDefault(int, bool)`), колонки собирает сам — не массив от сервиса (`../conventions.md` п. 11a)
 
 **Репозиторий НЕ делает:**
 - Не применяет бизнес-правила (`if order.status == PAID then ...`)
 - Не трансформирует и не маппит данные в DTO или другие структуры
 - Не вызывает другие сервисы или репозитории
-- Не бросает бизнес-исключения (`NotFoundAppException` допустимо, логика домена — нет)
+- Не бросает бизнес-исключения и «не найдено» — возвращает `null`, решает вызывающий
 
 ```php
 // ❌ Бизнес-логика в репозитории
@@ -105,10 +112,14 @@ public function findActiveWithDiscount(int $id): array
     return $item;
 }
 
-// ✅ Репозиторий возвращает сырые данные
-public function findById(int $id): array
+// ✅ Репозиторий возвращает сырые данные по условию, решение — в Service
+public function getDefaultByParkingId(int $parkingId): ?Tariff
 {
-    return $this->searchById($id); // просто данные из БД
+    /** @var ?Tariff */
+    return $this->getQuery()
+        ->where('parking_id', $parkingId)
+        ->where('is_default', true)
+        ->first();
 }
 
 public function getAllByColumn(string $value): Collection

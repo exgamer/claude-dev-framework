@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Repositories;
 
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
@@ -49,5 +50,45 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
             ->where('is_default', true)
             ->where('status', TariffStatusEnum::ACTIVE->value)
             ->first();
+    }
+
+    public function createFromDto(TariffDto $dto, TariffStatusEnum $status, bool $isDefault): Tariff
+    {
+        /** @var Tariff $tariff */
+        $tariff = $this->model->newInstance();
+        $tariff->fill([
+            ...$this->columns($dto),
+            'status' => $status,
+            'is_default' => $isDefault,
+        ])->save();
+
+        return $tariff;
+    }
+
+    public function updateFromDto(Tariff $tariff, TariffDto $dto): void
+    {
+        $tariff->fill($this->columns($dto))->save();
+    }
+
+    public function setDefault(int $id, bool $isDefault): void
+    {
+        $this->getQuery()
+            ->whereKey($id)
+            ->update(['is_default' => $isDefault]);
+    }
+
+    /**
+     * Колонки тарифа из DTO: status и is_default задаются отдельно.
+     *
+     * @return array<string, mixed>
+     */
+    private function columns(TariffDto $dto): array
+    {
+        return [
+            'parking_id' => $dto->getParkingId(),
+            'name' => $dto->getName(),
+            'currency' => $dto->getCurrency(),
+            'grace_minutes' => $dto->getGraceMinutes(),
+        ];
     }
 }

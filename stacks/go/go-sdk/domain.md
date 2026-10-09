@@ -192,17 +192,19 @@ Command/Query берёт только репозитории **своего** д
 
 ## Cross-domain зависимость
 
-Интерфейс объявляется в домене-потребителе, не в провайдере:
+Сервис, Command/Query домена чужой домен не берёт — ни репозиторий, ни сервис, ни интерфейс на чужой сервис (O-7, **[ОШИБКА]**). Нужны данные или проверка по другому домену — workflow: берёт интерфейсы репозиториев/сервисов доменов напрямую (`parkingdomain.Repository`) и передаёт данные домену параметрами; свой интерфейс объявляет только для того, чего у доменов нет (`CreateTariffTxManager`). Эталон — `examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go`:
 
 ```go
-// internal/domains/order/order/service.go
-type CityServiceInterface interface {
-    GetById(ctx context.Context, id uint) (*citydomain.City, error)
+// плохо: сервис домена order с интерфейсом на чужой сервис
+type Service struct {
+    repository  Repository
+    cityService CityServiceInterface
 }
 
-type Service struct {
-    repository           Repository
-    cityServiceInterface CityServiceInterface
+// хорошо: internal/workflows/order/order/create_order_workflow.go
+type CreateOrderWorkflow struct {
+    cityRepository  citydomain.Repository
+    orderRepository orderdomain.Repository
 }
 ```
 

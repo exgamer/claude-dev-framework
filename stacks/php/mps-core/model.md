@@ -5,13 +5,21 @@
 Модель — только маппинг на таблицу. Никакой бизнес-логики.
 
 ```php
-namespace App\Infrastructure\YourDomain\YourModule\Models;
+namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Models;
 
 use MPS\Core\Models\Model;
 
+/**
+ * Ваша сущность
+ *
+ * @property int $id                  PK
+ * @property string $name             Название
+ * @property YourStatusEnum $status   Статус
+ * @property Carbon $created_at       Дата создания
+ */
 class YourModel extends Model
 {
-    protected $table = 'your_table';
+    protected $table = 'your_schema.your_table';
 
     protected $fillable = [
         'name',
@@ -22,13 +30,10 @@ class YourModel extends Model
         'status'     => YourStatusEnum::class,
         'created_at' => 'datetime',
     ];
-
-    public function relation(): HasMany
-    {
-        return $this->hasMany(RelatedModel::class, 'your_model_id');
-    }
 }
 ```
+
+Связей (`hasMany`, `belongsTo`…) в модели нет — раздел «Relations» ниже. Эталон — `../examples/parking_app/Infrastructure/Postgres/Billing/Tariffs/Models/Tariff.php`.
 
 ## Что допустимо
 
@@ -38,7 +43,7 @@ class YourModel extends Model
 | `$fillable` / `$guarded` | защита mass assignment |
 | `$casts` | типизация колонок, cast в Enum |
 | `$appends` + accessor | простое вычисление без зависимостей |
-| Relations | только те, что используются в `with()` в Repository |
+| Relations | нет — связанные данные собираются через репозитории (`../conventions.md`, «Модели и внешние системы») |
 
 ## Что запрещено
 
@@ -75,6 +80,5 @@ public static function findActiveByUser(int $userId): Collection
 
 ## Relations
 
-Добавлять relation только если он **явно используется** через `with()` в `filterSearch` Repository.
-Не добавлять "на будущее" — связи создают неявные зависимости и соблазн обратиться к ним из любого места минуя Repository.
+Eloquent-связей (`BelongsTo`, `HasMany`…) в моделях нет, `with()` не используется (тег `model-has-eloquent-relations`): связи создают неявные запросы и соблазн обратиться к данным в обход Repository. Связанные данные — методом репозитория пачкой по id, сборка — в сервисе.
 

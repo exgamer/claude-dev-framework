@@ -49,12 +49,12 @@ class YourServiceTest extends TestCase
     public function test_something(): void
     {
         $repository = Mockery::mock(YourRepositoryInterface::class);
-        $repository->shouldReceive('findById')->once()->with(1)->andReturn(['id' => 1, 'name' => 'Test']);
+        $repository->shouldReceive('oneById')->once()->with(1)->andReturn(new YourModel(['name' => 'Test']));
 
         $service = new YourService($repository);
         $result = $service->doSomething(1);
 
-        $this->assertEquals('Test', $result['name']);
+        $this->assertEquals('Test', $result->name);
     }
 
     protected function tearDown(): void

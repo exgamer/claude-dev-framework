@@ -20,5 +20,5 @@
 | `Domains/Billing/definitions.php`, `ServiceProvider.php` | биндинг сервиса домена |
 | `Workflows/Billing/Tariffs/CreateTariffWorkflow.php` | **Workflow** — междоменная логика (Billing + Catalog), `{Action}Workflow`, `execute()` (P-2); транзакционен (O-8): проверка парковки и создание в одном `run()` |
 | `Entrypoints/Admin/Billing/…` | контекст Admin без `src/` (P-3, P-9); тонкий контроллер с OpenAPI; `Requests/Tariffs/{Create,Update,Index}Request` (P-5); `Responses/*Response`; `routes.php` с `ApiResponseMiddleware` |
-| `Infrastructure/Postgres/Billing/…` | тип хранилища в пути (P-10); модель с `@property`, схемой, `$casts`; репозиторий на `CRUDRepository` + `filterSearch`; `definitions.php`; миграция домена |
+| `Infrastructure/Postgres/Billing/…` | тип хранилища в пути (P-10); модель с `@property`, схемой, `$casts`; репозиторий на `CRUDRepository` + `filterSearch`; запись — DTO (`createFromDto`, `updateFromDto` через `fill()->save()`, колонки — явным списком внутри репозитория) и типизированный `setDefault(int, bool)`, без массивов из сервиса/Command; `definitions.php`; миграция домена |
 | `tests/Unit/ParkingApp/Domains/Billing/Tariffs/TariffDtoValidatorTest.php` | тест в `tests/`, путь повторяет путь класса (O-3) |

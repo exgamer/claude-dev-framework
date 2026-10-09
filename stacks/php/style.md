@@ -49,7 +49,7 @@
 
 - `final` — для Command/Query, workflow, валидаторов, хелперов. Сервисы и репозитории — не `final` (наследуют ядро, подменяются моками).
 - Конструктор — promotion: `private readonly Type $name`, по одному на строку, trailing comma.
-- Модели: `@property` на каждое поле с комментарием по-русски, `$table` со схемой (`'parking.tariffs'`), `$fillable`, `$casts` (enum-поля кастуются в enum).
+- Модели: `@property` на каждое поле с комментарием по-русски, `$table` со схемой (`'parking.tariffs'`; таблица в схеме `public` — без префикса, `'organizations'`: как у соседей `super_app`; с префиксом `public.` не работают тесты на временной схеме — AINA-2978), `$fillable`, `$casts` (enum-поля кастуются в enum).
 
 ## Форма кода
 
@@ -70,6 +70,7 @@
 | Сервис с логикой | `{Entity}Service` + `Interface` | `SessionService` |
 | Command / Query (в домене) | `{Action}Command` / `{Action}Query`, метод `execute()` | `ActivatePlannedTariffCommand` |
 | Workflow (междоменный) | `{Action}Workflow`, метод `execute()` | `CreateTariffWorkflow` |
+| Коллекция DTO | `{Entity}ItemsDto` (`DataObjectCollection`, `mps-core/data-objects.md`) | `PermissionItemsDto` |
 | Валидатор | `{Entity}DtoValidator` | `TariffDtoValidator` |
 | Enum | `{Entity}{Признак}Enum`, кейсы `UPPER_SNAKE` (P-16, как в ядре: `CurrencyEnum::KZT`); всегда `implements Enumerable` + `use EnumerableTrait` из `mps/core` (`mps-core/enums.md`) | `TariffStatusEnum::ACTIVE` |
 | Request | `Http/Requests/{Entity}/{Create,Update,Index}Request` | `Requests/Tariffs/CreateRequest` |
@@ -77,7 +78,7 @@
 | Job | `{Action}Job` | `ActivatePlannedTariffJob` |
 | Метод поиска в репозитории | `get…By…` (один) / `all…By…` (много) | `getDefaultTariffsByParkingId` |
 
-Имена DTO и Request — как в `parking_app` (решения P-5, P-7): `{Entity}Dto`, `Http/Requests/{Entity}/{Create,Update,Index}Request`. Варианты `super_app` (`BuildingDataDTO`, `Requests/CreateRequest` без папки сущности) в новом коде — **[ВНИМАНИЕ]**. Междоменный класс — `{Action}Workflow` с `execute()` (решение P-2); `*Command` в `Workflows/` parking_app — старый нейминг, переименовывается только в рамках задачи.
+Имена DTO и Request — как в `parking_app` (решения P-5, P-7): `{Entity}Dto`, `Http/Requests/{Entity}/{Create,Update,Index}Request`. Суффикс в PHP — `Dto`, в Go — `DTO` (аббревиатуры заглавными) — различие стеков. Варианты `super_app` (`BuildingDataDTO`, `Requests/CreateRequest` без папки сущности) в новом коде — **[ВНИМАНИЕ]**. Междоменный класс — `{Action}Workflow` с `execute()` (решение P-2); `*Command` в `Workflows/` parking_app — старый нейминг, переименовывается только в рамках задачи.
 
 ## Язык
 

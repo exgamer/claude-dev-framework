@@ -11,7 +11,7 @@ namespace App\Domains\YourDomain\Modules\YourModule\DataObjects;
 
 use MPS\Core\DataObjects\DataObject;
 
-class YourDTO extends DataObject
+class YourDto extends DataObject
 {
     private ?string $name = null;
     private ?int $status = null;
@@ -43,12 +43,12 @@ class YourDTO extends DataObject
 
 ```php
 // Фабричный метод
-$dto = YourDTO::make();
+$dto = YourDto::make();
 
 // Маппинг массива → объект через рефлексию
-$dto = YourDTO::make()->fromArray($request->validated());
+$dto = YourDto::make()->fromArray($request->validated());
 
-// Сериализация обратно в массив
+// Сериализация обратно в массив — не для передачи между слоями: в сервис и репозиторий уходит сам DTO (../conventions.md п. 11, 11a)
 $dto->toArray();                  // ключи как есть
 $dto->toArrayWithSnakeKeys();     // camelCase → snake_case
 $dto->toArrayWithCamelKeys();
@@ -78,28 +78,46 @@ if (! $dto->validated()) {
 
 ## DataObjectCollection
 
-Типизированная коллекция `DataObject`-ов. Элементы приходят из массивов и гидрируются в объекты.
+Типизированная коллекция `DataObject`-ов. Элементы приходят из массивов и гидрируются в объекты. Имя — `{Entity}ItemsDto` (как `PermissionItemsDto` в `parking_app`), `final`, `@extends DataObjectCollection<{Entity}Dto>`.
 
 ```php
-class YourItemCollection extends DataObjectCollection
+/**
+ * @extends DataObjectCollection<YourItemDto>
+ */
+final class YourItemsDto extends DataObjectCollection
 {
     // Единственное требование — реализовать hydrate()
-    protected function hydrate(array $item): YourItem
+    protected function hydrate(array $item): YourItemDto
     {
-        return YourItem::make()->fromArray($item);
+        return YourItemDto::make()->fromArray($item);
     }
 }
 ```
 
+**Вложенная коллекция в DTO** (`buildings: [{building_id, …}]`) — свойство и сеттер типизированы коллекцией, сеттер без логики: `fromArray()` сам соберёт `YourItemsDto` из списка. Сборка вложенных DTO в сеттере (`setBuildings(?array)` с `fromArray` по элементам) — нет: исключение сеттера ядро глотает, поле молча остаётся `null` (AINA-2978).
+
+```php
+private ?YourItemsDto $buildings = null;
+
+public function setBuildings(?YourItemsDto $value): self
+{
+    $this->buildings = $value;
+
+    return $this;
+}
+```
+
+Ядро (core 1.6.0) гидрирует коллекцию только из **списка** (`array_is_list`): ассоциативный массив `{"a": {...}}` → пустая коллекция, элемент не-массив (`[5]`) молча пропускается. Если пустая коллекция значит «отвязать всё», это разрушающий тихий отказ — поэтому Request обязан: поле — `list` (не только `array`, он пропускает ассоциативный), элементы — `'buildings.*' => ['array']` (`security.md`, «Меры по слоям»). При обновлении ядра — тест «не-список / не-массив → 422».
+
 **Использование:**
 
 ```php
-$collection = YourItemCollection::make()->setItems($rawArray);  // гидрирует каждый элемент
+$collection = YourItemsDto::make()->setItems($rawArray);  // гидрирует каждый элемент
 
 $collection->pushItem(['name' => 'foo']);   // array → hydrate() → объект
 $collection->pushItem($yourItem);           // уже готовый объект — напрямую
 
-$collection->getItems();   // YourItem[]
+$collection->getItems();   // YourItemDto[]
 $collection->fresh();      // очистить
 $collection->toArray();    // массив массивов
 

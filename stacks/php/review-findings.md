@@ -15,14 +15,15 @@
 - У чисел **и массивов** есть верхняя граница: `max:`, `between:`, `array|max:100`. Массив без лимита = DoS через тело запроса.
 - В Request нет SQL-запросов и вызовов сервисов (P-17, `conventions.md` п. 9a): ни `exists:`/`unique:`/`Rule::exists()`/`Rule::unique()`, ни своих правил и замыканий с моделью, `DB::` или репозиторием, ни запросов в `prepareForValidation()`/`withValidator()`/`after()`. Существование — в сервисе/workflow через репозиторий, уникальность — уникальный индекс + проверка в сервисе.
 - Бизнес-правила («нельзя менять статус, если оплачен») — не в Request. Но **допустимые варианты значений** (enum) — как раз в реквесте: `Rule::in(Enum::values())` / `Rule::enum(Enum::class)`.
-- PUT — полные данные (`conventions.md`, п. 12): в `UpdateRequest` поля `required` / `present|nullable`. Необязательное поле при записи DTO целиком (`updateById($id, $dto->toArrayWithSnakeKeys())`) затирается `null` — так в `super_app` были `BuildingService::update`, `AgreementTransactionService::update` (AINA-2628). Тег `update-request-optional-fields`.
+- PUT — полные данные (`conventions.md`, п. 12): в `UpdateRequest` поля `required` / `present|nullable`. Необязательное поле при записи DTO целиком (`updateFromDto($tariff, $dto)`, п. 11a) затирается `null` — так в `super_app` были `BuildingService::update`, `AgreementTransactionService::update` (AINA-2628). Тег `update-request-optional-fields`.
 
 ## Repository
 
 - Наследование от ядра (`CRUDRepository`), запросы через `$this->getQuery()`, не `Model::query()` / `DB::table()`.
-- Нет `*OrFail` — `NotFoundAppException` бросается там, где метод гарантирует возврат (см. `repository.md`).
+- Нет своих `*OrFail`-методов (ни в репозитории, ни в сервисе — п. 12a, SRP): `get…` возвращает `?Model`, `NotFoundAppException` бросает вызывающий. Тег `service-thin-wrapper`.
 - Нет `keyBy` / `map` / сборки структур — репозиторий отдаёт сырые данные, маппинг в Service.
-- Нет обращения к таблице чужого домена: репозиторий работает только со своими таблицами; данные двух доменов собирает workflow.
+- **Запись массивом** (AINA-2978, пользователь: «всегда DTO, массивы плохо») — `updateById($id, $dto->toArrayWithSnakeKeys())`, `updateById($id, ['is_default' => true])`, `create($data)` из сервиса/Command; то же в контроллере: `$this->service->update($id, $request->validated())`. По всей цепочке записи — DTO или типизированные аргументы (`conventions.md` п. 11a). Тег `write-array-instead-of-dto`, [ОШИБКА].
+- Нет обращения к таблице чужого домена: репозиторий пишет только в свои таблицы; данные двух доменов собирает workflow. Допустим read-only подзапрос (`EXISTS`/`JOIN`) к чужой таблице с комментарием, чья она (`architecture/cross-domain.md`).
 - Локальные phpstan-обёртки над `getQuery()` (типизированные прокси ради generics) не плодить — либо в `mps/core`, либо в ignore.
 - До самописа — посмотреть `mps-core/capabilities.md` (ядро: `QueryFilters\V2\StringFilter`, `LoggerAwareTrait`, …) и `Core/` подпроекта (`PaginatedQueryHelper`). «Уже есть в core» — частый реджект.
 
@@ -70,15 +71,15 @@
 - Наследование `DataObject`, аргумент сеттера — `$value`, сборка через `fromArray()`, даты — `Carbon`, без логики.
 - **Enum-поле DTO строкой** (AINA-2628, question: «а почему бы в DTO сразу не сложить `OneCDictionaryTypeEnum`?») — `private ?string $type` + `getType() === TypeEnum::FIXED->value`. Свойство и сеттер — enum, ядро приводит строку само (`mps-core/data-objects.md`). Тег `dto-enum-as-string`, [ВНИМАНИЕ].
 - **Тип сеттера шире свойства** (AINA-2628, blocking: «эти все типы прям нужны?») — `setQuantity(int|float|string|null $value)` с ручным `(float)` при свойстве `?float`. Строки из формы `fromArray()` приводит сам (`mps-core/data-objects.md`), сеттер — `float|null`. Тег `dto-setter-widened-type`, [ВНИМАНИЕ].
-- Сложная сборка DTO (из нескольких источников) — в фабрику, не в конструктор DTO и не в контроллер.
-- **Известное расхождение:** суффикс `DTO` (как в `data-objects.md`) vs `Dto` — в `parking_system` ревьюеры требуют `*Dto`. Внутри одного репозитория держать один вариант; при ревью не выбирать молча — назвать оба и предложить зафиксировать.
+- Сложная сборка DTO (из нескольких источников) — в фабрику, не в конструктор DTO и не в контроллер. Вложенная коллекция — `{E}ItemsDto` (`DataObjectCollection`), сеттер без сборки элементов; Request — `list` + `{поле}.*: array` (`mps-core/data-objects.md`, AINA-2978).
+- Суффикс — `Dto` (`{Entity}Dto`, P-5/P-7; в `parking_system` ревьюеры тоже требуют `*Dto`); `DTO` в новом PHP-коде — [ВНИМАНИЕ]. В Go — `DTO` по конвенции аббревиатур языка (`stacks/go/checklist.md` п. 34): различие стеков, не ошибка.
 
 ## Enums / Models
 
 - Описание класса и свойств (docblock) обязательны.
-- Логика внутри enum (`match` с бизнес-решениями, обращения к сервисам) — реджект; допустимы только `labels()`/`values()`-подобные вещи.
+- Логика внутри enum (`match` с бизнес-решениями, обращения к сервисам) — реджект; допустимы только `labels()`/`values()`-подобные вещи. Сюда же предикаты-классификаторы легаси (`RentTypeEnum::addressOnlyRent()`, `isCoworking()`): при переносе в enum не идут — нужны, когда появится потребитель, — в сервис/workflow (AINA-2978, тег `enum-contains-business-logic`).
 - **Enum без `Enumerable`** (AINA-2628, nit: «Имплементить Enumerable из mps/core») — каждый enum: `implements \MPS\Core\Enums\Enumerable` и `use EnumerableTrait;` первой строкой тела (`mps-core/enums.md`). Тег `enum-not-enumerable`, [ИНФО].
-- Eloquent-связи (`BelongsTo`, `HasMany`) в моделях не используются — данные собираются через репозитории и `expanded`.
+- Eloquent-связи (`BelongsTo`, `HasMany`) в моделях не используются — данные собираются через репозитории; параметр `expanded` не используется (`mps-core/service.md`, «Связанные данные — без `expanded`»), тег `expanded-param-used`.
 - Модель лежит в домене/инфраструктуре **своей** сущности, не рядом с тем, кто её первым использовал.
 - **Известное расхождение (superapp-api):** `MPS\Core\Enums\EnumerableTrait::labels()` vs `App\Traits\EnumLabelTranslatable::getLabels()` — две конвенции, не сводить молча.
 
@@ -162,7 +163,7 @@ RBAC/permission-middleware, который при отсутствии запи�
 
 ## За пределами файла — что ревьюеры проверяют по репозиторию
 
-- **Разъезд захардкоженных списков.** Появился/расширился enum → `grep` по старому набору: `in:a,b` в других реквестах, `enum: [...]` в `@OA`-аннотациях, словари во фронтовых эндпоинтах. Типовой баг: значение добавили в один реквест, а публичный фильтр и swagger остались старыми.
+- **Разъезд захардкоженных списков.** Появился/расширился enum → `grep` по старому набору: `in:a,b` в других реквестах, `enum: [...]` в `@OA`-аннотациях, словари во фронтовых эндпоинтах. Типовой баг: значение добавили в один реквест, а публичный фильтр и swagger остались старыми. Новый кейс enum — ещё и мапперы, allowlist и `match` **по этому enum** (`MediaCollectionMapper::MAP` — «источник истины» допустимых коллекций по типу модели): кейс в enum есть, в маппере нет — разъезд (AINA-2978, `impact-analysis.md`). Тег `enum-list-drift`, [ОШИБКА].
 - **Данные под миграцию поведения.** Новый каст модели (`'col' => SomeEnum::class`), новое значение enum, новый `NOT NULL` — сначала смотреть, что в колонке лежит. Значение вне enum → `ValueError` при гидрации и 500 на **чтении**, не только на записи.
 - **Деплойный риск.** Раскомментированный крон, включённый флаг, снятый `if (false)` — не «мелочь в дифе»: первый прогон на проде отработает по всем накопленным данным. Отдельным MR и сначала с `--dry-run`.
 - **Гигиена дифа.** `composer.lock` вместе с `composer.json`; нет неиспользуемых импортов; `.php-cs-fixer.cache` и сгенерированный `storage/api-docs/*.json` не уезжают в MR как посторонняя правка (лежат в `.gitignore`, но исторически трекаются — смотреть `git status --short`, не только HEAD).

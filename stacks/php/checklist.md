@@ -7,9 +7,9 @@
 ## Слои и место кода
 
 1. **О** Файл лежит по `structure.md` (дерево подпроекта); `Infrastructure/{Тип}/…`; новый код не в легаси `app/`. — `structure.md`
-2. **О** Контроллер тонкий: `Request` → `{E}Dto::make()->fromArray($request->validated())` → сервис/workflow → `response()->json(...)`. — `conventions.md` п. 1
+2. **О** Контроллер тонкий: `Request` → `{E}Dto::make()->fromArray($request->validated())` → сервис/workflow → `response()->json(...)`; в сервис — DTO, не `validated()`/`all()`/массив. — `conventions.md` п. 1, 11a
 3. **О** Service/Command/Query — только свой домен; 2+ домена → `Workflows/{D}/{M}/{Action}Workflow::execute()`; workflow берёт репозитории и сервисы любых доменов напрямую. — `conventions.md` п. 3 (O-7)
-4. **О** Бизнес-логика — в сервисе/Command/workflow; репозиторий — только запросы через `$this->getQuery()`, без `keyBy`/`map`; в сервисе нет `DB::`/`Model::where`. — `conventions.md` п. 2, `review-findings.md`
+4. **О** Бизнес-логика — в сервисе/Command/workflow; репозиторий — только запросы через `$this->getQuery()`, без `keyBy`/`map`; в сервисе нет `DB::`/`Model::where`; запись в репозиторий — DTO или типизированные аргументы, не массив (`createFromDto`/`updateFromDto`/`setDefault`). — `conventions.md` п. 2, 11a, `review-findings.md`
 5. **О** Интерфейс у каждого сервиса и репозитория; зависимости — конструктор, `private readonly`, тип — интерфейс; `app()`/`resolve()` в бизнес-коде нет. — `conventions.md` п. 5, 6
 6. **О** DI — только `definitions.php` домена/инфраструктуры. — `conventions.md` п. 7
 7. **О** Логика по контекстам различается → `{Context}{Entity}Service` в том же модуле, без `if ($isAdmin)`; сервисов в `Entrypoints/` нет. — `conventions.md`, «Логика, отличающаяся по контексту»
@@ -23,7 +23,7 @@
 ## Request и данные
 
 11. **О** В Request нет SQL: ни `exists:`/`unique:`/`Rule::exists/unique`, ни своих правил/замыканий с моделью/`DB::`/репозиторием. Существование — в сервисе/workflow, уникальность — уникальный индекс + проверка в сервисе. — `conventions.md` п. 9a (P-17)
-12. **О** `id`/`*_id` → `integer|gt:0`; у строк, чисел и массивов есть `max:`; допустимые значения — `Rule::enum()`; бизнес-правил в Request нет. — `review-findings.md`, «Requests»
+12. **О** `id`/`*_id` → `integer|gt:0`; у строк, чисел и массивов есть `max:`; допустимые значения — `Rule::enum()`; вложенная коллекция DTO — `list` + `{поле}.*: array`; бизнес-правил в Request нет. — `review-findings.md`, «Requests», `mps-core/data-objects.md`
 13. **О** PUT — полные данные: в `UpdateRequest` каждое поле `required`, очищаемое — `present|nullable`. — `conventions.md` п. 12 (O-10)
 14. **О** Роль/право на операцию — middleware на маршруте (`permission:…`/`role:…`), не `hasRole`/`authorize()`/`Gate::` в контроллере или домене. Доступ (здание/организация из заголовка или параметров) — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр; сервис и репозиторий о правах не знают. — `conventions.md` п. 19a
 15. **В** Доменные инварианты — `{E}DtoValidator::validate($dto)` → `ValidationAppException('VALIDATION ERROR', $errors)`. — `conventions.md` п. 10 (P-8)
@@ -52,7 +52,7 @@
 
 27. **О** Конкурентные места из `design.md` закрыты: уникальный индекс, условная смена статуса, идемпотентность, блокировка крона; состояния в памяти процесса нет (Octane, 2+ инстанса). — `approaches/patterns/concurrency.md`
 28. **О** Без N+1, пагинация, индекс под фильтр/сортировку, большие выборки — `chunk()`/`cursor()`. — `approaches/patterns/performance.md`
-29. **О** Мульти-тенантный скоуп в каждом методе (`index`/`show`/`update`/`destroy` по отдельности): параметр владельца выводится сервером, не берётся из запроса как необязательный. — `security.md`, `review-findings.md`
+29. **О** Мульти-тенантный скоуп в каждом методе (`index`/`show`/`update`/`destroy` по отдельности): параметр владельца выводится сервером, не берётся из запроса как необязательный; в сигнатуре сервиса/репозитория скоуп — без умолчания `= null`, `null` передаётся явно. — `security.md`, `review-findings.md`
 30. **О** Вебхук — проверка подписи до смены статуса; повтор события идемпотентен. — `security.md`
 31. **О** Нет сырого SQL с подстановкой ввода, секретов в коде и логах, mass assignment без allowlist. — `security.md`
 32. **О** Меры из `threats.md` по своим файлам реализованы.
@@ -63,7 +63,7 @@
 34. **В** Docblock класса — одна строка по-русски + `@author`; описания, пересказывающие имя, и «ИИ-шные» комментарии не писать. — `style.md`, `core/style.md`
 35. **В** `final` у Command/Query/workflow/валидаторов; promotion `private readonly`, trailing comma. — `style.md`
 36. **В** Имена по таблице `style.md` (`{Entity}Dto`, `{Entity}CrudService`, `{Action}Workflow`, enum `UPPER_SNAKE` + `Enumerable`).
-37. **О** Модель: `@property` по-русски, `$table` со схемой, `$fillable`, `$casts` (enum → enum). — `style.md`
+37. **О** Модель: `@property` по-русски, `$table` со схемой (таблица в `public` — без префикса), `$fillable`, `$casts` (enum → enum). — `style.md`
 
 ## Тесты и проверка
 

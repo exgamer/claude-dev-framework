@@ -49,12 +49,7 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
 
-        $data = $dto->toArrayWithSnakeKeys();
-        $data['status'] = TariffStatusEnum::ACTIVE->value;
-        $data['is_default'] = false;
-
-        /** @var Tariff */
-        return $this->repository->create($data);
+        return $this->repository->createFromDto($dto, TariffStatusEnum::ACTIVE, false);
     }
 
     /**
@@ -63,7 +58,10 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
      */
     public function update(int $id, TariffDto $dto): Tariff
     {
-        if (! $this->findById($id)) {
+        /** @var ?Tariff $tariff */
+        $tariff = $this->repository->oneById($id);
+
+        if (! $tariff) {
             throw new NotFoundAppException('Тариф не найден');
         }
 
@@ -74,8 +72,8 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
         }
 
         // PUT — полные данные: UpdateRequest требует все поля, DTO пишется целиком (conventions.md, п. 12)
-        $this->repository->updateById($id, $dto->toArrayWithSnakeKeys());
+        $this->repository->updateFromDto($tariff, $dto);
 
-        return $this->findById($id);
+        return $tariff;
     }
 }

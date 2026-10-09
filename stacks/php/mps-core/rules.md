@@ -91,6 +91,21 @@ use MPS\Utils\Components\QueryFilters\V2\IntFilter;
 use MPS\Utils\Components\QueryFilters\V2\RangeFilter;
 ```
 
+## Запись — `create`/`update`/`updateById` ядра
+
+`CRUDRepository::update()`/`updateById()` пишут query builder-ом: `$casts` не применяются, `$fillable` не проверяется — отсекаются только несуществующие колонки (проверено на core 1.6.0, AINA-2978); `create()` тоже принимает произвольный массив. Поэтому из сервиса/Command/workflow они с массивом не вызываются: запись — методами репозитория с DTO (`conventions.md` п. 11a), внутри — явный список колонок и `fill()->save()` у модели с casts.
+
+```php
+// плохо: массив из сервиса, json/enum мимо casts, любая колонка таблицы запишется
+$this->repository->updateById($id, $dto->toArrayWithSnakeKeys());
+
+// хорошо: репозиторий
+public function updateFromDto(Tariff $tariff, TariffDto $dto): void
+{
+    $tariff->fill($this->columns($dto))->save();   // модель нашёл и проверил сервис (../conventions.md п. 12a)
+}
+```
+
 ## Cache — зависит от версии mps/utils
 
 Версию смотреть в `composer.lock`, API — в `capabilities.md`, «Кеш и Redis».

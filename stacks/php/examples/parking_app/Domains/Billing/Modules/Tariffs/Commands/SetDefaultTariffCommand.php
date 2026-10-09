@@ -44,10 +44,10 @@ final class SetDefaultTariffCommand
             $previous = $this->repository->getDefaultByParkingId($tariff->parking_id);
 
             if ($previous) {
-                $this->repository->updateById($previous->id, ['is_default' => false]);
+                $this->repository->setDefault($previous->id, false);
             }
 
-            $this->repository->updateById($tariff->id, ['is_default' => true]);
+            $this->repository->setDefault($tariff->id, true);
         });
 
         /** @var Tariff */

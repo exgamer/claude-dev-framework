@@ -2,13 +2,13 @@
 
 > Справочник по использованию `mps/core` / `mps/utils` (перенесён из `claude-skills/php-arch`, пути приведены к структуре фреймворка). **Где класть файлы — `../structure.md`**, что есть в ядре и с какой версии — `capabilities.md`, официальная дока — `official/`. При расхождении главнее они.
 
-> **Уточнение фреймворка:** Command/Query — это сервис, вынесенный в отдельный класс, когда операция слишком большая; работает **в пределах одного домена**. Междоменная оркестрация — не Command, а workflow (`architecture/layers.md`). Вариант 2 ниже применять только для сценариев внутри одного домена.
+> **Уточнение фреймворка:** Command/Query — это сервис, вынесенный в отдельный класс, когда операция слишком большая; работает **в пределах одного домена**. Агрегатная и междоменная логика (сценарий над несколькими доменами, координация их сервисов и побочных эффектов) — только workflow (`architecture/layers.md`, O-7), не Command.
 
-Command в проекте выполняет две роли — **атомарная операция** и **оркестратор сценария** (внутри домена). Живёт в `Domains/{Domain}/Modules/{Module}/Commands/`.
+Command — **большая операция одного домена**. Живёт в `Domains/{Domain}/Modules/{Module}/Commands/`.
 
-## Вариант 1 — атомарный Command
+## Command одного домена
 
-Одно сфокусированное действие. Переиспользуется в нескольких местах.
+Одна операция одного домена, слишком большая для метода сервиса.
 
 ### execute() с явным аргументом
 
@@ -27,10 +27,10 @@ class YourSaveCommand extends Command implements LoggerAwareInterface
     public function __construct(
         private readonly TransactionManagerInterface $transactionManager,
         private readonly YourRepositoryInterface $repository,
-        private readonly OtherServiceInterface $otherService,
+        private readonly OtherServiceInterface $otherService, // модуль своего домена (O-6)
     ) {}
 
-    public function execute(YourDTO $dto, int $rowIndex): void
+    public function execute(YourDto $dto, int $rowIndex): void
     {
         $this->getLogger()->for($this);
 
@@ -38,9 +38,9 @@ class YourSaveCommand extends Command implements LoggerAwareInterface
             $existing = $this->repository->findByExternalId($dto->externalId);
 
             if ($existing) {
-                $this->repository->update($existing, $dto->toArray());
+                $this->repository->updateFromDto($existing, $dto);
             } else {
-                $model = $this->repository->create($dto->toArray());
+                $model = $this->repository->createFromDto($dto);
                 $this->otherService->notify($model);
             }
         });
@@ -85,40 +85,30 @@ class YourCommand extends Command
 }
 ```
 
-## Вариант 2 — оркестрирующий Command
+## Сценарий над несколькими доменами — Workflow, не Command
 
-Координирует несколько сервисов и атомарных Commands для выполнения полного сценария. Вызывается из Controller, CLI `handle()`, Job.
+«Оркестрирующего Command» нет: координация сервисов разных доменов (заказ + корзина + бонусы + уведомление) — `Workflows/{D}/{M}/{Action}Workflow::execute()`, транзакционен по умолчанию (O-8). Workflow берёт репозитории и сервисы любых доменов напрямую (O-7), Command/Query/Service домена чужой домен не берут — **[ОШИБКА]**, тег `domain-cross-domain-access`. Эталон — `../examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php`.
 
 ```php
-class CreateOrderCommand extends Command
+final class CreateOrderWorkflow
 {
     public function __construct(
         private readonly TransactionManagerInterface $transactionManager,
-        private readonly OrderServiceInterface $orderService,
-        private readonly CartServiceInterface $cartService,
-        private readonly NotifyCommand $notifyCommand,
-        private readonly ApplyBonusesCommand $applyBonusesCommand,
-    ) {}
-
-    private CreateOrderDTO $dto;
-
-    public function setDto(CreateOrderDTO $dto): self
-    {
-        $this->dto = $dto;
-
-        return $this;
+        private readonly OrderServiceInterface $orderService,     // домен Orders
+        private readonly CartServiceInterface $cartService,       // домен Carts
+        private readonly ApplyBonusesCommand $applyBonusesCommand, // домен Bonuses
+    ) {
     }
 
-    public function prepare(): bool
+    public function execute(CreateOrderDto $dto): Order
     {
-        $this->transactionManager->run(function () {
-            $order = $this->orderService->create($this->dto);
-            $this->cartService->clear($this->dto->getUserId());
-            $this->notifyCommand->setOrder($order)->execute();
-            $this->applyBonusesCommand->setOrder($order)->execute();
-        });
+        return $this->transactionManager->run(function () use ($dto) {
+            $order = $this->orderService->create($dto);
+            $this->cartService->clear($dto->getUserId());
+            $this->applyBonusesCommand->execute($order->id);
 
-        return true;
+            return $order;
+        });
     }
 }
 ```
@@ -136,11 +126,11 @@ class CreateOrderCommand extends Command
 ├─ CRUD одной сущности, нет побочных эффектов в других доменах?
 │   └─ → Service
 │
-├─ Атомарное действие, переиспользуется в нескольких местах?
-│   └─ → Атомарный Command
+├─ Большая операция одного домена (много шагов, зависимостей, ветвлений)?
+│   └─ → Command (изменение) / Query (чтение) в модуле
 │
-└─ Полный сценарий: несколько сервисов / доменов / побочные эффекты?
-    └─ → Оркестрирующий Command
+└─ Сценарий над 2+ доменами / агрегатная логика?
+    └─ → Workflow
 ```
 
 ---
@@ -154,7 +144,7 @@ public function store(Request $request): JsonResponse
     $order = $this->orderService->create(...);
     $this->cartService->clear(...);
     $this->notifyCommand->execute();
-    // → вынести в оркестрирующий Command
+    // → вынести в workflow
 }
 
 // ❌ Жирный сервис — оркестрация внутри Service
@@ -164,7 +154,7 @@ class OrderService
     {
         $order = $this->create(...);
         $this->bonusService->apply(...); // чужой домен
-        // → вынести в оркестрирующий Command
+        // → вынести в workflow
     }
 }
 ```
