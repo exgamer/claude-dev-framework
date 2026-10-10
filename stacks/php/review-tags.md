@@ -68,6 +68,7 @@
 | `enum-list-drift` | Новое значение enum не отражено во всех местах, где перечислен старый набор (`in:`, swagger `enum:`, словари фронта, мапперы/allowlist/`match` по этому enum) |
 | `legacy-pattern-copied` | Из легаси или соседнего кода перенесена реализация вопреки правилу стека (слой проверки, форма класса, фильтр, валидация) — в коде или в артефакте (`threats.md`, `design.md`) (`approaches/process/legacy-refactor.md`, O-17) |
 | `scope-param-defaults-unrestricted` | Параметр скоупа в сигнатуре сервиса/репозитория с умолчанием `= null` («без ограничения») — fail-open для будущих вызовов (`security.md`, `tenant-scope-missing`) |
+| `refactor-toggle` | Рефактор/перенос: старая и новая реализация выбираются флагом (конфиг/env/БД, DI по настройке, процент трафика, заголовок, shadow/dual-write) или контракт изменён под старым URL/событием без версии — вместо сохранённого контракта или новой версии (`approaches/process/legacy-refactor.md`, O-19) |
 | `deploy-risk-flag-enabled` | Раскомментированный крон/включённый флаг — риск первого прогона на накопленных данных |
 | `mr-hygiene-lockfile-drift` | `composer.lock` не обновлён вместе с `composer.json`, либо сгенерированные файлы (`.php-cs-fixer.cache`, `storage/api-docs/*.json`) уехали в MR |
 | `ai-style-comment` | Комментарий-пересказ кода построчно, сгенерированный ИИ |
