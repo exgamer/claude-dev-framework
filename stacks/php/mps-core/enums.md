@@ -33,17 +33,13 @@ enum YourStatusEnum: int implements Enumerable
 }
 ```
 
-## Swagger-аннотация
+## Swagger
+
+Атрибутом (`../conventions.md` п. 18), не docblock-аннотацией:
 
 ```php
-/**
- * @OA\Schema(
- *     schema="YourStatusEnum",
- *     type="integer",
- *     enum={1, 2},
- * )
- */
+#[OA\Schema(schema: 'YourStatusEnum', type: 'integer', enum: [1, 2])]
 enum YourStatusEnum: int implements Enumerable
 ```
 
-Ссылка в Request/Response: `ref="#/components/schemas/YourStatusEnum"`.
+Ссылка в Request/Response: `ref: '#/components/schemas/YourStatusEnum'`. Новый кейс — обновить `enum:` и все места, где набор перечислен (`enum-list-drift`).

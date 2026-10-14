@@ -1,9 +1,6 @@
+# Стек qa-playwright: UI-автотесты
 
-# Скилл: qa-writer
-
-Конвенции и структура для UI-автотестов на Python + Playwright + pytest (Page Object Model).
-
-При вызове `/qa-writer` — применяй все правила ниже к текущему проекту.
+Конвенции и структура для UI-автотестов на Python + Playwright + pytest (Page Object Model). Читает `/dev-qa` в режиме `tests` (`skills/dev-qa/SKILL.md`, Шаг 3); общие правила формы кода — `core/style.md`.
 
 ---
 
@@ -236,6 +233,27 @@ expect.soft(button).to_be_enabled()
 | Хардкод URL/текстов | Меняется везде | `data/constants.py` |
 | `try/except Exception` на всё | Глотает реальные ошибки | Ловить конкретные исключения |
 | `data-v-*` селекторы | Меняются при каждой сборке | `id` или `data-qa` |
+| `else`/`elif` после ветки с `return`/`raise`/`continue`, вложенный `if` вместо раннего выхода | Основной сценарий уходит вглубь, читать тяжелее | Ранний выход (`core/style.md`, «Форма кода», `else-after-return`) |
+
+Общие правила формы кода — `core/style.md`, «Форма кода»: они для всех стеков, Python в тестах не исключение.
+
+```python
+# плохо
+def open_modal(self):
+    if self.modal.is_visible():
+        return
+    else:
+        self.button.click()
+        expect(self.modal).to_be_visible()
+
+# хорошо
+def open_modal(self):
+    if self.modal.is_visible():
+        return
+
+    self.button.click()
+    expect(self.modal).to_be_visible()
+```
 
 ---
 

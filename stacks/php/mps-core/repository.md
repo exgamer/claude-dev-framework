@@ -19,8 +19,9 @@
 ---
 
 ```php
-namespace App\Domains\YourDomain\Modules\YourModule\Repositories;
+namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Repositories;   // реализация — в Infrastructure (P-10), интерфейс — в Domains/.../Repositories/
 
+use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
 use Illuminate\Contracts\Database\Query\Builder as BuilderContract;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
 use MPS\Utils\Components\QueryFilters\V2\IntFilter;
@@ -62,6 +63,8 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
 }
 ```
 
+> **Старая форма (P-19, 2026-10-14).** `CRUDRepository::search()` + хук `filterSearch()` + `SearchDataObject` — форма ядра, на которой написаны легаси, `parking_app` и `super_app`. В новом коде она **не используется**: список — явный метод репозитория `paginate…({E}FilterDto, Page)`, один метод собирает один запрос, фильтры подряд (`conventions.md` п. 2a, 12c, 12d). Раздел ниже — для чтения и правок существующего кода на `search()`.
+
 **Правила filterSearch:**
 - Всегда явно указывать `select` — не `select *`
 - JOIN'ы до WHERE условий
@@ -100,14 +103,14 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
 
 ```php
 // ❌ Бизнес-логика в репозитории
-public function findActiveWithDiscount(int $id): array
+public function getActiveWithDiscount(int $id): ?Tariff
 {
-    $item = $this->findById($id);
-    if ($item['status'] !== StatusEnum::ACTIVE->value) {
-        throw new BadRequestAppException('Not active'); // бизнес-правило → в Service
+    $item = $this->oneById($id);
+    if ($item->status !== StatusEnum::ACTIVE) {
+        throw new BadRequestAppException('Тариф не активен'); // бизнес-правило → в Service
     }
     
-    $item['price'] = $item['price'] * 0.9; // трансформация → в Service/Command
+    $item->price = $item->price * 0.9; // трансформация → в Service/Command
     
     return $item;
 }
@@ -122,8 +125,12 @@ public function getDefaultByParkingId(int $parkingId): ?Tariff
         ->first();
 }
 
-public function getAllByColumn(string $value): Collection
+/** @return Collection<int, Tariff> */
+public function allByParkingId(int $parkingId): Collection
 {
-    return $this->allByCondition(['column' => $value]);
+    return $this->getQuery()
+        ->where('parking_id', $parkingId)
+        ->orderBy('id')
+        ->get();
 }
 ```

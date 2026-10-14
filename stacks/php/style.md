@@ -25,7 +25,7 @@
   ```
 - Шаблонные docblock-и вида `@package App\…`, «Реализует бизнес-логику управления…», «Обеспечивает типобезопасность…» (стиль части `super_app`) — **[ВНИМАНИЕ]**, это пересказ, а не смысл.
 - `@param`/`@return` в docblock — только если добавляют информацию сверх сигнатуры (`array<int, string[]>`, generic, `@throws`). Дублировать `@param int $id` при типизированной сигнатуре не нужно.
-- Описание метода, пересказывающее его имя (`findAliveByIds` → «Неудалённые здания по набору id»), не писать — **[ИНФО]** (`core/style.md`, «Комментарии»):
+- Что писать в комментариях и docblock, чего не писать, уровни и теги — `core/style.md`, «Комментарии». PHP-пример про описание, повторяющее имя (**[ИНФО]**, `comment-restates-name`):
 
     ```php
     // плохо
@@ -53,7 +53,77 @@
 
 ## Форма кода
 
-- Ранний выход: `if (! $item) { throw new NotFoundAppException('…'); }` — сразу, основной сценарий без вложенности.
+- Ранний выход вместо `else` (`core/style.md`, «Форма кода»; `else-after-return`): `if (! $item) { throw new NotFoundAppException('…'); }` — сразу, основной сценарий без вложенности; ветка завершилась `return`/`throw`/`continue` — `else`/`elseif` после неё не пишется; выбор по значению — `match`.
+
+  ```php
+  // плохо
+  if ($session === null) {
+      throw new NotFoundAppException('сессия не найдена');
+  } else {
+      if ($session->isClosed()) {
+          return $session;
+      } else {
+          $this->close($session);
+
+          return $session;
+      }
+  }
+
+  // хорошо
+  if ($session === null) {
+      throw new NotFoundAppException('сессия не найдена');
+  }
+
+  if ($session->isClosed()) {
+      return $session;
+  }
+
+  $this->close($session);
+
+  return $session;
+  ```
+- Читается сверху вниз (`core/style.md`, «Форма кода»; `nested-call-chain`, **[ВНИМАНИЕ]**): замыкание не передаёт поведение в свой метод, вызов не вкладывается в вызов, лямбда — одна строка только там, где её требует библиотека, параметр замыкания не затеняет внешнюю переменную.
+
+  ```php
+  // плохо: поведение уезжает в хелпер, два уровня скобок, $query затеняет $query
+  $query = $this->getQuery()
+      ->where('orders.user_id', $userId)
+      ->whereExists($this->service(
+          static fn (Builder $query): Builder => $query->whereNotIn('services.type', self::QUANTITY_BASED_SERVICE_TYPES),
+      ));
+
+  // хорошо: подзапрос написан на месте, замыкание — только там, где Laravel без него не умеет
+  $query = $this->getQuery()
+      ->where('orders.user_id', $userId)
+      ->whereExists(static function (Builder $service): void {
+          $service->selectRaw('1')
+              ->from('services')
+              ->whereColumn('services.id', 'orders.service_id')
+              ->whereNull('services.deleted_at')
+              ->whereNotIn('services.type', self::QUANTITY_BASED_SERVICE_TYPES);
+      });
+
+  // плохо: вызов в вызове и индекс по результату
+  return $this->buildSettingCardsWorkflow->handle([$this->settingService->getByKey($key)])[0];
+
+  // хорошо: последовательно
+  $setting = $this->settingService->getByKey($key);
+  $cards = $this->buildSettingCardsWorkflow->handle([$setting]);
+
+  return $cards[0];
+
+  // плохо: четыре вызова один в другом
+  $ids = array_values(array_unique(array_filter(array_map(fn ($s) => $s->buildingId, $settings))));
+
+  // хорошо
+  $buildingIds = [];
+  foreach ($settings as $setting) {
+      if ($setting->buildingId !== null) {
+          $buildingIds[$setting->buildingId] = $setting->buildingId;
+      }
+  }
+  $buildingIds = array_values($buildingIds);
+  ```
 - Пустая строка перед `return`/`throw`/`try`/`break`/`continue` и после блоков `if`/`foreach` (cs-fixer `ErickSkrauch/line_break_after_statements`).
 - `! $value` — с пробелом; конкатенация `$a . $b` — с пробелами; короткие массивы; одинарные кавычки.
 - `=` и `=>` не выравниваются по колонке.
@@ -76,7 +146,8 @@
 | Request | `Http/Requests/{Entity}/{Create,Update,Index}Request` | `Requests/Tariffs/CreateRequest` |
 | Response | `{Entity}Response`, `{Entity}PaginatedResponse` | `TariffResponse` |
 | Job | `{Action}Job` | `ActivatePlannedTariffJob` |
-| Метод поиска в репозитории | `get…By…` (один) / `all…By…` (много) | `getDefaultTariffsByParkingId` |
+| Метод репозитория | один — `get…By…`/`oneBy…` → `?Model`; много — `all…By…` → `Collection`; список — `paginate…({E}FilterDto, Page)`/`list…` (P-19); запись — `createFromDto`/`updateFromDto`/типизированный метод (п. 11a); `*OrFail` — нет (п. 12a) | `getDefaultByParkingId`, `allByParkingId`, `paginateByFilter` |
+| Публичный метод сервиса для точки входа | `findById(int $id, ?array $scope): ?Model` — `null` переводит в 404 контроллер (п. 12a) | `findById` |
 
 Имена DTO и Request — как в `parking_app` (решения P-5, P-7): `{Entity}Dto`, `Http/Requests/{Entity}/{Create,Update,Index}Request`. Суффикс в PHP — `Dto`, в Go — `DTO` (аббревиатуры заглавными) — различие стеков. Варианты `super_app` (`BuildingDataDTO`, `Requests/CreateRequest` без папки сущности) в новом коде — **[ВНИМАНИЕ]**. Междоменный класс — `{Action}Workflow` с `execute()` (решение P-2); `*Command` в `Workflows/` parking_app — старый нейминг, переименовывается только в рамках задачи.
 

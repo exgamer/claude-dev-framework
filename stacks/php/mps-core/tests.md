@@ -24,7 +24,7 @@
 
 ```php
 // Чистый Unit — Helper, Trait, DataObject
-namespace Tests\Unit\Domains\YourDomain\Modules\YourModule;
+namespace Tests\Unit\ParkingApp\Core\Helpers;
 
 use PHPUnit\Framework\TestCase;
 
@@ -39,7 +39,7 @@ class YourHelperTest extends TestCase
 
 ```php
 // Unit с мокированием зависимостей — Service, Command
-namespace Tests\Unit\Domains\YourDomain\Modules\YourModule;
+namespace Tests\Unit\ParkingApp\Domains\YourDomain\YourModule;
 
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -70,7 +70,7 @@ class YourServiceTest extends TestCase
 Полный стек с реальной БД. Каждый тест откатывается в транзакцию.
 
 ```php
-namespace Tests\Feature\Entrypoints\Admin\YourDomain\YourModule;
+namespace Tests\Feature\ParkingApp\Admin\YourDomain\YourModule;
 
 use Tests\Feature\FeatureTestCase;
 
@@ -98,43 +98,38 @@ class PositiveTest extends FeatureTestCase
 
 ## Mock-классы
 
-Mock — тестовая заглушка для **внешней интеграции** (HTTP-клиент, внешнее API, платёжный шлюз).
-
-**Где живёт:** `Infrastructure/{Тип}/{Domain}/{Module}/Mocks/`
+Mock — тестовая заглушка для **внешней интеграции** (Gateway внешней системы, платёжный шлюз). Интерфейс объявляет домен-потребитель (`Domains/{D}/Modules/{M}/Repositories/{System}{Purpose}GatewayInterface.php`), реализация и мок — в инфраструктуре по имени внешней системы (`../structure.md`, `../conventions.md`, «Модели и внешние системы»):
 
 ```
-Infrastructure/{Тип}/{Domain}/{Module}/
-├── Integrations/
-│   └── ExternalService.php       — реальная реализация
-└── Mocks/
-    └── ExternalServiceMock.php   — заглушка для тестов
+Infrastructure/Http/{Provider}/{Product}/
+├── {Provider}{Purpose}Gateway.php        — реальная реализация
+└── Mocks/{Provider}{Purpose}GatewayMock.php
 ```
 
 **Не класть в `Domains/`** — домен не знает про инфраструктурные детали.
-**Не класть в `tests/`** — Mock регистрируется в `definitions.php` и подключается автоматически, это не тестовый файл.
+**Не класть в `tests/`** — Mock регистрируется в `definitions.php` и подключается автоматически в тестовом окружении, это не тестовый файл.
 
 ```php
-namespace App\Infrastructure\YourDomain\YourModule\Mocks;
+namespace App\ParkingApp\Infrastructure\Http\Lpm\Camera\Mocks;
 
-use App\Domains\YourDomain\Modules\YourModule\Interfaces\ExternalServiceInterface;
+use App\ParkingApp\Domains\Catalog\Modules\Parkings\Repositories\LpmCameraGatewayInterface;
 
-class ExternalServiceMock implements ExternalServiceInterface
+class LpmCameraGatewayMock implements LpmCameraGatewayInterface
 {
-    public function send(array $data): bool
+    public function holdOpen(int $cameraId): bool
     {
         return true;
     }
 }
 ```
 
-Регистрация в `Infrastructure/Postgres/{Domain}/Providers/definitions.php`:
+Регистрация — в `definitions.php` инфраструктуры рядом с реализацией:
 
 ```php
 [
-    'abstract' => ExternalServiceInterface::class,
-    'concrete' => ExternalService::class,
-    'mock'     => ExternalServiceMock::class,
-    'alias'    => 'external-service',
+    'abstract' => LpmCameraGatewayInterface::class,
+    'concrete' => LpmCameraGateway::class,
+    'mock'     => LpmCameraGatewayMock::class,
 ],
 ```
 
@@ -142,7 +137,7 @@ class ExternalServiceMock implements ExternalServiceInterface
 
 ```php
 // ❌ Unit тест наследует FeatureTestCase — переместить в Feature/
-namespace Tests\Unit\Domains\Catalog\Modules\ProductOffer;
+namespace Tests\Unit\ParkingApp\Domains\Catalog\ProductOffer;
 
 use Tests\Feature\FeatureTestCase; // ← нельзя в Unit/
 

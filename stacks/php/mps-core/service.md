@@ -47,11 +47,10 @@ class YourService extends CrudServiceDecorator implements YourServiceInterface
     // Кастомная сигнатура — не ограничена CreateCommandDataObject
     public function createItem(YourDto $dto): YourModel
     {
-        return $this->transactionManager->run(function () use ($dto) {
-            $model = $this->repository->createFromDto($dto);
-            $this->otherService->notify($model);
-            return $model;
-        });
+        $model = $this->transactionManager->run(fn () => $this->repository->createFromDto($dto));
+        $this->otherService->notify($model);   // побочный эффект — после коммита (../conventions.md п. 17)
+
+        return $model;
     }
 
     // Стандартный CRUD доступен через __call

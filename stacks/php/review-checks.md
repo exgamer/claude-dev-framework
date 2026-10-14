@@ -12,6 +12,7 @@
 |---|---|
 | Бизнес-логика в Model или Repository (`if` по статусам, трансформация данных, вызов другого сервиса/репозитория, бизнес-исключение кроме `NotFoundAppException`) | Model, Repository |
 | Толстый контроллер (логика вместо делегирования в Service/Command) | Controller |
+| Прямой запрос к БД вне репозитория: `DB::`, `Model::where`/`query()`/`find`/`all()`, `->get()`/`->first()` по модели (`service-direct-db-query`, `conventions.md` п. 2) | Service, Command, Query, **Workflow** — проверка grep-ом в 5.5 п. 0 |
 | Repository вызывает внешний сервис или другой Repository | Repository |
 | `throw new \Exception` / `\RuntimeException` вместо `MPS\Core\Exceptions\*AppException` | любой слой |
 | Стандартный `$app->singleton(Interface::class, Class::class)` вместо `definitions.php` | ServiceProvider, boot() |
@@ -51,8 +52,29 @@ Workflow (`Workflows/`) с записью — всегда в транзакци
 
 ## 5.5 — Проверки за пределами дифа
 
-Эти находки не видны в одном файле — их ловят по репозиторию и по данным. Выполняй при ревью дифа/MR (не при `--all`):
+Эти находки не видны в одном файле — их ловят по репозиторию и по данным. Выполняй при ревью дифа/MR; при `--all` — только пп. 0, 0a, 0b по всему проекту:
 
+0. **Запросы к БД вне репозитория** — всегда, механически, не по памяти (кейс 2026-10-14: запросы в workflow прошли, потому что искали глазами «в сервисе»):
+   ```
+   grep -rnE "DB::|::(query|where|whereIn|whereKey|find|findOrFail|all|firstWhere|create|insert|updateOrCreate|firstOrCreate)\(" \
+     Domains Contexts Workflows Entrypoints --include='*.php' | grep -vE "/(Repositories|Models)/|/Infrastructure/"
+   ```
+   Корни — папки проекта с кодом доменов (в `parking_app` они в корне подпроекта, в других — под `app/`): смотри `structure.md`. Паттерн ловит статические вызовы по модели (`Session::query()`, `User::where(...)`) и `DB::`; методы коллекций (`->pluck()`, `->first()`) намеренно не ищутся — шум. Каждая строка в `Services/`, `Commands/`, `Queries/`, `Workflows/`, `Validators/`, `Controllers/` — **[ОШИБКА]** `service-direct-db-query` (в Request — `request-queries-db`); `::create(`/`::all(` у DTO, enum, фабрик — не БД, отсеивать по классу. При ревью дифа — по файлам дифа и их соседям в модуле, при `--all` — по всему проекту. Проверено на эталоне `parking_app` 2026-10-14: одно срабатывание, и оно настоящее (`SessionEventService` → `Session::query()`), шума нет.
+0a. **Повторённая обработка формата** (`duplicated-format-logic`, `core/principles.md`, «Повторяющаяся обработка — один хелпер»):
+   ```
+   grep -rnE "preg_replace\('/(\\\\D|\[\^0-9\]|\[\^\\\\d\])|str_starts_with\(.*'(\+7|8)'|substr\(\$(phone|iin|card)|'7' \. |mb_substr\(\$phone" \
+     --include='*.php' . | grep -vE "/vendor/|/Helpers/|/tests/"
+   ```
+   Строка вне `Core/Helpers/` — кандидат: есть хелпер в проекте или шаблон в `MPS\Utils\Enums\RegexEnum` — **[ОШИБКА]**, второе вхождение без хелпера — **[ВНИМАНИЕ]**, одно и хелпера нет — **[ИНФО]** с предложением завести. В находке — все файлы с копиями.
+0b. **Индекс массива без проверки** (`array-key-unchecked`, `conventions.md` п. 11b) — по файлам дифа, где есть массив снаружи (`array $payload`, `json_decode`, `config(`, `->all()`, `explode(`, `preg_match(`, `keyBy(`). Две команды (обычный `grep -E`, без `-P` — на macOS его нет):
+   ```
+   # обращение по ключу, кроме уже защищённых (??, isset, array_key_exists, empty, unset) и присваиваний
+   grep -nE "\\\$[a-zA-Z_]+\[('[^']+'|\"[^\"]+\"|[0-9]+|\\\$[a-zA-Z_>-]+)\]" <файлы дифа> \
+     | grep -vE "\?\?|isset\(|array_key_exists\(|empty\(|unset\(|\]\s*=[^=>]"
+   # деструктуризация explode и группы preg_match
+   grep -nE "\[\\\$[a-zA-Z_, \\\$]+\]\s*=\s*explode\(|preg_match\(" <файлы дифа>
+   ```
+   Это список кандидатов, не вердикт: по каждому — «откуда массив и проверен ли ключ выше». Внешний/динамический без `isset`/`array_key_exists`/`??`/проверки `count`/`=== 1` — **[ОШИБКА]**; собранный в той же функции, `validated()` по `required`-полю, индекс по результату `array_map`/`array_column` над проверенными данными — не находка. На эталоне `parking_app` команда даёт ~50 строк, из них настоящих единицы (`TimeHelper`: `$parts[0]`/`$parts[1]` после `explode(':')` без проверки формата). `composer phpstan` ловит `offsetAccess.notFound` только при известной форме массива — его прогон не заменяет проверку.
 1. **Разъезд захардкоженных списков.** В дифе появился/расширился enum, `Rule::in(...)`, `in:a,b` — прогони `grep` по старому набору значений: другие Request'ы, `enum: [...]` / `@OA\Property(enum=...)` в аннотациях, словари во фронтовых эндпоинтах, `match`/`switch` по значениям. Рассинхрон — **[ОШИБКА]** с перечислением мест.
 2. **Данные под миграцию поведения.** Новый каст модели (`'col' => SomeEnum::class`), новое значение enum, новый `NOT NULL`, новый check-constraint — сначала посмотреть, что лежит в колонке:
    ```

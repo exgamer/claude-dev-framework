@@ -8,13 +8,13 @@
   ```go
   // GET / query-параметры
   request := indexRequest{}
-  if ve := validators.ValidateRequestQuery(c, &request); ve == false {
+  if ok := validators.ValidateRequestQuery(c, &request); !ok {
       return
   }
 
   // POST / PUT / PATCH / body
   request := createRequest{}
-  if ve := validators.ValidateRequestBody(c, &request); ve == false {
+  if ok := validators.ValidateRequestBody(c, &request); !ok {
       return
   }
   ```
@@ -165,6 +165,8 @@ Swaggo-нотация для path-параметров использует `:id
 - `middleware.MetricsMiddleware(a)`
 
 `middleware.FormattedResponseMiddleware()` — указать если отсутствует, но не считать ошибкой: есть редкие случаи когда он не нужен.
+
+`LoggerMiddleware` на DEBUG пишет тело запроса целиком: группа с ручками, принимающими пароли, токены, секреты (логин, смена пароля, HMAC), — без него или с исключением этих ручек (`review-findings.md`, «Безопасность»).
 
 Порядок подключения обязателен:
 

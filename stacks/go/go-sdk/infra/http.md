@@ -107,19 +107,24 @@ PUT / PATCH — аналогично POST, только другой конст�
 ## repository.go
 
 ```go
-func NewHttpRepository() *HttpRepository {
-    return &HttpRepository{}
+// Адрес и таймаут — из конфига через конструктор (bootstrap), не литералом в репозитории
+// (`conventions.md` п. 15, `architecture/integrations.md`); клиент не создаётся внутри.
+func NewHttpRepository(baseURL string, timeout time.Duration) *HttpRepository {
+    return &HttpRepository{baseURL: strings.TrimSuffix(baseURL, "/"), timeout: timeout}
 }
 
-type HttpRepository struct{}
+type HttpRepository struct {
+    baseURL string
+    timeout time.Duration
+}
 
 func (r *HttpRepository) GetById(ctx context.Context, id uint) (*domain.City, error) {
     httpInfo := gin.GetHttpInfoFromContext(ctx)
 
     resp, err := builder.NewGetHttpRequestBuilder[builder.Response[city]](
         ctx,
-        "http://catalog-service/api/v1/cities/"+strconv.Itoa(int(id)),
-    ).SetRequestHeaders(map[string]string{
+        r.baseURL+"/api/v1/cities/"+strconv.FormatUint(uint64(id), 10),
+    ).SetRequestTimeout(r.timeout).SetRequestHeaders(map[string]string{
         constants.RequestIdHeaderName: httpInfo.RequestId,
     }).GetResult()
 

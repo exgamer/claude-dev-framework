@@ -28,7 +28,7 @@
 **Допустимые зависимости:**
 ```
 Entrypoint     ──→  Workflow / Domain
-Workflow       ──→  Domain / Infrastructure
+Workflow       ──→  Domain          (интерфейсы репозиториев/сервисов доменов; к БД, кэшу, HTTP — только через них, `architecture/cross-domain.md`)
 Infrastructure ──→  Domain
 Bootstrap      ──→  Entrypoint + Workflow + Infrastructure + Domain
 ```
@@ -65,8 +65,8 @@ Infrastructure → Entrypoint        ✗
 
 ### Workflow Layer *(опциональный)*
 - **Что**: оркестрирует несколько доменных сервисов для бизнес-процесса, не принадлежащего ни одному домену.
-- **Состав**: `{конкретное_действие}_workflow.go` (оркестратор), `dto.go` (Input/Result), `repository.go` (опционально — если workflow требует специфических запросов).
-- **Правила**: зависит от Domain; не знает про HTTP/Gin/очереди; может иметь собственный репозиторий если логика принадлежит процессу.
+- **Состав**: `{конкретное_действие}_workflow.go` (оркестратор), `dto.go` (Input/Result), `tx_manager.go` (интерфейс транзакции, если workflow пишет — O-8).
+- **Правила**: зависит только от Domain — берёт интерфейсы репозиториев и сервисов доменов напрямую (O-7); не знает про HTTP/Gin/очереди и инфраструктуру. Своего репозитория у workflow нет: нужен запрос — метод в репозитории того домена, чья таблица; свой интерфейс workflow объявляет только для того, чего у доменов нет (`TxManager`, `go-sdk/domain.md`, «Cross-domain зависимость»).
 - **Когда использовать**: операция охватывает 2+ доменов как равноправных участников; бизнес-процесс из нескольких шагов; нужно переиспользовать из разных точек входа (HTTP + Consumer).
 
 ### Bootstrap / Application Layer
@@ -113,26 +113,26 @@ internal/
 │           ├── consumer_registry.go
 │           └── {module}_consumer.go
 │
-└── infrastructure/
-    ├── postgres/{domain}/{module}/
-    │   ├── model.go
-    │   ├── repository.go
-    │   └── mapper.go
-    ├── redis/{domain}/{module}/
-    │   └── repository.go
-    ├── http/{provider}/{product}/            ← внешний провайдер (kaspi/autopay, webkassa)
-    │   ├── model.go
-    │   ├── repository.go
-    │   └── mapper.go
-    ├── http/{service}/{module}/              ← наш другой микросервис
-    └── {tech}/{domain}/{module}/             ← другая технология (jwt/identity/admin)
-
-    └── workflows/                              ← опционально
-        └── {domain}/
-            └── {module}/
-                ├── {конкретное_действие}_workflow.go
-                ├── tx_manager.go               ← если workflow пишет (O-8)
-                └── dto.go
+├── infrastructure/
+│   ├── postgres/{domain}/{module}/
+│   │   ├── model.go
+│   │   ├── repository.go
+│   │   └── mapper.go
+│   ├── redis/{domain}/{module}/
+│   │   └── repository.go
+│   ├── http/{provider}/{product}/            ← внешний провайдер (kaspi/autopay, webkassa)
+│   │   ├── model.go
+│   │   ├── repository.go
+│   │   └── mapper.go
+│   ├── http/{service}/{module}/              ← наш другой микросервис
+│   └── {tech}/{domain}/{module}/             ← другая технология (jwt/identity/admin)
+│
+└── workflows/                                  ← опционально, отдельный слой (не внутри infrastructure)
+    └── {domain}/
+        └── {module}/
+            ├── {конкретное_действие}_workflow.go
+            ├── tx_manager.go                   ← если workflow пишет (O-8)
+            └── dto.go
 ```
 
 **Bootstrap путь**: `bootstrap/{module}/` если модулей мало или домен не нужен; `bootstrap/{domain}/{module}/` если нужна группировка по домену. Выбор определяется удобством навигации, не правилом. Все остальные слои всегда используют `{domain}/{module}/`.
@@ -239,6 +239,7 @@ main()
 | unit | рядом с кодом: `{file}_test.go` | `domains/billing/tariff/service_test.go` |
 | фикстуры | `testdata/` рядом с тестом | `infrastructure/jwt/identity/admin/testdata/` |
 | in-memory фейки репозиториев | рядом с тестом; общие для нескольких пакетов — `internal/testsupport/{domain}fakes/` | — |
+| хелпер преобразования формата (телефон, ИИН, номер карты, деньги, маска) — чистые функции над примитивами, без доменных типов и зависимостей | сначала SDK (`core/pkg/validation`: `NormalizePhoneNumber`, `CheckValidPhone`); нет в SDK — `pkg/{thing}/{thing}.go` (как `pkg/lpmsign`, `pkg/cryptenvelope`), `{thing}_test.go` рядом; вызов — из маппера хендлера/consumer'а и Response-маппера, не из сервиса и репозитория (`core/principles.md`, «Повторяющаяся обработка — один хелпер») | `duplicated-format-logic` |
 | интеграционные (живая БД/Redis) | рядом с кодом, с `//go:build integration` в первой строке | запуск: `go test -tags integration ./...` |
 | e2e (сервис целиком по HTTP) | `tests/<сценарий>/` в корне | `tests/kaspi/`, `tests/halyk/` |
 

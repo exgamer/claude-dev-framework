@@ -2,116 +2,93 @@
 
 > Справочник по использованию `mps/core` / `mps/utils` (перенесён из `claude-skills/php-arch`, пути приведены к структуре фреймворка). **Где класть файлы — `../structure.md`**, что есть в ядре и с какой версии — `capabilities.md`, официальная дока — `official/`. При расхождении главнее они — в фактах API (что есть и как вызывается); что из этого использовать — по правилам фреймворка (`../conventions.md`): примеры `official/` с `expanded`, `*OrFail`, суффиксом `DTO` — не образец.
 
+Правило — `../conventions.md` п. 18: атрибуты `#[OA\…]` (`use OpenApi\Attributes as OA;`), не docblock-аннотации `@OA\…`. Тексты `summary`/`description` — по-русски, по делу (`core/style.md`, «Любой текст для людей»). Эталон — `../examples/parking_app/Entrypoints/Admin/Billing/Tariffs/`.
+
 ## Где что живёт
 
-| Что | Где                                   |
-|---|---------------------------------------|
-| `@OA\Info`, глобальные параметры и схемы | `app/Http/Controllers/Controller.php` |
-| `@OA\Get/Post/Put/Delete` на методах | Controller в `Entrypoints/{channel}/` |
-| `@OA\Schema` полей запроса | Request класс                         |
-| `@OA\Schema` полей ответа | Response класс                        |
+| Что | Где |
+|---|---|
+| `#[OA\Info]`, общие параметры (`Authorization`, `Accept-Language`), общие ответы (`ValidationError422`, `NotFound404`), схемы ошибок | `Core/OpenApi/` подпроекта (`../structure.md`) |
+| `#[OA\Tag]` на классе, `#[OA\Get|Post|Put|Delete]` на методах | Controller в `Entrypoints/{Context}/{Domain}/{Module}/Http/Controllers/` |
+| `#[OA\Schema]` полей тела запроса | Request (`Create`/`Update`) |
+| `#[OA\Parameter]` query-параметров | `IndexRequest` (ссылки из контроллера — `ref: '#/components/parameters/…'`) |
+| `#[OA\Schema]` полей ответа | Response |
+| `#[OA\Schema]` enum | enum (`enums.md`) |
 
----
+**Тег:** `'{Context} {Подпроект}: {Сущность}'` — `'Admin Parking: Тарифы'`. Один и тот же на `#[OA\Tag]` класса и в `tags:` каждого метода.
 
 ## Controller — метод
 
 ```php
-/**
- * @OA\Put(
- *     operationId="basketUpsert",
- *     path="/api/cart/basket",
- *     tags={"cart:basket:client"},
- *     summary="Добавление",
- *     description="Добавление",
- *     @OA\Parameter(ref="#/components/parameters/app_auth"),
- *     @OA\Parameter(ref="#/components/parameters/app_device_id"),
- *     @OA\Parameter(ref="#/components/parameters/app_locale"),
- *     @OA\RequestBody(
- *       required=true,
- *       @OA\JsonContent(ref="#/components/schemas/BasketUpsertRequest"),
- *     ),
- *     @OA\Response(
- *       response=201,
- *       description="Ok",
- *       @OA\JsonContent(ref="#/components/schemas/BasketResponse"),
- *     ),
- *     @OA\Response(response=422, ref="#/components/responses/422"),
- * )
- */
-public function upsert(BasketUpsertRequest $request): JsonResponse { ... }
+#[OA\Post(
+    path: '/parking/admin/tariffs',
+    summary: 'Создание тарифа',
+    security: [['Authorization' => []]],
+    tags: ['Admin Parking: Тарифы'],
+    requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/TariffCreateRequest')),
+    responses: [
+        new OA\Response(
+            response: 201,
+            description: 'Тариф создан',
+            content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'data', ref: '#/components/schemas/TariffResponse'),
+            ])
+        ),
+        new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
+        new OA\Response(ref: '#/components/responses/NotFound404', response: 404),
+        new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
+    ]
+)]
+public function create(CreateRequest $request): JsonResponse { … }
 ```
 
-**Формат тегов:** `{domain}:{module}:{channel}` — например `cart:basket:client`, `order:order:admin`
-
-**Готовые параметры (ref):**
-- `app_auth` — заголовок Authorization
-- `app_locale` — заголовок Accept-Language
-- `app_device_id` — заголовок Device-Id
-- `app_api_key` — заголовок Api-Key
-- `search_page`, `search_per_page`, `search_sort` — query-параметры пагинации
-
-**Готовые ответы (ref):**
-- `#/components/responses/422` — ошибка валидации
-- `#/components/responses/204` — пустой ответ
-
----
+- У каждого метода — `404` (где есть id) и `500` (`../checklist.md` п. 24).
+- Обёртка `success`/`data` в ответе описывается: её даёт `ApiResponseMiddleware`, и это фактический формат (`../conventions.md` п. 19); сам код обёртку не собирает.
 
 ## Request — схема
 
 ```php
-/**
- * @OA\Schema(
- *    required={"products"},
- *    @OA\Property(
- *      property="products",
- *      title="Товары",
- *      type="array",
- *      @OA\Items(
- *        required={"product_id", "quantity"},
- *        @OA\Property(property="product_id", title="ID", type="integer", example="1"),
- *        @OA\Property(property="quantity",   title="Кол-во", type="integer", example="1"),
- *        @OA\Property(
- *          property="source",
- *          ref="#/components/schemas/BasketSourceEnum",
- *          nullable=true,
- *        ),
- *      ),
- *    ),
- * )
- */
-class BasketUpsertRequest extends CommandRequest { ... }
+#[OA\Schema(
+    schema: 'TariffCreateRequest',
+    required: ['parking_id', 'name'],
+    properties: [
+        new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
+        new OA\Property(property: 'name', description: 'Название тарифа', type: 'string', example: 'Стандарт'),
+        new OA\Property(property: 'status', ref: '#/components/schemas/TariffStatusEnum', nullable: true),
+    ],
+    type: 'object'
+)]
+class CreateRequest extends Request { … }
 ```
 
-Схема называется по имени класса автоматически (`BasketUpsertRequest` → `#/components/schemas/BasketUpsertRequest`).
+Query-параметры списка — на `IndexRequest`:
 
----
+```php
+#[OA\Parameter(parameter: 'TariffsIndexRequestStatus', name: 'status', description: 'Статус', in: 'query', schema: new OA\Schema(ref: '#/components/schemas/TariffStatusEnum'))]
+#[OA\Parameter(parameter: 'TariffsIndexRequestSort', name: 'sort', description: 'Сортировка', in: 'query', schema: new OA\Schema(ref: '#/components/schemas/TariffSortEnum'))]
+class IndexRequest extends SearchRequest { … }
+```
 
 ## Response — схема
 
 ```php
-/**
- * @OA\Schema(
- *   @OA\Property(property="id",   title="ID",    type="integer"),
- *   @OA\Property(property="name", title="Имя",   type="string"),
- * )
- */
-class BasketResponse extends JsonResponse {}
+#[OA\Schema(schema: 'TariffResponse', properties: [
+    new OA\Property(property: 'id', description: 'ID тарифа', type: 'integer', example: 1),
+    new OA\Property(property: 'name', description: 'Название', type: 'string', example: 'Стандарт'),
+], type: 'object')]
+class TariffResponse extends JsonResource {}
 ```
-
-Response-класс пустой — только аннотация.
-
----
 
 ## Enum — схема
 
 ```php
-/**
- * @OA\Schema(
- *   type="string",
- *   enum={"pending","active","archived"},
- * )
- */
-enum StatusEnum: string { ... }
+#[OA\Schema(schema: 'TariffStatusEnum', type: 'string', enum: ['active', 'archived'])]
+enum TariffStatusEnum: string implements Enumerable { … }
 ```
 
-Ссылка в свойстве: `ref="#/components/schemas/StatusEnum"`.
+Ссылка в свойстве: `ref: '#/components/schemas/TariffStatusEnum'`. Новый кейс enum → обновить `enum:` здесь и во всех местах, где перечислен набор (`enum-list-drift`).
+
+## Генерация
+
+Изменились роуты, Request, Response — Swagger перегенерирован перед MR (`regulations/rest-api.md`, `review-checks.md` «Гигиена MR»); сгенерированный `storage/api-docs/*.json` в MR не уезжает посторонней правкой.

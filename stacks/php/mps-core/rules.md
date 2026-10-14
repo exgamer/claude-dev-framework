@@ -39,9 +39,11 @@ return [
 ];
 ```
 
-**Где находится:**
-- `Infrastructure/Postgres/{Domain}/Providers/definitions.php` — биндинги домена (целевая структура)
-- `config/definitions.php` — только глобальные, cross-domain биндинги
+**Где находится** (`../conventions.md` п. 7, `../structure.md`):
+- `Domains/{Domain}/definitions.php` — сервисы, Command/Query домена (`Interface → класс`)
+- `Infrastructure/Postgres/{Domain}/Providers/definitions.php` — репозитории (`RepositoryInterface → Repository`), моки интеграций
+- `Core/definitions.php` — технические библиотеки подпроекта (AINA-2744)
+- `config/definitions.php` — только глобальные биндинги приложения
 
 **Поля:**
 - `abstract` — интерфейс (обязательно)
@@ -50,7 +52,7 @@ return [
 - `bindType` — по умолчанию `'singleton'`. До core 1.9.0 — только строки `'singleton'`/`'bind'` (иначе исключение). С **core ≥ 1.9.0** — строка или `MPS\Core\Components\Container\Enums\BindTypeEnum`: `singleton`, `bind`, `scoped`, `singletonIf`, `bindIf`, `scopedIf`.
 - `alias` — строковый псевдоним для `$application->alias()`
 
-Новый домен — новый `definitions.php` в `Infrastructure/Postgres/{Domain}/Providers/`. Не добавлять биндинги домена в глобальный `config/definitions.php`.
+Новый домен — свои `definitions.php` в `Domains/{Domain}/` и `Infrastructure/Postgres/{Domain}/Providers/`. Не добавлять биндинги домена в глобальный `config/definitions.php`.
 
 ## Исключения — рекомендуется из MPS\Core\Exceptions
 

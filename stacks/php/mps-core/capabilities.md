@@ -17,9 +17,9 @@
 | Задача | Что взять |
 |---|---|
 | DTO | `MPS\Core\DataObjects\DataObject`: `::make()`, `fromArray()`, `toArray()`, `toArrayWithSnakeKeys()`, `toArrayWithCamelKeys()`, `validated()`; коллекция — `DataObjectCollection` (`pushItem`) |
-| Репозиторий БД | `MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository` (+ `CRUDRepositoryInterface`): `create`, `oneById`, `oneByIdOrFail`, `oneByCondition`, `allByCondition`, `countByCondition`, `isUnique`, `search`, `update`, `updateById`, `upsert`, `delete`, `deleteById`; запросы — `getQuery()`; фильтры поиска — override `filterSearch()` |
+| Репозиторий БД | `MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository` (+ `CRUDRepositoryInterface`): `create`, `oneById`, `oneByIdOrFail` (не вызывать — `*OrFail` не используются, `conventions.md` п. 12a), `oneByCondition`, `allByCondition`, `countByCondition`, `isUnique`, `search`, `update`, `updateById`, `upsert`, `delete`, `deleteById`; запросы — `getQuery()`; `search`/`filterSearch()`/`SearchDataObject` — старая форма списка, в новом коде не используются (P-19, `conventions.md` п. 2a) |
 | Сервис | `MPS\Core\Services\Service`; сложный сервис поверх CRUD — `CrudServiceDecorator` (core ≥ 1.7.0); CRUD целиком — `Components\CRUD\Services\Database\Eloquent\CRUDService` (`create/update/delete(*CommandDataObject)`, `searchById`, `deleteById`), поиск — `SearchAwareTrait` (`search`, `searchById`, `searchByIds`) |
-| Параметры поиска | `Components\CRUD\DataObjects\SearchDataObject` (`setParams`, `setPerPage`, `setPage`) |
+| Параметры поиска (старая форма `search()`, P-19 — только для существующего кода) | `Components\CRUD\DataObjects\SearchDataObject` (`setParams`, `setPerPage`, `setPage`) |
 | События CRUD | `Components\CRUD\Events\{Before,After}{Modify,Delete}Event`, `AfterSearchEvent` |
 | Модель | `MPS\Core\Models\Model` |
 | Enum с метками | нативный `enum` + `MPS\Core\Enums\Enumerable` + `EnumerableTrait` (класс `MPS\Core\Enums\Enum` — deprecated с core 1.7.0): `values()`, `labels()`, `list()`, `label()`, `getLabel()`; готовые — `CurrencyEnum`, `LocaleEnum`, `EnvEnum`, `StringCaseEnum`, `StatusEnum` |
@@ -125,7 +125,7 @@
 | Задача | Что взять |
 |---|---|
 | Смена статуса сущности | `Components\StatusChange\Services\StatusChangeServiceTrait` (`statusChange`) + `StatusChangeRequest`; исключения — `EntityAlreadyThisStatusException`, `StatusNotDefinedException` |
-| Поиск по UUID | `Components\Uuid\Services\UuidServiceTrait` (`getByUuid`, `getByUuidOrFail`, `getByUuids`) |
+| Поиск по UUID | `Components\Uuid\Services\UuidServiceTrait` (`getByUuid`, `getByUuids`; `getByUuidOrFail` не вызывать — `conventions.md` п. 12a) |
 | Slug | `Components\Slug\Services\SlugServiceTrait` (`generateSlug`, `getBySlug`, `checkSlugUnique`) |
 | Переводы (kk/ru/en) | `Components\MultiLanguage` — `TranslationModelTrait`, `TranslatableServiceTrait`, `TranslatableRequest` |
 | Дерево (категории) | `Components\Tree` — `TreeRepositoryTrait`, `TreeServiceTrait`, `TreeCacheService` |

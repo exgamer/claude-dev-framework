@@ -29,7 +29,7 @@
 
 ## Режим `design` — модель угроз
 
-**Вход:** `docs/tasks/<ключ>/design.md`. Прочитать: `stacks/<stack>/security.md`, `stacks/<stack>/review-findings.md` (разделы «Безопасность», «Платёжные хендлеры»), `architecture/integrations.md`, `approaches/patterns/idempotency.md`, `outbox.md`, `stacks/<stack>/…/capabilities.md` (готовые механизмы: подпись HMAC, JWT, rate limit…). Посмотреть, как в проекте уже решено то же самое у соседнего модуля/шлюза — меры повторяют его форму.
+**Вход:** `docs/tasks/<ключ>/design.md`. Прочитать: `stacks/<stack>/security.md` (чеклист с тегами и «Меры по слоям»; `review-findings.md` в этом режиме не читается — O-15, он нужен только аудиту), `architecture/integrations.md`, `approaches/patterns/idempotency.md`, `outbox.md`, `stacks/<stack>/…/capabilities.md` (готовые механизмы: подпись HMAC, JWT, rate limit…). Посмотреть, как в проекте уже решено то же самое у соседнего модуля/шлюза — меры повторяют его форму.
 
 **Проход по каждому эндпойнту / консьюмеру / сценарию задачи:**
 

@@ -29,6 +29,8 @@ URL описывает ресурс, без глаголов. Действие �
 /api/<context>/<version?>/<domain>/<module>/<entity>/<action?>
 ```
 
+В монолите `superapp-api` первый сегмент после `/api` — подпроект (`/parking/admin/tariffs`, `stacks/php/conventions.md` п. 20): это контракт существующих клиентов, новый подпроект следует ему, новый сервис — схеме выше.
+
 - `context` — аудитория: `admin`, `client` (совпадает с `{context}` в `entrypoints/{context}/`).
 - `version` — `v1` для всего нового.
 - kebab-case, сущности во множественном числе для коллекций.

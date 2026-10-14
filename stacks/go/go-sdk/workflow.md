@@ -9,7 +9,7 @@
 - Workflow оркестрирует несколько доменов — если логика в рамках одного домена, использовать Command/Query в домене
 - Может содержать сложную бизнес-логику если она требует координации нескольких доменов
 - Получает зависимости через конструктор (domain Repository/CacheRepository напрямую, не через сервис)
-- Может объявлять собственные контракты репозитория (`repository.go`) если workflow требует специфических запросов
+- Своих репозиториев не объявляет: нужен запрос — метод в репозитории того домена, чья таблица (`architecture/cross-domain.md`); свой интерфейс — только `TxManager` в `tx_manager.go`
 - Не знает о HTTP, entrypoint и инфраструктуре
 - Один workflow — один сценарий использования; несколько операций не совмещать
 - Точка входа всегда называется `Exec`
@@ -26,7 +26,7 @@
 | Входные/выходные данные | `dto.go` |
 | Интерфейс транзакции | `tx_manager.go` |
 
-Имя файла — конкретное действие + суффикс `_workflow`: `calculate_session_debt_workflow.go`, не `workflow.go` и не `calculate_session_debt.go` (регламент `BACKEND_ARCHITECT-GO`, решение O-1 в `core/decisions.md`).
+Имя файла — конкретное действие + суффикс `_workflow`: `calculate_session_debt_workflow.go`, не `workflow.go` и не `calculate_session_debt.go` (регламент `BACKEND_ARCHITECT-GO`, решение 2026-10-07 в `core/decisions-log.md`).
 
 Суффикс `_command`/`_query` в слое workflow не используется (решение G-1): междоменный сценарий — `*_workflow.go` (`sync_outbox_event_command.go` → `sync_outbox_event_workflow.go`), однодоменная большая операция — это Command/Query домена (`go-sdk/domain.md`), её место не в `workflows/`.
 

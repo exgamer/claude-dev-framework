@@ -19,11 +19,11 @@ parking_app/                                   ← корень подпроек
 ├── ServiceProvider.php                        ← регистрирует провайдеры доменов, инфраструктуры, точек входа
 ├── Core/                                      ← общее для подпроекта, не бизнес-логика
 │   ├── Database/Managers/                     ← TransactionManagerInterface, NoopTransactionManager
-│   ├── Database/Query/PaginatedQueryHelper.php
+│   ├── Database/Query/PaginatedQueryHelper.php ← старая форма списка (P-19), новый код не использует
 │   ├── Requests/{Request,SearchRequest}.php   ← базовые FormRequest
-│   ├── Resources/                             ← PaginateResource, схемы ошибок для OpenAPI
+│   ├── Resources/                             ← форма пагинации (items/pagination) для {E}PaginatedResponse; PaginateResource — старая форма (P-19)
 │   ├── Http/Middleware/
-│   ├── Rules/                                 ← кастомные правила валидации (PhoneRule, LicensePlateRule)
+│   ├── Rules/                                 ← свои правила валидации — только когда нет в ядре (RegexRule + RegexEnum::MOBILE_PHONE, mps-core/capabilities.md)
 │   └── Enums/, Helpers/, OpenApi/
 │
 ├── Domains/{Domain}/
@@ -38,8 +38,8 @@ parking_app/                                   ← корень подпроек
 │       ├── Commands/{Action}Command.php       ← большая операция изменения внутри домена, метод execute()
 │       ├── Queries/{Action}Query.php          ← большая операция чтения внутри домена, метод execute()
 │       ├── Validators/{Entity}DtoValidator.php            ← доменная валидация DTO
-│       ├── Jobs/                              ← отложенные задачи домена
-│       └── Components/{Name}/                 ← изолированный алгоритм (калькулятор и т.п.) со своими DTO/Enums/Utils/Tests
+│       ├── Jobs/{Action}Job.php               ← отложенные действия домена (Laravel ShouldQueue); обработчики RabbitMQ — Entrypoints/Queue (mps-core/jobs.md)
+│       └── Components/{Name}/                 ← изолированный алгоритм (калькулятор и т.п.) со своими DTO/Enums; тесты — в tests/ (O-3), преобразования формата — Core/Helpers
 │
 ├── Workflows/{Domain}/{Module}/               ← только междоменная агрегатная логика
 │   └── {Action}Workflow.php                   ← метод execute() (решение P-2)
@@ -51,6 +51,8 @@ parking_app/                                   ← корень подпроек
 │       ├── Controllers/{Entity}Controller.php
 │       ├── Requests/{Entity}/{Create,Update,Index}Request.php
 │       └── Responses/{Entity}Response.php, {Entity}PaginatedResponse.php
+├── Entrypoints/Queue/{Domain}/{Module}/{Event}Handler.php   ← обработчики RabbitMQ (контекст Queue, mps-core/jobs.md)
+├── Entrypoints/Console/{Domain}/{Module}/…Command.php        ← консоль (mps-core/cli.md)
 │
 └── Infrastructure/
     ├── ServiceProvider.php
@@ -68,6 +70,8 @@ parking_app/                                   ← корень подпроек
 **Infrastructure — всегда с типом** (решение P-10): `Infrastructure/{Postgres,Redis,Http,RabbitMQ,…}/…`. `Infrastructure/{Domain}/` без типа (как `super_app/Infrastructure/Acms`, `Infrastructure/User/Models`) в новом коде — **[ВНИМАНИЕ]**.
 
 **`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` (как в `super_app`) в новом коде не заводится. Техническая библиотека подпроекта без бизнес-логики (над расширением PHP или ФС: архивы, файлы) — `Core/{Lib}/{Services,Drivers,DTO,Enums,Exceptions}`, интерфейсы рядом с реализацией, регистрация — `Core/definitions.php` (AINA-2744).
+
+**Хелперы (`Core/Helpers/{Thing}Helper.php`)** — чистые преобразования формата (`core/principles.md`, «Повторяющаяся обработка — один хелпер»): `PhoneHelper::normalize(string $raw): ?string`, `PhoneHelper::format(string $digits): string`, `IinHelper`, `CardHelper`, `MoneyHelper`. `final class`, только `public static` методы, без конструктора и DI, без `DB::`/моделей/конфига, без доменных типов; одна тема — один класс (не `StrHelper` с телефоном, картой и датами внутри). Тесты — `tests/Unit/Core/Helpers/{Thing}HelperTest.php`. Вызывается из `prepareForValidation()` Request'а (нормализация входа), из Response (формат вывода), из консольных команд; в сервисе и репозитории преобразований формата нет — им приходит уже нормализованное значение. Эталон формы — `super_app/Core/Helpers/PhoneHelper.php`; `app/Helpers/StrHelper.php` с телефоном внутри — не образец.
 
 **Слой `Contexts/` из `Backend_Architecture_Reglament.md` проекта = `Entrypoints/`** (решение P-9): отдельной папки `Contexts/` нет, контекст — первый уровень внутри `Entrypoints/` (`Entrypoints/Admin/…`). Пустую `parking_app/Contexts/` образцом не считать.
 
@@ -120,7 +124,7 @@ parking_app/                                   ← корень подпроек
 - [ ] `Enums/` — статусы и типы
 - [ ] `Commands/{Action}Command.php` / `Queries/{Action}Query.php` в модуле — если операция слишком большая для сервиса
 - [ ] `Workflows/{D}/{M}/{Action}Workflow.php` — если сценарий трогает другой домен
-- [ ] `Jobs/` — отложенные действия домена
+- [ ] `Jobs/{Action}Job.php` — отложенные действия домена; обработчик очереди — `Entrypoints/Queue/{D}/{M}/{Event}Handler.php`
 
 ---
 

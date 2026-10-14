@@ -66,7 +66,7 @@
 
 - Связанные данные — **через репозитории пачкой** (`whereIn` по id), Eloquent-связей и eager loading нет (`stacks/php/conventions.md`).
 - Большие выборки — `chunk()` / `chunkById()` / `cursor()` / `lazy()`; не `->get()->toArray()` по большой таблице.
-- Фильтры — `QueryFilters\V2`; пагинация — `PaginatedQueryHelper`; медленные запросы — `SlowQueryDetector` (`mps-core/capabilities.md`).
+- Список — один метод репозитория `paginate…({E}FilterDto, Page)` с явным `orderBy` и `per_page ≤ 100` (P-19, `stacks/php/conventions.md` п. 2a); `QueryFilters\V2`/`PaginatedQueryHelper` — только в существующем коде на `search()`; медленные запросы — `SlowQueryDetector` (`mps-core/capabilities.md`).
 - Octane: никакого статического/синглтон-состояния между запросами (`LogContext::clear()` и т.п.).
 - Локально для поиска N+1 и тяжёлых запросов — Debugbar/Telescope.
 

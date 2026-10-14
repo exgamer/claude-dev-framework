@@ -2,14 +2,14 @@
 
 Жёсткие правила одной строкой. Разработчик держит её открытой во время работы и проходит по ней на самопроверке; подробности и примеры — по ссылке, когда пункт касается задачи. Памятка не заменяет правила: при расхождении главнее файл по ссылке.
 
-Уровень: **О** — [ОШИБКА], **В** — [ВНИМАНИЕ].
+Уровень: **О** — [ОШИБКА], **В** — [ВНИМАНИЕ], **И** — [ИНФО].
 
 ## Слои и место кода
 
 1. **О** Файл лежит по `structure.md` (дерево подпроекта); `Infrastructure/{Тип}/…`; новый код не в легаси `app/`. — `structure.md`
 2. **О** Контроллер тонкий: `Request` → `{E}Dto::make()->fromArray($request->validated())` → сервис/workflow → `response()->json(...)`; в сервис — DTO, не `validated()`/`all()`/массив. — `conventions.md` п. 1, 11a
 3. **О** Service/Command/Query — только свой домен; 2+ домена → `Workflows/{D}/{M}/{Action}Workflow::execute()`; workflow берёт репозитории и сервисы любых доменов напрямую. — `conventions.md` п. 3 (O-7)
-4. **О** Бизнес-логика — в сервисе/Command/workflow; репозиторий — только запросы через `$this->getQuery()`, без `keyBy`/`map`; в сервисе нет `DB::`/`Model::where`; запись в репозиторий — DTO или типизированные аргументы, не массив (`createFromDto`/`updateFromDto`/`setDefault`). — `conventions.md` п. 2, 11a, `review-findings.md`
+4. **О** Бизнес-логика — в сервисе/Command/workflow; репозиторий — только запросы через `$this->getQuery()`, без `keyBy`/`map`; в сервисе, Command/Query и **workflow** нет запросов к БД — ни `DB::`, ни `Model::where`/`Model::query()`/`Model::find`, ни `->get()` по модели: только методы репозитория через интерфейс; запись в репозиторий — DTO или типизированные аргументы, не массив (`createFromDto`/`updateFromDto`/`setDefault`). — `conventions.md` п. 2, 11a, `review-findings.md`
 5. **О** Интерфейс у каждого сервиса и репозитория; зависимости — конструктор, `private readonly`, тип — интерфейс; `app()`/`resolve()` в бизнес-коде нет. — `conventions.md` п. 5, 6
 6. **О** DI — только `definitions.php` домена/инфраструктуры. — `conventions.md` п. 7
 7. **О** Логика по контекстам различается → `{Context}{Entity}Service` в том же модуле, без `if ($isAdmin)`; сервисов в `Entrypoints/` нет. — `conventions.md`, «Логика, отличающаяся по контексту»
@@ -18,7 +18,7 @@
 
 ## Ядро
 
-10. **О** Что есть в `mps/core`/`mps/utils`/`Core/` подпроекта — не пишется заново; устаревшее API (`RabbitManager::putIn`, `QueryFilters` V1, `getOrCreate`, `FileManager::upload`) — нет. Методы сверены со справочником версии из `composer.lock`. — `conventions.md` п. 21, 22, `mps-core/capabilities.md`
+10. **О** Что есть в `mps/core`/`mps/utils`/`Core/` подпроекта — не пишется заново; устаревшее API (`RabbitManager::putIn`, `QueryFilters` V1, `FileManager::upload`; `getOrCreate` — при utils ≥ 2.6.4) — нет. Методы сверены со справочником версии из `composer.lock`. — `conventions.md` п. 21, 22, `mps-core/capabilities.md`
 
 ## Request и данные
 
@@ -29,7 +29,7 @@
 15. **В** Доменные инварианты — `{E}DtoValidator::validate($dto)` → `ValidationAppException('VALIDATION ERROR', $errors)`. — `conventions.md` п. 10 (P-8)
 16. **О** Между слоями — DTO (`DataObject`, private-свойства, геттеры, fluent-сеттеры), не массив; enum-поле DTO — enum. — `conventions.md` п. 11
 17. **В** Ключи (атрибуты, заголовки, теги кэша) — enum, не константы; константы в интерфейсах — **О**. — `conventions.md` п. 12b
-18. **В** Список: `$sortAttributes` + сортировка по умолчанию в сервисе; каждое поле `filterRules()` применяется в `filterSearch()`. — `conventions.md` п. 12c, 12d
+18. **В** Список как в Go (P-19): `paginate…({E}FilterDto, Page)` — один метод собирает один запрос, фильтры подряд `if (...) { $query->where(...); }`, явный `orderBy` в конце; каждое поле `IndexRequest` → поле FilterDto → условие; `search()`/`filterSearch()`/`SearchDataObject`/`PaginatedQueryHelper` в новом коде нет. — `conventions.md` п. 2a, 12c, 12d
 
 ## Транзакции и побочные эффекты
 
@@ -77,3 +77,8 @@
 42. **О** Миграции, сиды, массовые правки, очистка, `migrate:fresh`/`RefreshDatabase` на общей БД — не запускать без явного «да» на каждую. — `core/principles.md`, «Действия с БД»
 43. **О** Пробел или спор — не решать молча: вопрос или решение по политике `/dev` + строка в `rules-log.md`. — `core/principles.md`
 44. **О** Коммит и пуш — только по явному «да» на каждый.
+45. **И** Ранний выход вместо `else`/`elseif`: ветка с `return`/`throw`/`continue` — и дальше без вложенности; выбор по значению — `match`. — `core/style.md`, «Форма кода», `style.md`
+46. **В** Преобразование формата (телефон, ИИН, карта, деньги, даты) — один раз: сначала mps/utils (`RegexEnum`…), потом `Core/Helpers/{Thing}Helper` (`final`, `static`, без DI/БД/доменных типов); вторая копия — вынести, не копировать; вызов — `prepareForValidation()`/Response, не сервис. — `core/principles.md`, «Повторяющаяся обработка — один хелпер», `structure.md`
+47. **О** Элемент массива из внешних данных (payload, ответ API, config, `explode`/`preg_match`, `keyBy`-карта) — только после проверки ключа: DTO через `fromArray`, иначе `??`/`array_key_exists` с явной обработкой или исключение; `?? ''` молча — нет. — `conventions.md` п. 11b
+48. **В** Читается сверху вниз: замыкание не передаёт поведение в свой метод (`->when()` → `if`), вызов не вкладывается в вызов и не индексируется на месте (`handle([getByKey()])[0]` → три строки; цепочки `array_*` → `foreach`/именованные переменные), лямбда — одна строка только где требует библиотека, без затенения внешних переменных, глубина блоков ≤ 2. — `core/style.md`, «Форма кода»; `style.md`; тег `nested-call-chain`
+49. **В** Запрос репозитория виден целиком: без приватных методов-кусков, колонки явно в каждом `select` (не константой), фильтры списка — в том же методе, `filterSearch()` не используется (P-19); большой запрос по чужим таблицам — несколько репозиториев + сборка в сервисе/workflow. — `conventions.md` п. 2a; тег `query-split-into-pieces`

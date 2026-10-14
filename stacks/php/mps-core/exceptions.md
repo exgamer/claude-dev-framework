@@ -38,25 +38,26 @@ AppException (base, trackable)
 
 ```php
 // Сущность не найдена
-$order = $this->repository->findById($id);
+$order = $this->repository->oneById($id);
 if (! $order) {
-    throw new NotFoundAppException('Order not found');
+    throw new NotFoundAppException('Заказ не найден');
 }
 
 // Бизнес-правило нарушено
-if ($order['status'] !== OrderStatusEnum::PENDING->value) {
-    throw new BadRequestAppException('Order is not in pending status');
+if ($order->status !== OrderStatusEnum::PENDING) {
+    throw new BadRequestAppException('Заказ не в статусе ожидания');
 }
 
 // Ошибка внешнего сервиса
 $response = $this->paymentGateway->charge($amount);
 if (! $response->isSuccessful()) {
-    throw new OperationFailedAppException('Payment failed');
+    throw new OperationFailedAppException('Оплата не прошла');
 }
 
-// Валидация на уровне домена (редко — обычно Request)
-if (count($items) === 0) {
-    throw new ValidationAppException('Items list cannot be empty', ['items' => ['required']]);
+// Доменный инвариант — через {E}DtoValidator (P-8), сервис бросает исключение
+$errors = OrderDtoValidator::validate($dto);
+if ($errors) {
+    throw new ValidationAppException('VALIDATION ERROR', $errors);
 }
 ```
 
@@ -70,14 +71,14 @@ if (count($items) === 0) {
 
 ```php
 throw new BadRequestAppException(
-    'Cannot cancel order',
-    ['reason' => 'Payment already processed', 'order_id' => $id]
+    'Заказ нельзя отменить',
+    ['reason' => 'Платёж уже проведён', 'order_id' => $id]
 );
 
 // ValidationAppException: details — массив field => [errors]
 throw new ValidationAppException(
-    'Validation failed',
-    ['phone' => ['Invalid format'], 'email' => ['Already taken']]
+    'VALIDATION ERROR',
+    ['phone' => ['Неверный формат'], 'email' => ['Уже занят']]
 );
 ```
 

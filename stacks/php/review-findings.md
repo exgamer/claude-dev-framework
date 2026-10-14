@@ -14,7 +14,7 @@
 - `id`, `*_id` → `['integer', 'gt:0']`. Ноль и отрицательные проходят `integer` и дают пустой 404/500 вместо 422.
 - У чисел **и массивов** есть верхняя граница: `max:`, `between:`, `array|max:100`. Массив без лимита = DoS через тело запроса.
 - В Request нет SQL-запросов и вызовов сервисов (P-17, `conventions.md` п. 9a): ни `exists:`/`unique:`/`Rule::exists()`/`Rule::unique()`, ни своих правил и замыканий с моделью, `DB::` или репозиторием, ни запросов в `prepareForValidation()`/`withValidator()`/`after()`. Существование — в сервисе/workflow через репозиторий, уникальность — уникальный индекс + проверка в сервисе.
-- Бизнес-правила («нельзя менять статус, если оплачен») — не в Request. Но **допустимые варианты значений** (enum) — как раз в реквесте: `Rule::in(Enum::values())` / `Rule::enum(Enum::class)`.
+- Бизнес-правила («нельзя менять статус, если оплачен») — не в Request. Но **допустимые варианты значений** (enum) — как раз в реквесте: `Rule::enum(Enum::class)` (`checklist.md` п. 12).
 - PUT — полные данные (`conventions.md`, п. 12): в `UpdateRequest` поля `required` / `present|nullable`. Необязательное поле при записи DTO целиком (`updateFromDto($tariff, $dto)`, п. 11a) затирается `null` — так в `super_app` были `BuildingService::update`, `AgreementTransactionService::update` (AINA-2628). Тег `update-request-optional-fields`.
 
 ## Repository
@@ -22,6 +22,7 @@
 - Наследование от ядра (`CRUDRepository`), запросы через `$this->getQuery()`, не `Model::query()` / `DB::table()`.
 - Нет своих `*OrFail`-методов (ни в репозитории, ни в сервисе — п. 12a, SRP): `get…` возвращает `?Model`, `NotFoundAppException` бросает вызывающий. Тег `service-thin-wrapper`.
 - Нет `keyBy` / `map` / сборки структур — репозиторий отдаёт сырые данные, маппинг в Service.
+- **Запрос виден целиком** (mobile-api-rewrite MR !3773, пользователь): запрос метода не собран из приватных кусков (`service(Closure)`, `activeQuery()`), колонки — явным списком в `select`, не константой; фильтры списка — в том же методе, `search()`/`filterSearch()` не используются (P-19); слишком большой запрос — сборка из нескольких репозиториев в сервисе/workflow (`conventions.md` п. 2a). Тег `query-split-into-pieces`, [ВНИМАНИЕ].
 - **Запись массивом** (AINA-2978, пользователь: «всегда DTO, массивы плохо») — `updateById($id, $dto->toArrayWithSnakeKeys())`, `updateById($id, ['is_default' => true])`, `create($data)` из сервиса/Command; то же в контроллере: `$this->service->update($id, $request->validated())`. По всей цепочке записи — DTO или типизированные аргументы (`conventions.md` п. 11a). Тег `write-array-instead-of-dto`, [ОШИБКА].
 - Нет обращения к таблице чужого домена: репозиторий пишет только в свои таблицы; данные двух доменов собирает workflow. Допустим read-only подзапрос (`EXISTS`/`JOIN`) к чужой таблице с комментарием, чья она (`architecture/cross-domain.md`).
 - Локальные phpstan-обёртки над `getQuery()` (типизированные прокси ради generics) не плодить — либо в `mps/core`, либо в ignore.
@@ -40,24 +41,26 @@
 ## Controller
 
 - Тонкий. Имена методов — `index / view / create / update / delete`.
-- Нет ручной обёртки `['success' => true, 'data' => ...]` — её даёт `JsonResponse` ядра.
 - **Обёртка `success/data` в Response-классе или контроллере при `superAppApi`/`ApiResponseMiddleware` на маршруте** (AINA-2628: «не надо оборачивать, это делает мидлвар») — Response отдаёт только данные; в Swagger-описании метода контроллера обёртка `success`/`data` при этом описывается (это реальный формат ответа). Тег `response-double-wrap`, [ОШИБКА].
 - **Ответ через макрос фасада** (AINA-2628, blocking: «mixin для Response не юзаем») — `Response::ok($data)` / `Response::created()` / `Response::deleted()` из `Response::mixin(new JsonResponseMixin)` провайдера проекта. Grep по `use` такую зависимость не видит. Замена — `response()->json(new {E}Response(...), Response::HTTP_CREATED)` (`conventions.md`, п. 19). Тег `controller-response-macro`, [ОШИБКА].
 - Swagger на каждый эндпоинт, с `404` и `500` в ответах (см. `swagger.md`).
 - `per_page` в пагинации задаётся явно (в `SearchRequest` и в аннотации), не «по умолчанию где-то в ядре».
 - Текущий пользователь — `request()->user` / `$request->user()`, не `Auth::id()` в глубине сервиса.
-- **Middleware в маршруте через `::class`** (AINA-2628: «давай регать как остальные мидлвары») — свой middleware подключается строковым алиасом из `bootstrap/app.php` (`$middleware->alias`), как остальные (`conventions.md`, п. 20). Тег `route-middleware-not-aliased`, [ИНФО].
+- **Middleware в маршруте через `::class`** (AINA-2628: «давай регать как остальные мидлвары») — свой middleware подключается строковым алиасом из `bootstrap/app.php` (`$middleware->alias`), как остальные (`conventions.md`, п. 20). Тег `route-middleware-not-aliased`, [ВНИМАНИЕ] (памятка п. 26).
 - **Метод-обёртка над одной проверкой/вызовом** (AINA-2628: «`findByIdOrFail` не делай таких функций», «`assertValid` — то же самое», «какой смысл от `getById`, когда внутри вызов своей же репы») — `conventions.md`, п. 12a. Тег `service-thin-wrapper`, [ВНИМАНИЕ].
 - **Константа вместо enum / константа в интерфейсе** (AINA-2628: «зачем константы в интерфейсе репы, константы в enum») — `conventions.md`, п. 12b. Тег `constant-not-enum`, [ВНИМАНИЕ]; в интерфейсе — [ОШИБКА].
-- **Контекст-фильтр отдельным аргументом поиска** (AINA-2628: «что мешает сразу DTO засетить `building_ids` в контроллере?») — `search($dto, $buildingIds)` с вписыванием в параметры внутри сервиса; фильтр кладёт в `SearchDataObject` контроллер (`conventions.md`, п. 19a). Тег `search-filter-outside-dto`, [ИНФО].
+- **Контекст-фильтр отдельным аргументом поиска** (AINA-2628: «что мешает сразу DTO засетить `building_ids` в контроллере?») — `search($dto, $buildingIds)` с вписыванием в параметры внутри сервиса; фильтр выставляет контроллер полем `{E}FilterDto` (в старой форме — `SearchDataObject`) (`conventions.md`, п. 19a). Тег `search-filter-outside-dto`, [ИНФО].
 - **Список без сортировки** (AINA-2628: «не задан `orderBy()`, читать как параметр + дефолт») — `conventions.md`, п. 12c. Тег `list-without-default-sort`, [ВНИМАНИЕ].
-- **Фильтр валидируется, но не применяется** (AINA-2628: «IndexRequest валидирует `description` и `id_one_c`, но `filterSearch` их не применяет») — `conventions.md`, п. 12d. Тег `request-filter-not-applied`, [ВНИМАНИЕ].
+- **Фильтр валидируется, но не применяется** (AINA-2628: «IndexRequest валидирует `description` и `id_one_c`, но `filterSearch` их не применяет»; в новой форме — поле `IndexRequest` не доходит до `{E}FilterDto` или метода списка) — `conventions.md`, п. 12d. Тег `request-filter-not-applied`, [ВНИМАНИЕ].
 - **Проверка доступа в FormRequest** (AINA-2628, blocking: «запрос в Request»; «валидация входных данных не место для проверки доступов») — правило вида `new AccessibleBuilding()` на `building_id`: ходит в БД за правами и дублирует middleware. Доступ к `building_id` из тела/фильтра проверяет middleware контекста (403), в Request — только `['required', 'integer', 'gt:0']`. Тег `request-access-check`, [ОШИБКА].
 - **Проверка прав в сервисе/контроллере** (AINA-2628: «проверка прав не совсем зона сервиса») — резолвер доступа в контроллере, параметр `$accessibleBuildingIds` в сервисе. Права и контекст — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр (`conventions.md`, п. 19a). Тег `access-check-outside-middleware`, [ОШИБКА].
 
 ## Workflows / Commands
 
+- **Читается сверху вниз** (mobile-api-rewrite MR !3773, пользователь): замыкание не передаёт поведение в свой метод, цепочки `array_values(array_unique(array_filter(array_map(…))))` → `foreach`, лямбда длиннее строки → метод или first-class callable, параметр замыкания не затеняет внешнюю переменную (`core/style.md`, «Форма кода»). Тег `nested-call-chain`, [ВНИМАНИЕ]; касается всех слоёв, не только workflow.
+
 - Workflow берёт репозитории и сервисы любых доменов напрямую (O-7); Command/Query домена — только своего домена (`domain-cross-domain-access`).
+- **Запросов к БД в workflow нет** (`service-direct-db-query`): ни `DB::`, ни `Model::where`/`query()`/`find`. Кейс 2026-10-14: фреймворк написал запросы прямо в workflow — памятка говорила только «в сервисе», и workflow прочитали как исключение. Нужна выборка из таблицы домена — метод в репозитории этого домена, workflow его вызывает; выборка по двум таблицам — два метода двух репозиториев и сборка в workflow, либо read-only `EXISTS`/`JOIN` внутри репозитория владельца с комментарием (раздел Repository).
 - Workflow и Command не доверяют транспортному Request: доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (P-8), потому что тот же сценарий вызывается из консоли и очереди, где Request нет.
 
 ## Domains / Infrastructure
@@ -88,6 +91,7 @@
 - Клиент внешней системы называется `*Gateway`, не `*Service` (сервис — доменный слой).
 - Зависимости (HTTP-клиент, конфиг) — в конструктор, не `app()`/`config()` внутри методов.
 - Отсутствующий обязательный конфиг → `InvalidConfigurationAppException`, не молчаливый дефолт `?? ''`.
+- **Индекс массива без проверки** (`array-key-unchecked`, `conventions.md` п. 11b) — `$payload['x']`, `$response['data'][0]`, `[$a, $b] = explode(...)`, `$byId[$id]` по внешним или динамическим данным: локально ключ есть, на проде нет → Warning, `null`, `TypeError`. Внешний массив — в DTO через `fromArray()` на границе; обязательный ключ без значения — исключение с именем поля, не дефолт.
 
 ## Ошибки, логи, Sentry
 

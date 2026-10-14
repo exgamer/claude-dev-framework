@@ -12,7 +12,7 @@
 
 ```php
 // Infrastructure/Postgres/{Domain}/Providers/ServiceProvider.php
-namespace App\Infrastructure\YourDomain\Providers;
+namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\Providers;
 
 use MPS\Core\Modules\ModuleServiceProvider;
 
@@ -25,34 +25,42 @@ class ServiceProvider extends ModuleServiceProvider
 }
 ```
 
-### 3. Зарегистрировать в DomainServiceProvider
+### 3. Зарегистрировать в корневом ServiceProvider подпроекта
 
 ```php
-// ServiceProvider.php подпроекта (список провайдеров доменов).php
+// ServiceProvider.php подпроекта
 $this->registerServiceProviders([
-    \App\Infrastructure\YourDomain\Providers\ServiceProvider::class,
+    \App\ParkingApp\Domains\YourDomain\ServiceProvider::class,
+    \App\ParkingApp\Infrastructure\Postgres\YourDomain\Providers\ServiceProvider::class,
 ]);
 ```
 
-### 4. definitions.php
+### 4. definitions.php — два файла
 
-Живёт в `Infrastructure/Postgres/{Domain}/Providers/definitions.php`.
-Интерфейсы из `Domains/`, реализации из `Infrastructure/`:
+Сервисы домена — `Domains/{Domain}/definitions.php`, репозитории — `Infrastructure/Postgres/{Domain}/Providers/definitions.php` (`../conventions.md` п. 7). Интерфейсы — из `Domains/`, реализации репозиториев — из `Infrastructure/`.
 
 ```php
-use App\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
-use App\Domains\YourDomain\Modules\YourModule\Services\YourServiceInterface;
-use App\Domains\YourDomain\Modules\YourModule\Services\YourService;
-use App\Infrastructure\YourDomain\YourModule\Repositories\YourRepository;
+// Domains/{Domain}/definitions.php
+use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Services\YourCrudService;
+use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Services\YourCrudServiceInterface;
+
+return [
+    [
+        'abstract' => YourCrudServiceInterface::class,
+        'concrete' => YourCrudService::class,
+    ],
+];
+```
+
+```php
+// Infrastructure/Postgres/{Domain}/Providers/definitions.php
+use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
+use App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Repositories\YourRepository;
 
 return [
     [
         'abstract' => YourRepositoryInterface::class,
         'concrete' => YourRepository::class,
-    ],
-    [
-        'abstract' => YourServiceInterface::class,
-        'concrete' => YourService::class,
     ],
 ];
 ```
@@ -67,7 +75,7 @@ return [
 Большинство модулей ServiceProvider не имеют.
 
 ```php
-namespace App\Domains\YourDomain\Modules\YourModule;
+namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule;
 
 use MPS\Core\Modules\ModuleServiceProvider;
 

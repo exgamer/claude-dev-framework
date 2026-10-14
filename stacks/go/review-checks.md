@@ -37,8 +37,20 @@
 
 ## 5.3 — Проверки за пределами дифа
 
-Выполняй при ревью дифа/MR (не при `--all`):
+Выполняй при ревью дифа/MR; при `--all` — только пп. 0, 0a по всему проекту:
 
+0. **Запросы к хранилищам вне `internal/infrastructure`** — всегда, механически (`conventions.md` п. 4; тег `service-direct-db-query`):
+   ```
+   grep -rnE "gorm\.|sqlx?\.|pgx\.|redis\.(Client|UniversalClient)|\.QueryRow|\.Table\(|\.Model\(" \
+     --include='*.go' . | grep -vE "/infrastructure/|/bootstrap/|_test\.go|/vendor/"
+   ```
+   Строка в `domains/**`, `workflows/**`, `entrypoints/**` — **[ОШИБКА]** `service-direct-db-query`: запрос переносится в репозиторий, слой получает метод интерфейса. Исключения: `bootstrap/` (DI — клиент создаётся и раздаётся репозиториям, отфильтрован), `entrypoints/system/healthcheck` (пингует БД напрямую — так в эталоне). `.Exec(`/`.Raw(` в паттерне нет намеренно: так называются методы workflow и `httpresponse` в SDK. Проверено на `parking-session-service` 2026-10-14: кроме healthcheck срабатываний нет.
+0a. **Повторённая обработка формата** (`duplicated-format-logic`, `core/principles.md`, «Повторяющаяся обработка — один хелпер»):
+   ```
+   grep -rnE "unicode\.IsDigit|strings\.Map\(|regexp\.MustCompile\(\"\[\^0-9\]|\"\+7\"|TrimPrefix\(.*\"(\+7|8|7)\"" \
+     --include='*.go' . | grep -vE "/vendor/|^\./pkg/|_test\.go"
+   ```
+   Строка в `domains/`, `workflows/`, `entrypoints/` — кандидат: есть `validation.NormalizePhoneNumber`/`CheckValidPhone` в SDK или пакет в `pkg/` — **[ОШИБКА]**, второе вхождение без пакета — **[ВНИМАНИЕ]**, одно — **[ИНФО]** с предложением вынести в `pkg/`.
 1. **Разъезд `const`-блоков и статусов.** Новое значение типа-статуса → `grep` по `switch`/`map` по этому типу, по `enums:` в swagger-аннотациях DTO, по строковым литералам. Рассинхрон — **[ОШИБКА]** с перечислением мест.
 2. **Новый статус без потребителя.** Появился `Status*` — покажи, кто его обрабатывает (cron, consumer, переход в workflow). Нет потребителя — **[ОШИБКА]** (тупик навсегда, см. `review-findings.md`).
 3. **Данные под миграцию поведения.** Новый `NOT NULL`, новое значение enum, новый FK — что лежит в колонке на stage/prod. Если локальной базы в репо нет — явно поручить проверку автору, а не пропускать пункт.

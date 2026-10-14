@@ -19,8 +19,8 @@ Workflow — агрегат над доменами, его граница = г�
 
 ## Общее
 
-- **Где открывать:** на уровне, который принимает решение о сценарии, — workflow или сервис/Command своего модуля. Не в репозитории, не в контроллере/хендлере.
+- **Где открывать:** на уровне, который принимает решение о сценарии, — workflow или сервис/Command своего модуля. Не в репозитории (исключение — транзакция целиком внутри одного метода одного репозитория, `stacks/go/go-sdk/infra/postgres.md`), не в контроллере/хендлере.
 - **Чем:**
   - Go — `gosdk-db-core/pkg/transaction` (`Manager*`), интерфейс `TxManager` объявляет потребитель. Менеджер пересобирает на `tx` **только репозитории** — внутри `fn` нельзя вызывать сервис или Command домена: их репозитории на пуле, запись уйдёт мимо транзакции (**[ОШИБКА]**, тег `tx-bypassed-by-service`). Workflow пишет через репозитории (O-7). Подробно — `stacks/go/go-sdk/infra/postgres.md`.
-  - PHP — `TransactionManagerInterface::run(callable)`; биндинг `DatabaseTransactionManager`, в тестах `NoopTransactionManager` (`mock` в `definitions.php`). Не `DB::transaction`. Транзакция на соединении — сервисы домена внутри `run()` в неё попадают (вложенные — savepoint). Подробно — `stacks/php/mps-core/transactions.md`.
+  - PHP — `TransactionManagerInterface::run(callable)`; биндинг `DatabaseTransactionManager`, в тестах `NoopTransactionManager` (`mock` в `definitions.php`). Не `DB::transaction` в сервисе, Command и workflow; `DB::transaction` с SQL-специфичными инструкциями (`SET LOCAL`) — только внутри `Infrastructure/` (`stacks/php/mps-core/transactions.md`). Транзакция на соединении — сервисы домена внутри `run()` в неё попадают (вложенные — savepoint). Подробно — `stacks/php/mps-core/transactions.md`.
 - **Внутри транзакции нет побочных эффектов:** HTTP во внешние системы, публикация в брокер, файлы, `dispatch`, инвалидация кэша — после коммита. Нужна гарантия доставки события вместе с записью → outbox.

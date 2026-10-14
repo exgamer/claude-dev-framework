@@ -10,17 +10,19 @@ Command — **большая операция одного домена**. Жи�
 
 Одна операция одного домена, слишком большая для метода сервиса.
 
-### execute() с явным аргументом
+### Форма
+
+Точка входа — `execute()` с типизированными аргументами (DTO, id), результат — модель/значение (`../style.md`, «Имена»). `Command::prepare()` ядра и fluent-сеттеры с массивами (`setData(array)`) в новом коде не используются: параметры команды — аргументы `execute()`, данные — DTO (п. 11a).
 
 ```php
-namespace App\Domains\YourDomain\Modules\YourModule\Commands;
+namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands;
 
 use MPS\Core\Commands\Command;
 use MPS\Core\Components\Database\Transaction\TransactionManagerInterface;
 use MPS\Utils\Components\Logger\Interfaces\LoggerAwareInterface;
 use MPS\Utils\Components\Logger\Traits\LoggerAwareTrait;
 
-class YourSaveCommand extends Command implements LoggerAwareInterface
+final class SaveYourEntityCommand extends Command implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
@@ -28,59 +30,27 @@ class YourSaveCommand extends Command implements LoggerAwareInterface
         private readonly TransactionManagerInterface $transactionManager,
         private readonly YourRepositoryInterface $repository,
         private readonly OtherServiceInterface $otherService, // модуль своего домена (O-6)
-    ) {}
+    ) {
+    }
 
-    public function execute(YourDto $dto, int $rowIndex): void
+    public function execute(YourDto $dto): YourModel
     {
         $this->getLogger()->for($this);
 
-        $this->transactionManager->run(function () use ($dto, $rowIndex) {
-            $existing = $this->repository->findByExternalId($dto->externalId);
-
+        $model = $this->transactionManager->run(function () use ($dto) {
+            $existing = $this->repository->getByExternalId($dto->getExternalId());
             if ($existing) {
                 $this->repository->updateFromDto($existing, $dto);
-            } else {
-                $model = $this->repository->createFromDto($dto);
-                $this->otherService->notify($model);
+
+                return $existing;
             }
+
+            return $this->repository->createFromDto($dto);
         });
-    }
-}
-```
 
-### prepare() с fluent-сеттерами
+        $this->otherService->notify($model);   // побочный эффект — после коммита (п. 17)
 
-Когда параметры задаются поэтапно или команда переиспользуется с разными наборами данных:
-
-```php
-class YourCommand extends Command
-{
-    private array $data = [];
-    private ?User $user = null;
-
-    public function __construct(
-        private readonly YourServiceInterface $service,
-    ) {}
-
-    public function setData(array $data): self
-    {
-        $this->data = $data;
-
-        return $this;
-    }
-
-    public function setUser(User $user): self
-    {
-        $this->user = $user;
-
-        return $this;
-    }
-
-    public function prepare(): bool
-    {
-        $this->service->doSomething($this->data, $this->user);
-
-        return true;
+        return $model;
     }
 }
 ```

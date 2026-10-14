@@ -115,7 +115,8 @@ $this->orderService->getRepository()->transaction(function () use ($dto) {
 ```
 
 `DB::transaction()` напрямую — только если нужны специфичные PostgreSQL-инструкции
-внутри той же транзакции:
+внутри той же транзакции, и только в инфраструктурном коде (менеджер транзакций, репозиторий); сервис, Command и workflow
+всегда работают через `TransactionManagerInterface`:
 
 ```php
 // Допустимо только при необходимости SQL-уровня

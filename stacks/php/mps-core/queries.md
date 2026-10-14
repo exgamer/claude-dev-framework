@@ -2,71 +2,52 @@
 
 > Справочник по использованию `mps/core` / `mps/utils` (перенесён из `claude-skills/php-arch`, пути приведены к структуре фреймворка). **Где класть файлы — `../structure.md`**, что есть в ядре и с какой версии — `capabilities.md`, официальная дока — `official/`. При расхождении главнее они — в фактах API (что есть и как вызывается); что из этого использовать — по правилам фреймворка (`../conventions.md`): примеры `official/` с `expanded`, `*OrFail`, суффиксом `DTO` — не образец.
 
-Запросы инкапсулируют сложные операции чтения, агрегирующие несколько сервисов.
+Query — большая операция **чтения** одного домена, вынесенная из сервиса (`architecture/layers.md`): несколько выборок своих модулей и сборка результата. Другой домен — workflow (O-7).
 
 ## Структура
 
-Interface — опционален. Создавать если Query инжектируется в другие классы или подменяется в тестах. Если используется только в одном месте — достаточно конкретного класса.
-
 ```
 Domains/{Domain}/Modules/{Module}/Queries/
-├── YourQueryInterface.php   — опционально
-└── YourQuery.php
-```
-
-## Interface
-
-```php
-namespace App\Domains\YourDomain\Modules\YourModule\Queries;
-
-interface YourQueryInterface
-{
-    public function setFilters(array $filters): self;
-    public function prepare(): array;
-}
+└── {Action}Query.php            — final, метод execute(); интерфейс — только если Query подменяется в тестах или инжектируется через границу (../conventions.md п. 5)
 ```
 
 ## Implementation
 
+Параметры — типизированный DTO фильтра, не `array`; данные других модулей своего домена — через их интерфейсы (O-6), пачкой по id (`approaches/patterns/performance.md`).
+
 ```php
-namespace App\Domains\YourDomain\Modules\YourModule\Queries;
+namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Queries;
 
 use MPS\Core\Queries\Query;
 use MPS\Utils\Components\Logger\Interfaces\LoggerAwareInterface;
 use MPS\Utils\Components\Logger\Traits\LoggerAwareTrait;
 
-class YourQuery extends Query implements YourQueryInterface, LoggerAwareInterface
+final class ListYourItemsWithRelatedQuery extends Query implements LoggerAwareInterface
 {
     use LoggerAwareTrait;
 
-    private array $filters = [];
-
     public function __construct(
-        private readonly YourServiceInterface $service,
-        private readonly RelatedServiceInterface $relatedService,
-    ) {}
-
-    public function setFilters(array $filters): self
-    {
-        $this->filters = $filters;
-
-        return $this;
+        private readonly YourRepositoryInterface $repository,
+        private readonly RelatedRepositoryInterface $relatedRepository,   // другой модуль своего домена
+    ) {
     }
 
-    public function prepare(): array
+    /**
+     * @return list<YourItemView>
+     */
+    public function execute(YourItemsFilterDto $filter): array
     {
         $this->getLogger()->for($this);
 
-        $items = $this->service->searchAll($this->filters);
-        $ids   = array_column($items, 'id');
+        $items = $this->repository->listByFilter($filter);
+        $relatedByItemId = $this->relatedRepository->allByItemIds(array_column($items, 'id'));
 
-        $related = $this->relatedService->searchByIds($ids);
-
-        foreach ($items as &$item) {
-            $item['related'] = $related[$item['id']] ?? [];
+        $result = [];
+        foreach ($items as $item) {
+            $result[] = new YourItemView($item, $relatedByItemId[$item->id] ?? []);
         }
 
-        return $items;
+        return $result;
     }
 }
 ```
@@ -75,22 +56,18 @@ class YourQuery extends Query implements YourQueryInterface, LoggerAwareInterfac
 
 ```php
 public function __construct(
-    private readonly YourQueryInterface $query,
-) {}
-
-public function getAggregatedData(array $filters): array
-{
-    return $this->query
-        ->setFilters($filters)
-        ->prepare();
+    private readonly ListYourItemsWithRelatedQuery $query,
+) {
 }
+
+$items = $this->query->execute($filter);
 ```
 
-## Когда использовать Query vs Service->search()
+## Когда Query, когда метод сервиса
 
 | Ситуация | Что использовать |
 |---|---|
-| Простая выборка из одной таблицы | `service->search($dto)` |
-| Агрегация нескольких сервисов | `Query` |
-| Сложный SQL (UNION, подзапросы) | `Query` с прямым обращением к репозиторию |
-| Переиспользуется в нескольких местах | `Query` |
+| Простая выборка одного модуля | метод сервиса → метод репозитория |
+| Несколько выборок и сборка внутри одного домена | `Query` |
+| Сложный SQL (UNION, подзапросы) | метод репозитория; `Query` только собирает результат |
+| Данные другого домена | workflow (O-7) |

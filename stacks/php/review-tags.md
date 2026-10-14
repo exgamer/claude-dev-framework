@@ -7,10 +7,7 @@
 
 В сохранённом файле (отчёт) колонка **«Категория»/«Уязвимость»** каждой строки — это **не архитектурный слой** (`Repository`/`Service`/`Domain`...), а **конкретный, стабильный kebab-case тег самого паттерна нарушения**. По этому тегу считаются у автора MR повторяющиеся ошибки одного типа (например, чтобы увидеть «этот разработчик регулярно делает прямые запросы в сервисе») — общий слой для этого бесполезен, а свободный текст не даёт точных совпадений.
 
-Правила:
-- kebab-case, 2–5 английских слов, называет **паттерн**, а не файл/слой (`service-direct-db-query`, не `Service` и не «прямой запрос к БД в SessionService»);
-- **переиспользуй** тег из таблицы ниже (или уже использованный в этом же ревью), если находка — тот же паттерн;
-- новый тег заводи только если ни один известный не подходит — коротко, конкретно, без деталей конкретного MR (детали — в `Описание`, не в теге).
+Как именовать и когда заводить новый — `approaches/process/review.md`, «Теги» (одно место правила).
 
 Известные теги — для [БЕЗОПАСНОСТЬ] см. колонку «Тег» в 5.1; для остальных находок (из ``review-findings.md``):
 
@@ -27,8 +24,8 @@
 | `repository-returns-mapped-structure` | Repository делает `keyBy`/`map`/сборку структур вместо сырых данных |
 | `expanded-param-used` | Параметр `expanded`/`{E}ExpandEnum`/`hasExpand()` — клиент выбирает состав ответа; связанные данные — всегда, методом своего репозитория пачкой по id (`conventions.md`, «Модели и внешние системы») |
 | `repository-cross-domain-access` | Repository пишет в таблицу чужого домена, вызывает его репозиторий или несёт его бизнес-логику; read-only подзапрос (`EXISTS`/`JOIN`) с комментарием, чья таблица, — не находка (`architecture/cross-domain.md`) |
-| `repository-reinvents-core-helper` | Самописная обёртка вместо готового `QueryFilters\V2`/`PaginatedQueryHelper`/`LogAwareTrait` из core |
-| `service-direct-db-query` | Прямой `DB::`/`Model::where` в сервисе вместо репозитория |
+| `repository-reinvents-core-helper` | Самописная замена готового класса ядра/`Core/` подпроекта (`LoggerAwareTrait`, `TransactionManagerInterface`, базовые Request, `QueryFilters\V2` в коде на старой форме `search()`) — `mps-core/capabilities.md` |
+| `service-direct-db-query` | Прямой запрос к БД (`DB::`, `Model::where`/`query()`/`find`, `->get()` по модели) в сервисе, Command/Query **или workflow** вместо метода репозитория; тег один для всех трёх |
 | ~~`service-orchestrates-foreign-repository`~~ | не используется (O-7): сервис домена не трогает чужой домен ни через репозиторий, ни через сервис — тег `domain-cross-domain-access` |
 | `workflow-without-transaction` | Workflow пишет без `TransactionManagerInterface::run()` и без причины в `design.md` (O-8) |
 | `multi-write-without-transaction` | Service/Command домена делает несколько связанных записей без общей транзакции |
@@ -36,13 +33,13 @@
 | `service-method-name-mismatch` | Имя метода не соответствует тому, что он реально делает |
 | `service-status-branching-duplicated` | Ветвление по статусам (`if`/`elseif`) продублировано в нескольких методах вместо state machine |
 | `service-side-effect-timing-wrong` | Побочный эффект (Storage/HTTP/очередь) не снаружи транзакции или до записи вместо после |
-| `controller-manual-response-wrapper` | Ручная обёртка `['success' => true, 'data' => ...]` вместо `JsonResponse` ядра |
+| ~~`controller-manual-response-wrapper`~~ | не используется — тот же паттерн, что `response-double-wrap` |
 | `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`superAppApi`) |
 | `service-thin-wrapper` | Метод-обёртка над одной проверкой/вызовом в сервисе или репозитории (`findByIdOrFail`/любой `*OrFail`, `assertValid`, внутренний `getById` → свой репозиторий); публичный `findById(): ?Model` для точки входа — не находка |
 | `constant-not-enum` | Значение-ключ константой класса/интерфейса вместо enum |
-| `search-filter-outside-dto` | Фильтр поиска передан отдельным аргументом и вписывается в параметры внутри сервиса |
-| `list-without-default-sort` | Список без `$sortAttributes` и сортировки по умолчанию |
-| `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не применяется в `filterSearch` |
+| `search-filter-outside-dto` | Контекст-фильтр списка (здания, организация) передан в сервис отдельным аргументом и вписывается в параметры внутри него вместо поля `{E}FilterDto`, выставленного в контроллере (`conventions.md` п. 19a) |
+| `list-without-default-sort` | Метод списка без явного `orderBy` по умолчанию (`conventions.md` п. 12c) |
+| `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не попадает в `{E}FilterDto` / не применяется в методе списка репозитория (старая форма — `filterSearch`) |
 | `request-access-check` | Проверка доступа (здание/организация пользователя) в правилах FormRequest вместо middleware |
 | `route-middleware-not-aliased` | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` |
 | `access-check-outside-middleware` | Права/контекст (роль или право на операцию, здания, организация) проверяются или вычисляются в контроллере или сервисе, а не в middleware на маршруте → атрибуты запроса → `RequestHelper` (для Go — тот же тег) |
@@ -72,11 +69,16 @@
 | `deploy-risk-flag-enabled` | Раскомментированный крон/включённый флаг — риск первого прогона на накопленных данных |
 | `mr-hygiene-lockfile-drift` | `composer.lock` не обновлён вместе с `composer.json`, либо сгенерированные файлы (`.php-cs-fixer.cache`, `storage/api-docs/*.json`) уехали в MR |
 | `ai-style-comment` | Комментарий-пересказ кода построчно, сгенерированный ИИ |
+| `array-key-unchecked` | `$arr['key']`/`$arr[0]`/деструктуризация по массиву из внешних данных (payload, ответ API, config, `explode`/`preg_match`, `keyBy`-карта) без проверки ключа — `Undefined array key` → `null` → `TypeError`/500 (`conventions.md` п. 11b) |
+| `duplicated-format-logic` | Преобразование формата (нормализация телефона/ИИН/карты, форматирование денег/дат) написано inline или повторено, хотя есть в SDK/`Core/Helpers` или встречается второй раз (`core/principles.md`, «Повторяющаяся обработка — один хелпер»); inline при живом хелпере — [ОШИБКА] |
+| `else-after-return` | `else`/`elseif` после ветки, завершившейся `return`/`throw`/`continue`, или вложенный `if` вместо раннего выхода; цепочка `if/elseif` по значению вместо `match` (`core/style.md`, «Форма кода») |
 | `ai-style-text` | «ИИ-вода» в тексте для людей вне комментариев: Swagger, сообщение ошибки клиенту, коммит, описание MR, ответ в треде — вступления, благодарности, канцелярит, пересказ (`core/style.md`, «Любой текст для людей») |
 | `enum-not-enumerable` | Enum не реализует `MPS\Core\Enums\Enumerable` / без `EnumerableTrait` |
 | `dto-enum-as-string` | Поле DTO с фиксированным набором значений хранится строкой, а не enum (сравнения через `->value`) |
 | `dto-setter-widened-type` | Тип аргумента сеттера DTO шире типа свойства (`int\|string`, ручное приведение) «на случай строк» — ядро приводит само |
 | `comment-restates-name` | Описание метода/класса пересказывает его имя («Неудалённые здания по набору id» над `findAliveByIds`) |
+| `nested-call-chain` | Вложенный вызов глубже одного уровня (`array_values(array_unique(array_filter(array_map(…))))`), индекс или метод по результату вызова (`handle([getByKey($key)])[0]`, `foo(...)->bar()`), замыкание-поведение в свой метод (`$this->service(static fn ($q) => …)`, `->when($cond, fn …)` вместо `if`), лямбда длиннее строки/с ветвлением, параметр замыкания затеняет внешнюю переменную, глубина блоков > 2 (`core/style.md`, «Форма кода»; `stacks/php/style.md`) |
+| `query-split-into-pieces` | Запрос репозитория собран из приватных методов-кусков (`activeQuery()`, `service(Closure)`, `withBuilding($q)`), колонки — константой `COLUMNS` вместо явного списка в `select`, или запрос-монстр на 3+ подзапроса по чужим таблицам вместо сборки из нескольких репозиториев в сервисе/workflow; фильтры списка — в том же методе; `CRUDRepository::search()`/`filterSearch()` в новом коде не используются (P-19, `conventions.md` п. 2a) |
 
 Если ни один тег не подходит — придумай новый в этом же формате.
 
