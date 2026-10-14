@@ -152,7 +152,7 @@ err := w.txManager.Exec(ctx, func(ctx context.Context, sessionRepo sessiondomain
 - Тесты: фейк менеджера вызывает `fn` с in-memory репозиториями — `examples/tariff/internal/testsupport/txfakes`.
 - Внутри `fn` — никаких HTTP-вызовов, публикаций в очередь и `time.Sleep`: транзакция держит блокировки. Побочные эффекты — через outbox (см. `approaches/patterns/outbox.md`).
 - Имя интерфейса отражает операцию (`SessionEntryTxManager`), а не придуманную механику (`EnqueueTxManager` без очереди — **[ОШИБКА]**, см. `../conventions.md`, п. 20).
-- Ручной `client.Transaction(func(tx *gorm.DB) error {...})` в репозитории допустим только если транзакция целиком внутри одного метода одного репозитория.
+- Ручной `client.Transaction(func(tx *gorm.DB) error {...})` в репозитории не используется: метод репозитория выполняет один запрос (`../conventions.md`, п. 15b), а несколько запросов в одной транзакции — это сервис, Command или workflow через `txManager.Exec`.
 
 ## Пагинация
 

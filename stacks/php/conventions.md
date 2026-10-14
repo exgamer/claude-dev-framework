@@ -28,6 +28,38 @@
     - Большой запрос (ориентир ~40 строк, 3+ подзапроса по чужим модулям) — несколько методов репозиториев, каждый в своём модуле; сервис/workflow вызывает их через интерфейсы и собирает **готовые данные** пачкой по id (`layers.md`, п. 3). Запросов в сервисе/workflow при этом нет — ни `DB::`, ни `getQuery()`, ни Builder, возвращённый из репозитория (п. 2, `service-direct-db-query`, **[ОШИБКА]**). Подзапрос `EXISTS`/`JOIN` по чужой таблице внутри метода репозитория — только на чтение и с комментарием, чья таблица (`cross-domain.md`); предпочтение — метод репозитория того модуля.
     - **Констант колонок нет** (`private const COLUMNS = [...]`): список — явно в каждом `select`/`paginate` (тот же тег). Константы значений (`QUANTITY_BASED_SERVICE_TYPES`, имена статусов) остаются.
     - Scope на моделях (`scopeActive`) не используются — запрос живёт только в репозитории (`mps-core/model.md`).
+2b. **Метод репозитория — один запрос** (**[ОШИБКА]**, тег `repository-multi-query`; правило и «почему» — `architecture/layers.md`, «Правила слоёв»; здесь — Laravel). В публичном методе одна завершающая операция: `get`/`first`/`pluck`/`exists`/`count`/`paginate`/`update`/`delete`/`insert`/`upsert`/`save`. Две подряд — разделить на два метода, а порядок и `TransactionManagerInterface::run()` — в сервис, Command или workflow.
+
+    ```php
+    // плохо: блокировка и удаление в одном методе репозитория
+    public function deleteForOwner(MediaOwnerDto $owner, string $collectionName): void
+    {
+        $lockedUuids = $this->getQuery()
+            ->where('model_type', $owner->getModelType())
+            ->where('model_id', $owner->getModelId())
+            ->where('collection_name', $collectionName)
+            ->lockForUpdate()
+            ->pluck('uuid')
+            ->all();
+
+        $this->getQuery()
+            ->whereIn('uuid', $lockedUuids)
+            ->delete();
+    }
+
+    // хорошо: два метода репозитория, порядок и транзакция — в сервисе
+    public function lockUuidsForOwner(MediaOwnerDto $owner, string $collectionName): array { /* один SELECT … FOR UPDATE */ }
+
+    public function deleteByUuids(array $uuids): int { /* один DELETE */ }
+
+    // сервис
+    $this->transactionManager->run(function () use ($owner, $collectionName): void {
+        $uuids = $this->repository->lockUuidsForOwner($owner, $collectionName);
+        $this->repository->deleteByUuids($uuids);
+    });
+    ```
+
+    Обновление — `$this->getQuery()->where('id', $id)->update($columns)`: Eloquent Builder сам ставит `updated_at`, возвращает число строк. Не `first()` → `fill()` → `save()`: это два запроса.
 3. **Service, Command/Query, Workflow — разные вещи** (`architecture/layers.md`). Workflow берёт репозитории и сервисы любых доменов напрямую; Command/Query/Service — только своего домена (O-7). Операция слишком большая для сервиса → `Commands/{Action}Command` (изменение) / `Queries/{Action}Query` (чтение) в том же модуле домена. Нужен другой домен → workflow в `Workflows/`. Пример workflow: создание тарифа проверяет парковку (Catalog) и вызывает `TariffCrudService` (Billing) — Billing-сервис о Catalog не знает. В `parking_app` такие классы пока называются `*Command` и лежат в `Workflows/` — это старый нейминг, не образец.
 4. **Репозиторий возвращает модель.** `{E}RepositoryInterface` может возвращать Eloquent-модель `Infrastructure/Postgres/{D}/{M}/Models/{E}` (решение P-4) — сервисы и workflow работают с ней. Модель не уходит в ответ напрямую: только через `{E}Response`.
 5. **Интерфейсы:** `RepositoryInterface` — всегда; `ServiceInterface` — всегда; Command/Query — без интерфейса, пока его не подменяют в тестах и не инжектируют через границу домена.
