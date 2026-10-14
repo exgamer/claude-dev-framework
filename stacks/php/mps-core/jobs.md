@@ -11,7 +11,7 @@
 
 ## Обработчик RabbitMQ
 
-Тонкий, как контроллер: payload → DTO → сервис/workflow. Бизнес-логики нет; доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (`workflow-trusts-transport-request`). Повторная доставка безопасна (`approaches/patterns/idempotency.md`): обработчик проверяет текущий статус записи и выходит, если уже обработано.
+Общие правила consumer — `approaches/patterns/async.md`, «Consumer». Тонкий, как контроллер: payload → DTO → сервис/workflow. Бизнес-логики нет; доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (`workflow-trusts-transport-request`). Повторная доставка безопасна (`approaches/patterns/idempotency.md`): обработчик проверяет текущий статус записи и выходит, если уже обработано.
 
 ```php
 namespace App\ParkingApp\Entrypoints\Queue\YourDomain\YourModule;

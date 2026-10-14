@@ -8,4 +8,5 @@
 - TTL — константа в файле кэш-репозитория (`2*time.Hour`). Свежесть — TTL + ленивое заполнение. **Фоновых пулеров/горутин обновления нет.**
 - Инвалидация — при записи, в том же сценарии, что меняет данные (сервис `InvalidateXCache`).
 - Go: `gosdk-redis-core` `NewHelper[T]` (`SetStruct`/`GetStruct`), удаление `Unlink`. PHP: `getOrSet` без тегов, `SmartCache` с тегами (`stacks/php/mps-core/rules.md`).
+- Ключ — `{service}:{entity}:{id}` или `{service}:{entity}:{поле1}:{поле2}` для составного; префикс сервиса обязателен (общий Redis), все параметры, от которых зависит значение, — в ключе (`performance.md`, `cache-key-incomplete`). Go — константа префикса в файле кэш-репозитория, PHP — `KeyHelper::generate()`.
 - Секреты (ключи, JWT-секреты, креды) в Redis не кладутся.

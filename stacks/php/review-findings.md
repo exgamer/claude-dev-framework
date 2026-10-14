@@ -11,8 +11,7 @@
 
 ## Requests (`Http/Requests/*`)
 
-- `id`, `*_id` → `['integer', 'gt:0']`. Ноль и отрицательные проходят `integer` и дают пустой 404/500 вместо 422.
-- У чисел **и массивов** есть верхняя граница: `max:`, `between:`, `array|max:100`. Массив без лимита = DoS через тело запроса.
+- Границы входа (`gt:0` для id, `max:`/`between:` для чисел и массивов, enum, `list` для коллекций) — общее правило `regulations/rest-api.md`, «Валидация входа»; ревьюеры ловят это чаще всего: `['integer', 'gt:0']`, `array|max:100`.
 - В Request нет SQL-запросов и вызовов сервисов (P-17, `conventions.md` п. 9a): ни `exists:`/`unique:`/`Rule::exists()`/`Rule::unique()`, ни своих правил и замыканий с моделью, `DB::` или репозиторием, ни запросов в `prepareForValidation()`/`withValidator()`/`after()`. Существование — в сервисе/workflow через репозиторий, уникальность — уникальный индекс + проверка в сервисе.
 - Бизнес-правила («нельзя менять статус, если оплачен») — не в Request. Но **допустимые варианты значений** (enum) — как раз в реквесте: `Rule::enum(Enum::class)` (`checklist.md` п. 12).
 - PUT — полные данные (`conventions.md`, п. 12): в `UpdateRequest` поля `required` / `present|nullable`. Необязательное поле при записи DTO целиком (`updateFromDto($tariff, $dto)`, п. 11a) затирается `null` — так в `super_app` были `BuildingService::update`, `AgreementTransactionService::update` (AINA-2628). Тег `update-request-optional-fields`.

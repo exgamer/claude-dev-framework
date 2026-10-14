@@ -11,6 +11,8 @@
 
 ## Платёжные хендлеры и workflow (`internal/workflows/**/payment/*`, `internal/entrypoints/**/http/{kaspi,halyk,kassa24,...}`)
 
+Правила платёжного пути — `approaches/patterns/payments.md` (общие для стеков). Ниже — Go-кейсы, которые уже стреляли:
+
 - **Идемпотентность pay** по `(payment_system, payment_system_txn_id)`. Если unique-констрейнта в таблице транзакций нет — повторный или параллельный запрос от шлюза = двойное списание. Новый путь записи транзакции → показать, где дедупликация.
 - **Платёж без сессии** → `session_id = 0` → FK violation и 500 (класс Kaspi FK). Новые пути записи проверять на nullable / валидацию `session_id` до INSERT.
 - **Кэш ответов шлюза** (`payment_system_logs`, `CachedBytes` в mapper) — **ошибки кэшировать нельзя**, иначе шлюз вечно получает закэшированный фейл. Эталонный паттерн — mapper kassa24; новый шлюз сверять с ним.
@@ -27,6 +29,8 @@
 - **`logger.Warning`/`logger.Error` вместо `errorreporter`** для намеренно не пробрасываемых ошибок (MR!151, многократно: "сокрытие ошибки. Использовать errorreporter sdk", "тут и везде где такое") — `gosdk-core/pkg/errorreporter.CaptureSoft`/`CaptureError(ctx, err, tags)` уходит в Sentry и дедуплицирует повтор через слои; голый `logger.*` — нет. См. `conventions.md`, п. 19.
 
 ## Конфиг
+
+Правило — `regulations/service-requirements.md`, «Конфиг» (обязательная настройка отсутствует — не стартуем; хосты нормализуются при чтении). Go-кейсы:
 
 - Viper с динамическими ключами (`PARKING_HOST_<id>`): опечатка в имени env молча даёт пустой host. Новый динамический ключ → валидация на старте (пустое значение = fail при init, `conventions.md`, п. 9 допускает panic только здесь).
 - Хвостовой `/` или `/api/` в хостах даёт двойной слеш в URL (класс smartpoint `/api//parking/payment`). Нормализовать через `strings.TrimSuffix` / `url.JoinPath` при чтении конфига, не в каждом вызове.

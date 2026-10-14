@@ -61,7 +61,7 @@ YYYY_MM_DD_HHMMSS_{описание}.php
 
 ---
 
-## Ограничения внешнего ключа (Foreign Key Constraints) обязательны если возможно
+## Ограничения внешнего ключа — всегда явно (`approaches/patterns/migrations.md`)
 
 ```php
 $table->foreign('product_offer_id')

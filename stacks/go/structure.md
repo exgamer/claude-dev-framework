@@ -234,6 +234,8 @@ main()
 
 ## Тесты (решение O-3)
 
+Что и как тестировать — `approaches/process/testing.md`; здесь — где лежит.
+
 | Что | Где | Пример |
 |---|---|---|
 | unit | рядом с кодом: `{file}_test.go` | `domains/billing/tariff/service_test.go` |

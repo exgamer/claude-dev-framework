@@ -34,7 +34,7 @@ trigger: /dev-review
 - платежи, HTTP-роуты, статусы/enum, транзакции, данные → соответствующие разделы `review-findings.md` (платёжные пути — раздел «Платёжные хендлеры» обязательно);
 - API/контракт, миграции, git-гигиена → `{DF}/regulations/{rest-api,entity,contracts,git}.md`;
 - граница доменов, workflow, интеграция → `{DF}/architecture/*.md`;
-- транзакции, конкурентность, производительность, кэш, outbox → `{DF}/approaches/patterns/*.md`, на которые ссылается `design.md`;
+- транзакции, конкурентность, производительность, кэш, outbox → `{DF}/approaches/patterns/*.md`, на которые ссылается `design.md`; платёжный путь → `payments.md` всегда; тесты в диффе → `{DF}/approaches/process/testing.md`;
 - подозрение на расхождение формы с эталоном → соответствующий файл `{DF}/stacks/<stack>/examples/`, не весь модуль.
 
 API сверять со справочником версии проекта (`reference/`; Go — версии из `go.mod`, PHP — из `composer.lock`) — **поиском по имени класса/функции (`grep`), файл целиком не читать**; справочника нужной версии нет — пересобрать `{DF}/tools/sdk-ref/`.

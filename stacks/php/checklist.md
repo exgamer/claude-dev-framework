@@ -9,11 +9,11 @@
 1. **О** Файл лежит по `structure.md` (дерево подпроекта); `Infrastructure/{Тип}/…`; новый код не в легаси `app/`. — `structure.md`
 2. **О** Контроллер тонкий: `Request` → `{E}Dto::make()->fromArray($request->validated())` → сервис/workflow → `response()->json(...)`; в сервис — DTO, не `validated()`/`all()`/массив. — `conventions.md` п. 1, 11a
 3. **О** Service/Command/Query — только свой домен; 2+ домена → `Workflows/{D}/{M}/{Action}Workflow::execute()`; workflow берёт репозитории и сервисы любых доменов напрямую. — `conventions.md` п. 3 (O-7)
-4. **О** Бизнес-логика — в сервисе/Command/workflow; репозиторий — только запросы через `$this->getQuery()`, без `keyBy`/`map`; в сервисе, Command/Query и **workflow** нет запросов к БД — ни `DB::`, ни `Model::where`/`Model::query()`/`Model::find`, ни `->get()` по модели: только методы репозитория через интерфейс; запись в репозиторий — DTO или типизированные аргументы, не массив (`createFromDto`/`updateFromDto`/`setDefault`). — `conventions.md` п. 2, 11a, `review-findings.md`
+4. **О** Бизнес-логика — в сервисе/Command/workflow; репозиторий — только запросы через `$this->getQuery()`, без `keyBy`/`map`; в сервисе, Command/Query и **workflow** нет запросов к БД — ни `DB::`, ни `Model::where`/`Model::query()`/`Model::find`, ни `->get()` по модели: только методы репозитория через интерфейс; запись в репозиторий — DTO или типизированные аргументы, не массив (`createFromDto`/`updateFromDto`/`setDefault`). — `conventions.md` п. 2, 11a; контракт репозитория — `architecture/layers.md`, «Правила слоёв»
 5. **О** Интерфейс у каждого сервиса и репозитория; зависимости — конструктор, `private readonly`, тип — интерфейс; `app()`/`resolve()` в бизнес-коде нет. — `conventions.md` п. 5, 6
 6. **О** DI — только `definitions.php` домена/инфраструктуры. — `conventions.md` п. 7
 7. **О** Логика по контекстам различается → `{Context}{Entity}Service` в том же модуле, без `if ($isAdmin)`; сервисов в `Entrypoints/` нет. — `conventions.md`, «Логика, отличающаяся по контексту»
-8. **О** Eloquent-связей в моделях нет; клиент внешней системы — `*Gateway` в `Infrastructure/Http/…`, конфиг через конструктор. — `conventions.md`, «Модели и внешние системы»
+8. **О** Eloquent-связей в моделях нет; клиент внешней системы — `*Gateway` в `Infrastructure/Http/…`, конфиг через конструктор; обязательная настройка отсутствует — `InvalidConfigurationAppException`, не дефолт. — `conventions.md`, «Модели и внешние системы»; `regulations/service-requirements.md`, «Конфиг»
 9. **В** Нет методов-обёрток над одной проверкой/вызовом (`findByIdOrFail`, `assertValid`). — `conventions.md` п. 12a
 
 ## Ядро
@@ -23,7 +23,7 @@
 ## Request и данные
 
 11. **О** В Request нет SQL: ни `exists:`/`unique:`/`Rule::exists/unique`, ни своих правил/замыканий с моделью/`DB::`/репозиторием. Существование — в сервисе/workflow, уникальность — уникальный индекс + проверка в сервисе. — `conventions.md` п. 9a (P-17)
-12. **О** `id`/`*_id` → `integer|gt:0`; у строк, чисел и массивов есть `max:`; допустимые значения — `Rule::enum()`; вложенная коллекция DTO — `list` + `{поле}.*: array`; бизнес-правил в Request нет. — `review-findings.md`, «Requests», `mps-core/data-objects.md`
+12. **О** `id`/`*_id` → `integer|gt:0`; у строк, чисел и массивов есть `max:`; допустимые значения — `Rule::enum()`; вложенная коллекция DTO — `list` + `{поле}.*: array`; бизнес-правил в Request нет. — `regulations/rest-api.md`, «Валидация входа», `mps-core/data-objects.md`
 13. **О** PUT — полные данные: в `UpdateRequest` каждое поле `required`, очищаемое — `present|nullable`. — `conventions.md` п. 12 (O-10)
 14. **О** Роль/право на операцию — middleware на маршруте (`permission:…`/`role:…`), не `hasRole`/`authorize()`/`Gate::` в контроллере или домене. Доступ (здание/организация из заголовка или параметров) — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр; сервис и репозиторий о правах не знают. — `conventions.md` п. 19a
 15. **В** Доменные инварианты — `{E}DtoValidator::validate($dto)` → `ValidationAppException('VALIDATION ERROR', $errors)`. — `conventions.md` п. 10 (P-8)
@@ -36,6 +36,7 @@
 19. **О** Workflow с записью — проверки и все записи в одном `TransactionManagerInterface::run()`; без транзакции — только с причиной в `design.md`. — `approaches/patterns/transactions.md` (O-8)
 20. **О** Service/Command с 2+ связанными записями — `run()`; не `DB::transaction`, не `$repo->transaction`. — `conventions.md` п. 16
 21. **О** Очередь, `Job::dispatch`, HTTP, файлы, сброс кэша — после записи и вне транзакции. — `conventions.md` п. 17
+21a. **О** Обработчик очереди — в `Entrypoints/Queue/`, тонкий, идемпотентный, payload через DTO; временная ошибка — повтор, постоянная — фиксация без повтора. — `approaches/patterns/async.md`, «Consumer», `mps-core/jobs.md`
 
 ## Ошибки
 
@@ -53,7 +54,7 @@
 27. **О** Конкурентные места из `design.md` закрыты: уникальный индекс, условная смена статуса, идемпотентность, блокировка крона; состояния в памяти процесса нет (Octane, 2+ инстанса). — `approaches/patterns/concurrency.md`
 28. **О** Без N+1, пагинация, индекс под фильтр/сортировку, большие выборки — `chunk()`/`cursor()`. — `approaches/patterns/performance.md`
 29. **О** Мульти-тенантный скоуп в каждом методе (`index`/`show`/`update`/`destroy` по отдельности): параметр владельца выводится сервером, не берётся из запроса как необязательный; в сигнатуре сервиса/репозитория скоуп — без умолчания `= null`, `null` передаётся явно. — `security.md`, `review-findings.md`
-30. **О** Вебхук — проверка подписи до смены статуса; повтор события идемпотентен. — `security.md`
+30. **О** Вебхук — проверка подписи до смены статуса; повтор события идемпотентен; платёжный путь — все пункты `payments.md`. — `security.md`, `approaches/patterns/payments.md`
 31. **О** Нет сырого SQL с подстановкой ввода, секретов в коде и логах, mass assignment без allowlist. — `security.md`
 32. **О** Меры из `threats.md` по своим файлам реализованы.
 
@@ -70,7 +71,8 @@
 38. **О** Unit-тесты на правила R*, ветки ошибок и кейсы `qa.md` уровня unit — в `tests/Unit/…`, путь повторяет путь класса. — `structure.md`, «Тесты»
 39. **О** Прогнаны `composer csfix-validate`, `composer phpstan`, `composer test:run` (или аналоги проекта); вывод показан. Не запускал — так и написано.
 40. **О** Связи: по каждому изменённому классу/роуту/таблице/enum найдены использования (имя + строковый литерал); новое значение enum — в `in:`, swagger `enum:`, словарях фронта. — `approaches/process/impact-analysis.md`
-41. **О** Миграция обратно совместима (expand/contract), порядок выкатки описан. — `approaches/patterns/migrations.md`
+41. **О** Миграция обратно совместима (expand/contract), FK явно, порядок выкатки описан. — `approaches/patterns/migrations.md`
+41a. **О** У нового статуса/значения есть потребитель (крон, consumer, переход), иначе тупик. — `approaches/process/impact-analysis.md`
 
 ## Действия агента
 

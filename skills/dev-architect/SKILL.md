@@ -10,7 +10,7 @@ trigger: /dev-architect
 
 ## Шаг 1 — Правила
 
-Прочитай: `{DF}/core/*.md`, `{DF}/architecture/*.md`, `{DF}/regulations/*.md`, `{DF}/approaches/process/impact-analysis.md`, `{DF}/stacks/<stack>/structure.md` и `conventions.md`, `{DF}/approaches/process/planning.md`; по теме задачи — нужные `{DF}/approaches/patterns/*.md`. Режим `refactor` — `legacy-refactor.md`, `migrate` — `stack-migration.md` и `structure.md` обоих стеков. Локальные `.claude/dev-rules.md` проекта.
+Прочитай: `{DF}/core/*.md`, `{DF}/architecture/*.md`, `{DF}/regulations/*.md`, `{DF}/approaches/process/impact-analysis.md`, `{DF}/stacks/<stack>/structure.md` и `conventions.md`, `{DF}/approaches/process/planning.md`; по теме задачи — нужные `{DF}/approaches/patterns/*.md` (деньги/колбэки шлюзов — `payments.md` обязательно). Режим `refactor` — `legacy-refactor.md`, `migrate` — `stack-migration.md` и `structure.md` обоих стеков. Локальные `.claude/dev-rules.md` проекта.
 
 ## Шаг 2 — Изучи код
 

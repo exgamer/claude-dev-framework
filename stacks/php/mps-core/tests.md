@@ -4,6 +4,8 @@
 
 ## Когда что использовать
 
+Общие правила уровней и моков — `approaches/process/testing.md`; здесь — классы ядра и Laravel.
+
 | Тип | Когда писать |
 |---|---|
 | Unit | Helpers, Traits, DataObjects, Services с мокированными зависимостями |

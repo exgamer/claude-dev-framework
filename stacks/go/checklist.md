@@ -9,9 +9,9 @@
 1. **О** Файл лежит по `structure.md` (таблица путей, чеклист модуля); имя файла = что в нём объявлено, не `ports.go`/`utils.go`. — `conventions.md` п. 12, 16
 2. **О** Зависимости слоёв: домен не знает HTTP/БД/workflow, entrypoint не знает bootstrap. — `architecture/layers.md`
 3. **О** Service/Command/Query — только свой домен; 2+ домена → workflow; workflow берёт репозитории и сервисы любых доменов напрямую. — `architecture/layers.md` (O-7)
-4. **О** Хендлер тонкий: биндинг/формат → маппинг → сервис/workflow. Роль/право на операцию — middleware на маршруте (`RequirePermission`); доступ (здание/организация) — middleware контекста, в сервис — фильтром. Проверок ролей/прав в хендлере и домене нет. — `conventions.md` п. 7
+4. **О** Хендлер тонкий: биндинг/формат → маппинг → сервис/workflow; формат входа — id > 0, границы у чисел и массивов, enum (`regulations/rest-api.md`, «Валидация входа»). Роль/право на операцию — middleware на маршруте (`RequirePermission`); доступ (здание/организация) — middleware контекста, в сервис — фильтром. Проверок ролей/прав в хендлере и домене нет. — `conventions.md` п. 7
 5. **О** Бизнес-логика только в сервисах/Command/workflow; маппер только маппит, репозиторий только запросы. — `conventions.md` п. 6, 15
-6. **О** Хранилища (БД, Redis, HTTP, файлы) — только через репозитории `internal/infrastructure`; исходящий HTTP — только `gosdk-http-request-builder`. — `conventions.md` п. 4, 5
+6. **О** Хранилища (БД, Redis, HTTP, файлы) — только через репозитории `internal/infrastructure`; исходящий HTTP — только `gosdk-http-request-builder`; репозиторий только запросы, «не найдено» — `nil, nil`, без `FindOrCreate`. — `conventions.md` п. 4, 5; `architecture/layers.md`, «Правила слоёв»
 7. **О** Интерфейс объявляет потребитель, в отдельном файле по имени интерфейса; конструктор возвращает конкретный тип. — `conventions.md` п. 10–12
 8. **О** Workflow собирается в `workflows_factory.go`, файл `{действие}_workflow.go`, метод `Exec`. — `go-sdk/workflow.md`
 9. **О** Домен не строит `map[string]any` с колонками БД: частичное обновление — DTO `Patch` + маппер в инфре. — `core/style.md`, «Данные между слоями»
@@ -36,8 +36,9 @@
 19. **О** Запрос к БД/Redis — с таймаутом. — `review-findings.md`, «Контекст»
 20. **О** Ошибки не игнорируются (`_ =`); технические — обёрнуты с ID (`%w`); бизнес-ошибки — `AppException` SDK, по-русски. — `conventions.md` п. 8, `go-sdk/exceptions.md`
 21. **В** Намеренно не проброшенная ошибка — `errorreporter.CaptureSoft/CaptureError`, не только лог. — `conventions.md` п. 19
-22. **О** `panic` — только при старте приложения. — `conventions.md` п. 9
+22. **О** `panic` — только при старте приложения; обязательная настройка отсутствует — не стартуем, не дефолт; хосты нормализуются при чтении конфига. — `conventions.md` п. 9; `regulations/service-requirements.md`, «Конфиг»
 23. **О** `go` — там, где решают про асинхронность (workflow/entrypoint), не внутри сервиса; побочный эффект после записи — outbox, не fire-and-forget. — `conventions.md` п. 18
+23a. **О** Consumer тонкий и идемпотентный: payload → DTO → сервис/workflow; ошибка десериализации — ACK, временная — NACK; топология — при старте через SDK. — `approaches/patterns/async.md`, «Consumer», `go-sdk/entrypoint/rabbit.md`
 24. **О** `nil` вместо обязательной зависимости в конструктор не передаётся. — `conventions.md` п. 21
 25. **О** Конкурентные места из `design.md` закрыты: уникальный индекс + перехват `23505` → 422, условный `UPDATE` статуса, идемпотентность, блокировка крона; общее состояние — без data race (`go test -race`). — `approaches/patterns/concurrency.md`
 26. **О** Без N+1, список с пагинацией, индекс под фильтр/сортировку, массовые операции пачками. — `approaches/patterns/performance.md`
@@ -47,7 +48,7 @@
 
 28. **О** Каждый хендлер ресурса скоупит по владельцу/тенанту — отдельно `get`/`update`/`delete`, не только список; чужая запись → 404. — `security.md`
 29. **О** Новый роут без auth-middleware — только осознанно, с причиной в MR. — `review-findings.md`, «HTTP-роуты»
-30. **О** Вебхук/колбэк — проверка подписи по протоколу провайдера до смены статуса; повтор события не создаёт вторую запись. — `security.md`, `approaches/patterns/idempotency.md`
+30. **О** Вебхук/колбэк — проверка подписи по протоколу провайдера до смены статуса; повтор события не создаёт вторую запись; платёжный путь — все пункты `payments.md`. — `security.md`, `approaches/patterns/{idempotency,payments}.md`
 31. **О** Нет SQL-конкатенации, секретов в коде/логах/общем Redis, внутренних деталей в ответе. — `security.md`
 32. **О** Меры из `threats.md` по своим файлам реализованы.
 
@@ -64,7 +65,7 @@
 38. **О** Unit-тесты на правила R*, ветки ошибок и кейсы `qa.md` уровня unit — рядом с кодом, фейки по интерфейсам (`testsupport/*fakes`, фейк транзакции — `txfakes`). — `structure.md`, «Тесты»
 39. **О** Прогнаны `go build ./... && go vet ./... && go test ./... && gofmt -l internal pkg` (с горутинами — `-race`); вывод показан. Не запускал — так и написано.
 40. **О** Связи: по каждому изменённому символу/роуту/таблице/enum найдены использования (имя + строковый литерал); новое значение статуса/enum — во всех `switch`/`map`/swagger `enums`. — `approaches/process/impact-analysis.md`
-41. **О** У нового статуса есть обработчик (крон/consumer/переход), иначе тупик.
+41. **О** У нового статуса есть обработчик (крон/consumer/переход), иначе тупик. — `approaches/process/impact-analysis.md`, `approaches/patterns/payments.md`
 
 ## Действия агента
 
