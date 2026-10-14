@@ -79,6 +79,21 @@ import (
       SetRequestTimeout(timeout).
       SetThrowUnmarshalError(false)
   ```
+- Читается сверху вниз (`core/style.md`, «Форма кода»; **[ВНИМАНИЕ]**): вызов не вкладывается в вызов и не индексируется на месте, замыкание не передаёт поведение в свою функцию, функция-литерал — короткая, без затенения внешних переменных, глубина блоков ≤ 2. Один уровень с коротким аргументом допустим.
+
+  ```go
+  // допустимо: аргумент — один вызов маппера от входных данных
+  result, err := h.workflow.Handle(ctx, mapper.ToInput(req))
+
+  // плохо: вызов в аргументе и индекс по результату
+  return toResponse(s.withMedia(ctx, []*Tariff{tariff})[0]), nil
+
+  // хорошо
+  tariffs := s.withMedia(ctx, []*Tariff{tariff})
+  response := toResponse(tariffs[0])
+
+  return response, nil
+  ```
 - Ранний выход вместо `else` (`core/style.md`, «Форма кода»; `else-after-return`): `if err != nil { return ..., err }` и дальше основной сценарий без вложенности; ветка завершилась `return`/`continue` — `else` после неё не пишется (gofmt-стиль, его же требует `golint`/`revive` правилом `indent-error-flow`); выбор по значению — `switch`.
 
   ```go

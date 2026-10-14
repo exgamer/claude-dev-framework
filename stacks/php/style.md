@@ -124,6 +124,23 @@
   }
   $buildingIds = array_values($buildingIds);
   ```
+
+  Один уровень с коротким аргументом — допустим; вызов внутри аргумента или индекс по результату — разворачивать:
+
+  ```php
+  // допустимо: аргумент — один вызов маппера/хелпера от входных данных
+  $this->requestOtpWorkflow->handle(PhoneRequestMapper::toDto($request));
+  $paginator = ContractPagination::restore($items, Mapper::perPage($request), $request->page());
+
+  // плохо: вызов в аргументе и индекс по результату
+  return $this->withMedia([$this->repository->findById($id)])[0];
+
+  // хорошо
+  $entity = $this->repository->findById($id);
+  $entities = $this->withMedia([$entity]);
+
+  return $entities[0];
+  ```
 - Пустая строка перед `return`/`throw`/`try`/`break`/`continue` и после блоков `if`/`foreach` (cs-fixer `ErickSkrauch/line_break_after_statements`).
 - `! $value` — с пробелом; конкатенация `$a . $b` — с пробелами; короткие массивы; одинарные кавычки.
 - `=` и `=>` не выравниваются по колонке.
