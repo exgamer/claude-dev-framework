@@ -72,6 +72,7 @@
 | `deploy-risk-flag-enabled` | Раскомментированный крон/включённый флаг — риск первого прогона на накопленных данных |
 | `mr-hygiene-lockfile-drift` | `composer.lock` не обновлён вместе с `composer.json`, либо сгенерированные файлы (`.php-cs-fixer.cache`, `storage/api-docs/*.json`) уехали в MR |
 | `ai-style-comment` | Комментарий-пересказ кода построчно, сгенерированный ИИ |
+| `ai-style-text` | «ИИ-вода» в тексте для людей вне комментариев: Swagger, сообщение ошибки клиенту, коммит, описание MR, ответ в треде — вступления, благодарности, канцелярит, пересказ (`core/style.md`, «Любой текст для людей») |
 | `enum-not-enumerable` | Enum не реализует `MPS\Core\Enums\Enumerable` / без `EnumerableTrait` |
 | `dto-enum-as-string` | Поле DTO с фиксированным набором значений хранится строкой, а не enum (сравнения через `->value`) |
 | `dto-setter-widened-type` | Тип аргумента сеттера DTO шире типа свойства (`int\|string`, ручное приведение) «на случай строк» — ядро приводит само |
