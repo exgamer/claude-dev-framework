@@ -17,6 +17,7 @@
 ```
 parking_app/                                   ← корень подпроекта = PSR-4 App\ParkingApp\
 ├── ServiceProvider.php                        ← регистрирует провайдеры доменов, инфраструктуры, точек входа
+├── Common/                                    ← общий бизнес-словарь двух и более доменов (`architecture/layers.md`): Enums/, ValueObjects/, Support/ (чистые функции), Exceptions/; без DI и I/O
 ├── Core/                                      ← общее для подпроекта, не бизнес-логика
 │   ├── Database/Managers/                     ← TransactionManagerInterface, NoopTransactionManager
 │   ├── Database/Query/PaginatedQueryHelper.php ← старая форма списка (P-19), новый код не использует
@@ -69,7 +70,7 @@ parking_app/                                   ← корень подпроек
 
 **Infrastructure — всегда с типом** (решение P-10): `Infrastructure/{Postgres,Redis,Http,RabbitMQ,…}/…`. `Infrastructure/{Domain}/` без типа (как `super_app/Infrastructure/Acms`, `Infrastructure/User/Models`) в новом коде — **[ВНИМАНИЕ]**.
 
-**`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` (как в `super_app`) в новом коде не заводится. Техническая библиотека подпроекта без бизнес-логики (над расширением PHP или ФС: архивы, файлы) — `Core/{Lib}/{Services,Drivers,DTO,Enums,Exceptions}`, интерфейсы рядом с реализацией, регистрация — `Core/definitions.php` (AINA-2744).
+**`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` (как в `super_app`) в новом коде не заводится. Бизнес-понятия, нужные двум и более доменам (enum, value-объекты, чистые функции над ними), — не в `Core/`, а в `Common/` (`architecture/layers.md`, «Общий бизнес-словарь»). Техническая библиотека подпроекта без бизнес-логики (над расширением PHP или ФС: архивы, файлы) — `Core/{Lib}/{Services,Drivers,DTO,Enums,Exceptions}`, интерфейсы рядом с реализацией, регистрация — `Core/definitions.php` (AINA-2744).
 
 **Хелперы (`Core/Helpers/{Thing}Helper.php`)** — чистые преобразования формата (`core/principles.md`, «Повторяющаяся обработка — один хелпер»): `PhoneHelper::normalize(string $raw): ?string`, `PhoneHelper::format(string $digits): string`, `IinHelper`, `CardHelper`, `MoneyHelper`. `final class`, только `public static` методы, без конструктора и DI, без `DB::`/моделей/конфига, без доменных типов; одна тема — один класс (не `StrHelper` с телефоном, картой и датами внутри). Тесты — `tests/Unit/Core/Helpers/{Thing}HelperTest.php`. Вызывается из `prepareForValidation()` Request'а (нормализация входа), из Response (формат вывода), из консольных команд; в сервисе и репозитории преобразований формата нет — им приходит уже нормализованное значение. Эталон формы — `super_app/Core/Helpers/PhoneHelper.php`; `app/Helpers/StrHelper.php` с телефоном внутри — не образец.
 

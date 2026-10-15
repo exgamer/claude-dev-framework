@@ -19,7 +19,7 @@
 | # | Решение | Где записано |
 |---|---|---|
 | O-4 | Источник и версию Go SDK всегда спрашивать у пользователя (ответ — в `design.md`); PHP — версия из `composer.lock` | `stacks/go/conventions.md` п. 23, `stacks/php/conventions.md` |
-| O-7 | Service/Command/Query — только свой домен; 2+ домена → workflow, он берёт репозитории/сервисы любых доменов напрямую | `architecture/layers.md` |
+| O-7 | Service/Command/Query — только свой домен; 2+ домена → workflow, он берёт репозитории/сервисы любых доменов напрямую; чужой домен (в т. ч. enum) не импортируется; понятие двух и более доменов — слой `Common` (enum, value-объекты, чистые функции, без DI и I/O), копия — [ОШИБКА] | `architecture/layers.md` |
 | O-8 | Workflow транзакционен по умолчанию: проверки + все записи в одной транзакции; Go — внутри `txManager.Exec` только репозитории из аргументов | `approaches/patterns/transactions.md` |
 | O-9 | Массовые операции, очистка, схема/миграции в БД — только по явному «да» на каждую; stage/prod — никогда | `core/principles.md`, «Действия с БД» |
 | O-10 | PUT — полные данные (`required` / `present\|nullable`), частичное обновление не применяется | `regulations/rest-api.md` |

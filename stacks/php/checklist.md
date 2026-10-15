@@ -30,7 +30,7 @@
 14. **О** Роль/право на операцию — middleware на маршруте (`permission:…`/`role:…`), не `hasRole`/`authorize()`/`Gate::` в контроллере или домене. Доступ (здание/организация из заголовка или параметров) — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр; сервис и репозиторий о правах не знают. — `conventions.md` п. 19a
 15. **В** Доменные инварианты — `{E}DtoValidator::validate($dto)` → `ValidationAppException('VALIDATION ERROR', $errors)`. — `conventions.md` п. 10 (P-8)
 16. **О** Между слоями — DTO (`DataObject`, private-свойства, геттеры, fluent-сеттеры), не массив; enum-поле DTO — enum. — `conventions.md` п. 11
-17. **В** Ключи (атрибуты, заголовки, теги кэша) и значения домена (типы, статусы, провайдеры, действия) — enum, не константы; повтор значения существующего enum константой и константы в интерфейсах — **О**. — `conventions.md` п. 12b
+17. **В** Ключи (атрибуты, заголовки, теги кэша) и значения домена (типы, статусы, провайдеры, действия) — enum, не константы; повтор значения существующего enum константой и константы в интерфейсах — **О**; подмножество значений enum — метод enum, не `const array` из кейсов в другом классе.  — `conventions.md` п. 12b
 18. **В** Список как в Go (P-19): `paginate…({E}FilterDto, Page)` — один метод собирает один запрос, фильтры подряд `if (...) { $query->where(...); }`, явный `orderBy` в конце; каждое поле `IndexRequest` → поле FilterDto → условие; `search()`/`filterSearch()`/`SearchDataObject`/`PaginatedQueryHelper` в новом коде нет. — `conventions.md` п. 2a, 12c, 12d
 
 ## Транзакции и побочные эффекты
