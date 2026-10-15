@@ -36,7 +36,7 @@
 | ~~`controller-manual-response-wrapper`~~ | не используется — тот же паттерн, что `response-double-wrap` |
 | `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`superAppApi`) |
 | `service-thin-wrapper` | Метод-обёртка над одной проверкой/вызовом в сервисе или репозитории (`findByIdOrFail`/любой `*OrFail`, `assertValid`, внутренний `getById` → свой репозиторий); публичный `findById(): ?Model` для точки входа — не находка |
-| `constant-not-enum` | Значение-ключ константой класса/интерфейса вместо enum |
+| `constant-not-enum` | Значение-ключ или значение домена (тип, статус) константой класса/интерфейса вместо enum; повтор значения существующего enum — [ОШИБКА] |
 | `search-filter-outside-dto` | Контекст-фильтр списка (здания, организация) передан в сервис отдельным аргументом и вписывается в параметры внутри него вместо поля `{E}FilterDto`, выставленного в контроллере (`conventions.md` п. 19a) |
 | `list-without-default-sort` | Метод списка без явного `orderBy` по умолчанию (`conventions.md` п. 12c) |
 | `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не попадает в `{E}FilterDto` / не применяется в методе списка репозитория (старая форма — `filterSearch`) |
