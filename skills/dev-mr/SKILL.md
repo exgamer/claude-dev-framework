@@ -20,6 +20,8 @@ trigger: /dev-mr
 
 Прочитай `{DF}/approaches/process/mr-threads.md` — процедура целиком: MR и ветка, выгрузка тредов, префиксы, анализ, документ, две остановки на обсуждение, выполнение, итог. Выполняй по шагам. Также: `{DF}/regulations/code-review.md` (префиксы, обязанности автора, соответствие уровням фреймворка), `{DF}/core/principles.md` («Пробелы и споры», «Действия с БД»), `{DF}/core/decisions.md`, `{DF}/core/rules-evolution.md` («Лог отклонений по задаче»). Локальные `.claude/dev-rules.md` проекта главнее фреймворка.
 
+Проверь доступ к IDE и при недоступности предложи включить — `{DF}/approaches/process/code-navigation.md`, «Проверка при старте»; работу это не останавливает. Поиск по коду при анализе и правках — по тому же файлу.
+
 ## Шаг 2 — Правила стека
 
 Для сверки замечаний с правилами: `{DF}/stacks/<stack>/checklist.md` всегда; `security.md`, `review-findings.md`, PHP — `review-tags.md`; остальное (`conventions.md`, `style.md`, `mps-core/*` / `go-sdk/*`, `{DF}/approaches/patterns/*`) — grep по теме замечания, не целиком. Для правок — как разработчик стека: `{DF}/skills/dev-<stack>/SKILL.md`, Шаги 1, 3–5.

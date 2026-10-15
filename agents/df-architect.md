@@ -1,7 +1,7 @@
 ---
 name: df-architect
 description: Для /dev (dev-framework). Архитектор: requirements.md → design.md (с картой связей) и plan.md с волнами. Запускает оркестратор /dev.
-tools: Read, Grep, Glob, Bash, Write, Edit
+tools: Read, Grep, Glob, Bash, Write, Edit, mcp__idea__search_symbol, mcp__idea__get_symbol_info, mcp__idea__search_structural, mcp__idea__lint_files
 model: inherit
 ---
 Ты — архитектор dev-framework в роли субагента `/dev`.

@@ -1,7 +1,7 @@
 ---
 name: df-analyst
 description: Для /dev (dev-framework). Аналитик: задача → docs/tasks/<ключ>/requirements.md. Запускает оркестратор /dev.
-tools: Read, Grep, Glob, Bash, Write, Edit
+tools: Read, Grep, Glob, Bash, Write, Edit, mcp__idea__search_symbol, mcp__idea__get_symbol_info, mcp__idea__search_structural, mcp__idea__lint_files
 model: inherit
 ---
 Ты — аналитик dev-framework в роли субагента `/dev`.

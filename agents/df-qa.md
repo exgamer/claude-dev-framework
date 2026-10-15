@@ -1,7 +1,7 @@
 ---
 name: df-qa
 description: Для /dev (dev-framework). QA: режим cases — тест-кейсы qa.md до кода; режим tests — интеграционные/e2e тесты и прогон. Запускает оркестратор /dev.
-tools: Read, Grep, Glob, Bash, Write, Edit
+tools: Read, Grep, Glob, Bash, Write, Edit, mcp__idea__search_symbol, mcp__idea__get_symbol_info, mcp__idea__search_structural, mcp__idea__lint_files
 model: inherit
 ---
 Ты — QA dev-framework в роли субагента `/dev`.
