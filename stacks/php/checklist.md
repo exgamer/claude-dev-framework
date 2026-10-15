@@ -8,7 +8,7 @@
 
 1. **О** Файл лежит по `structure.md` (дерево подпроекта); `Infrastructure/{Тип}/…`; новый код не в легаси `app/`. — `structure.md`
 2. **О** Контроллер тонкий: `Request` → `{E}Dto::make()->fromArray($request->validated())` → сервис/workflow → `response()->json(...)`; в сервис — DTO, не `validated()`/`all()`/массив. — `conventions.md` п. 1, 11a
-3. **О** Service/Command/Query — только свой домен; 2+ домена → `Workflows/{D}/{M}/{Action}Workflow::execute()`; workflow берёт репозитории и сервисы любых доменов напрямую. — `conventions.md` п. 3 (O-7)
+3. **О** Service/Command/Query — только свой домен; 2+ домена → `Workflows/{D}/{M}/{Action}Workflow::execute()`; workflow берёт репозитории и сервисы любых доменов напрямую. Из домена чужой домен (сервис, репозиторий, сущность, enum) не импортируется: понятие двух и более доменов — `Common/` (enum, value-объекты, чистые функции; без DI и I/O); копия понятия — `duplicated-enum`, логика в `Common/` — `common-with-logic`. — `conventions.md` п. 3 (O-7); `architecture/layers.md`, «Общий бизнес-словарь»
 4. **О** Бизнес-логика — в сервисе/Command/workflow; репозиторий — только запросы через `$this->getQuery()`, без `keyBy`/`map`; в сервисе, Command/Query и **workflow** нет запросов к БД — ни `DB::`, ни `Model::where`/`Model::query()`/`Model::find`, ни `->get()` по модели: только методы репозитория через интерфейс; запись в репозиторий — DTO или типизированные аргументы, не массив (`createFromDto`/`updateFromDto`/`setDefault`). — `conventions.md` п. 2, 11a; контракт репозитория — `architecture/layers.md`, «Правила слоёв»
 5. **О** Интерфейс у каждого сервиса и репозитория; зависимости — конструктор, `private readonly`, тип — интерфейс; `app()`/`resolve()` в бизнес-коде нет. — `conventions.md` п. 5, 6
 6. **О** DI — только `definitions.php` домена/инфраструктуры. — `conventions.md` п. 7
@@ -30,7 +30,7 @@
 14. **О** Роль/право на операцию — middleware на маршруте (`permission:…`/`role:…`), не `hasRole`/`authorize()`/`Gate::` в контроллере или домене. Доступ (здание/организация из заголовка или параметров) — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр; сервис и репозиторий о правах не знают. — `conventions.md` п. 19a
 15. **В** Доменные инварианты — `{E}DtoValidator::validate($dto)` → `ValidationAppException('VALIDATION ERROR', $errors)`. — `conventions.md` п. 10 (P-8)
 16. **О** Между слоями — DTO (`DataObject`, private-свойства, геттеры, fluent-сеттеры), не массив; enum-поле DTO — enum. — `conventions.md` п. 11
-17. **В** Ключи (атрибуты, заголовки, теги кэша) и значения домена (типы, статусы, провайдеры, действия) — enum, не константы; повтор значения существующего enum константой и константы в интерфейсах — **О**; подмножество значений enum — метод enum, не `const array` из кейсов в другом классе.  — `conventions.md` п. 12b
+17. **В** Ключи (атрибуты, заголовки, теги кэша) и значения домена (типы, статусы, провайдеры, действия) — enum, не константы; повтор значения существующего enum константой и константы в интерфейсах — **О**; подмножество значений enum — метод enum, не `const array` из кейсов в другом классе. — `conventions.md` п. 12b
 18. **В** Список как в Go (P-19): `paginate…({E}FilterDto, Page)` — один метод собирает один запрос, фильтры подряд `if (...) { $query->where(...); }`, явный `orderBy` в конце; каждое поле `IndexRequest` → поле FilterDto → условие; `search()`/`filterSearch()`/`SearchDataObject`/`PaginatedQueryHelper` в новом коде нет. — `conventions.md` п. 2a, 12c, 12d
 
 ## Транзакции и побочные эффекты

@@ -14,7 +14,9 @@
 3. Ошибки делятся на **временные** (сеть, 5xx — повтор через очередь/ретрай) и **постоянные** (нет конфигурации, битый payload — ручной разбор, без бесконечного повтора). Тип ошибки задаёт исключение и записан в `@throws`/доке метода.
 4. Повтор зависших — консольная команда / consumer по расписанию.
 
-## Где в эталонах
+## Где реализовано (исходные проекты, для справки)
+
+Агент эти проекты не открывает: в проекте задачи — соседний outbox-модуль, если есть, иначе — по шагам выше.
 
 - Go: `domains/session/outbox_session_event/` (сущность, статус-enum, репозиторий), `workflows/session/outbox_session_event/sync_outbox_event_command.go` (по правилам — `sync_outbox_event_workflow.go`, G-1), consumer в `bootstrap/.../consumers_factory.go`.
 - PHP: `Domains/Billing/Modules/WhitelistOutbox/`, `Workflows/Billing/WhitelistOutbox/DeliverWhitelistCommand.php` (по правилам — `DeliverWhitelistWorkflow`, P-2), публикация `Infrastructure/RabbitMQ/Billing/WhitelistOutbox/`, повтор `Entrypoints/Console/Billing/WhitelistOutbox/RetryWhitelistOutboxCommand.php`.

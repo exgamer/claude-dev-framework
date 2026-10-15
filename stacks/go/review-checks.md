@@ -37,7 +37,7 @@
 
 ## 5.3 — Проверки за пределами дифа
 
-Выполняй при ревью дифа/MR; при `--all` — только пп. 0, 0a по всему проекту:
+Выполняй при ревью дифа/MR; при `--all` — только пп. 0, 0a, 0b по всему проекту:
 
 0. **Запросы к хранилищам вне `internal/infrastructure`** — всегда, механически (`conventions.md` п. 4; тег `service-direct-db-query`):
    ```
@@ -51,6 +51,24 @@
      --include='*.go' . | grep -vE "/vendor/|^\./pkg/|_test\.go"
    ```
    Строка в `domains/`, `workflows/`, `entrypoints/` — кандидат: есть `validation.NormalizePhoneNumber`/`CheckValidPhone` в SDK или пакет в `pkg/` — **[ОШИБКА]**, второе вхождение без пакета — **[ВНИМАНИЕ]**, одно — **[ИНФО]** с предложением вынести в `pkg/`.
+0b. **Копии enum, импорт чужого домена, логика в Common** (`duplicated-enum`, `common-with-logic`; `architecture/layers.md`, «Общий бизнес-словарь»):
+   ```
+   # пары enum с одним набором значений
+   python3 - <<'PY'
+   import re,glob
+   e={f:set(re.findall(r'=\s*"([^"]+)"',open(f).read())) for f in glob.glob('internal/**/*_enum.go',recursive=True)}
+   e={f:v for f,v in e.items() if v}; fs=list(e)
+   for i,a in enumerate(fs):
+       for b in fs[i+1:]:
+           c=e[a]&e[b]
+           if len(c)>=3 and len(c)/min(len(e[a]),len(e[b]))>=0.6: print(len(c),a,b)
+   PY
+   # импорты доменов из доменов — сверить {domain} в пути импорта с папкой файла
+   grep -rnE '"[^"]+/internal/domains/[^"/]+' internal/domains --include='*.go' | grep -v '_test\.go'
+   # зависимости Common
+   grep -rnE '"[^"]+/internal/(domains|infrastructure|workflows|entrypoints|app)/|"context"|"net/http"|"database/sql"|gorm' internal/common --include='*.go'
+   ```
+   Пара enum, где один файл — в дифе, и это то же понятие — **[ОШИБКА]** `duplicated-enum` (в находке — перенос в `internal/common/` и откуда импортировать); совпадение случайных значений разных понятий — не находка. Импорт другого `{domain}` из `internal/domains/{domain}/` — **[ОШИБКА]**: enum или value-объект — `duplicated-enum` с переносом в `internal/common/`, сервис или репозиторий — сценарий двух доменов, его место — workflow (O-7). Строка третьей команды — **[ОШИБКА]** `common-with-logic`.
 1. **Разъезд списков, новый статус без потребителя, данные под миграцию, гигиена MR** — правила общие, `approaches/process/review.md`, «За пределами дифа»; здесь только что искать в Go: `switch`/`map` по типу статуса, `enums:` в swagger-аннотациях DTO, строковые литералы значений; `go.sum` вместе с `go.mod`; локальной базы в репозитории может не быть — тогда проверку колонок явно поручать автору.
 2. **Инструменты.** `go build ./... && go vet ./... && go test ./... && gofmt -l internal pkg`; с горутинами — `go test -race`. CI проекта часто только containerize + deploy — локальный прогон единственный гейт, результат в отчёт явно. Падение e2e из `tests/*` без `APP_URL` («unsupported protocol scheme») — не сигнал; локальный гейт — юнит-тесты пакетов. Swagger: `swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1`.
 3. **Платёжные пути** — `approaches/patterns/payments.md`, каждый пункт явно; новый платёжный сценарий без теста в `tests/<шлюз>/` — законное замечание.

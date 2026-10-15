@@ -7,7 +7,7 @@
 | Что | Где лежит | Класс |
 |---|---|---|
 | **Обработчик сообщения RabbitMQ** (consumer) — точка входа, как контроллер: сообщение пришло извне | `Entrypoints/Queue/{Domain}/{Module}/{Event}Handler.php` (контекст `Queue`, `architecture/layers.md`: consumers — Entrypoint). Эталон — `parking_app/Entrypoints/Queue/Billing/WhitelistOutbox/WhitelistChangeHandler.php` | `MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job` |
-| **Отложенное действие домена** (Laravel queued job: активировать тариф в назначенное время) | `Domains/{Domain}/Modules/{Module}/Jobs/{Action}Job.php`. Эталон — `ActivatePlannedTariffJob` | `ShouldQueue` + `Queueable` |
+| **Отложенное действие домена** (Laravel queued job: активировать тариф в назначенное время) | `Domains/{Domain}/Modules/{Module}/Jobs/{Action}Job.php`. Пример — `ActivatePlannedTariffJob` в `superapp-api/parking_app` (в `examples/` его нет) | `ShouldQueue` + `Queueable` |
 
 ## Обработчик RabbitMQ
 

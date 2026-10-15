@@ -15,6 +15,6 @@
 | `mps-core/reference/` | полный список классов и методов ядра по версиям (генерируется `tools/sdk-ref/php.sh`) |
 | `mps-core/` | как пользоваться ядром: DataObject, CRUD-репозиторий/сервис, исключения, транзакции, очередь, кэш, Swagger, миграции, тесты |
 
-Эталоны кода: `superapp-api/parking_app` (основной), `superapp-api/super_app` (второй). Легаси `superapp-api/app` — не эталон.
+Исходные проекты правил: `superapp-api/parking_app` (основной), `superapp-api/super_app` (второй); легаси `superapp-api/app` — не эталон. Агенты их отдельно не читают — образец формы `examples/`.
 
 Порядок чтения разработчиком — `skills/dev-php/SKILL.md`, «Шаг 1»: памятка → `core/principles.md` → `structure.md` → по задаче нужные пункты `conventions.md`/`style.md` и файлы `mps-core/`. `review-findings.md` — материал ревьюера.

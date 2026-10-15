@@ -31,6 +31,7 @@ Entrypoint     ──→  Workflow / Domain
 Workflow       ──→  Domain          (интерфейсы репозиториев/сервисов доменов; к БД, кэшу, HTTP — только через них, `architecture/cross-domain.md`)
 Infrastructure ──→  Domain
 Bootstrap      ──→  Entrypoint + Workflow + Infrastructure + Domain
+все слои       ──→  Common          (Common → только стандартная библиотека и сам Common; `architecture/layers.md`, «Общий бизнес-словарь»)
 ```
 
 **Запрещённые зависимости (нарушение = ошибка ревью):**
@@ -41,6 +42,8 @@ Domain         → Workflow          ✗
 Workflow       → Entrypoint        ✗
 Entrypoint     → Bootstrap         ✗
 Infrastructure → Entrypoint        ✗
+Domain {A}     → Domain {B}        ✗  (понятие двух доменов — Common, сценарий двух доменов — Workflow)
+Common         → любой слой        ✗
 ```
 
 ---
@@ -91,6 +94,8 @@ internal/
 │           ├── workflows_factory.go        ← опционально, только сборка workflow
 │           ├── handlers_factory.go
 │           └── consumers_factory.go        ← опционально
+│
+├── common/                                 ← общий бизнес-словарь двух и более доменов (`architecture/layers.md`): `{понятие}_enum.go`, value-объекты, чистые функции, их ошибки; без зависимостей, I/O, DI
 │
 ├── domains/
 │   └── {domain}/
@@ -144,6 +149,7 @@ internal/
 | Слой | Путь |
 |---|---|
 | Domain | `internal/domains/{domain}/{module}/` |
+| Common (общий бизнес-словарь) | `internal/common/` — `{понятие}_enum.go`, value-объекты, чистые функции |
 | Workflow | `internal/workflows/{domain}/{module}/` или `internal/workflows/{module}/` |
 | Entrypoint HTTP | `internal/entrypoints/{context}/http/{domain}/{module}/` |
 | Entrypoint служебный (health, ready, metrics) | `internal/entrypoints/system/http/{name}/` (решение G-4) |
@@ -242,6 +248,7 @@ main()
 | фикстуры | `testdata/` рядом с тестом | `infrastructure/jwt/identity/admin/testdata/` |
 | in-memory фейки репозиториев | рядом с тестом; общие для нескольких пакетов — `internal/testsupport/{domain}fakes/` | — |
 | хелпер преобразования формата (телефон, ИИН, номер карты, деньги, маска) — чистые функции над примитивами, без доменных типов и зависимостей | сначала SDK (`core/pkg/validation`: `NormalizePhoneNumber`, `CheckValidPhone`); нет в SDK — `pkg/{thing}/{thing}.go` (как `pkg/lpmsign`, `pkg/cryptenvelope`), `{thing}_test.go` рядом; вызов — из маппера хендлера/consumer'а и Response-маппера, не из сервиса и репозитория (`core/principles.md`, «Повторяющаяся обработка — один хелпер») | `duplicated-format-logic` |
+| тест границ `Common` | `internal/common/boundary_test.go`: разбирает файлы `internal/common/...` (`go/parser`, без новых зависимостей) и падает на импорте не из стандартной библиотеки и не из `internal/common/` (`approaches/process/testing.md`) | — |
 | интеграционные (живая БД/Redis) | рядом с кодом, с `//go:build integration` в первой строке | запуск: `go test -tags integration ./...` |
 | e2e (сервис целиком по HTTP) | `tests/<сценарий>/` в корне | `tests/kaspi/`, `tests/halyk/` |
 

@@ -93,7 +93,7 @@ func (r *PostgresRepository) Create(ctx context.Context, e *domain.Product) (*do
 
 ## Транзакции
 
-Workflow — всегда, если пишет (O-8); Command/Service — когда несколько операций записи обязаны выполниться атомарно (см. `../conventions.md`, правило 17, `approaches/patterns/transactions.md`). Менеджер транзакций SDK `gosdk-db-core/pkg/transaction` (`Manager`, `Manager2` … `Manager5` — по числу репозиториев в одной транзакции).
+Workflow — всегда, если пишет (O-8); Command/Service — когда несколько операций записи обязаны выполниться атомарно (см. `../../conventions.md`, правило 17, `approaches/patterns/transactions.md`). Менеджер транзакций SDK `gosdk-db-core/pkg/transaction` (`Manager`, `Manager2` … `Manager5` — по числу репозиториев в одной транзакции).
 
 Как это устроено:
 - **Домен/workflow** объявляет узкий интерфейс `TxManager` в отдельном файле `tx_manager.go` — только сигнатура `Exec`, без gorm.
@@ -151,8 +151,8 @@ err := w.txManager.Exec(ctx, func(ctx context.Context, sessionRepo sessiondomain
 - Проверки, от которых зависит запись, читаются внутри `fn`, через репозитории из аргументов.
 - Тесты: фейк менеджера вызывает `fn` с in-memory репозиториями — `examples/tariff/internal/testsupport/txfakes`.
 - Внутри `fn` — никаких HTTP-вызовов, публикаций в очередь и `time.Sleep`: транзакция держит блокировки. Побочные эффекты — через outbox (см. `approaches/patterns/outbox.md`).
-- Имя интерфейса отражает операцию (`SessionEntryTxManager`), а не придуманную механику (`EnqueueTxManager` без очереди — **[ОШИБКА]**, см. `../conventions.md`, п. 20).
-- Ручной `client.Transaction(func(tx *gorm.DB) error {...})` в репозитории не используется: метод репозитория выполняет один запрос (`../conventions.md`, п. 15b), а несколько запросов в одной транзакции — это сервис, Command или workflow через `txManager.Exec`.
+- Имя интерфейса отражает операцию (`SessionEntryTxManager`), а не придуманную механику (`EnqueueTxManager` без очереди — **[ОШИБКА]**, см. `../../conventions.md`, п. 20).
+- Ручной `client.Transaction(func(tx *gorm.DB) error {...})` в репозитории не используется: метод репозитория выполняет один запрос (`../../conventions.md`, п. 15b), а несколько запросов в одной транзакции — это сервис, Command или workflow через `txManager.Exec`.
 
 ## Пагинация
 

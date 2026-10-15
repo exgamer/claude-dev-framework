@@ -1,6 +1,6 @@
 # Структура PHP-сервиса (Laravel + mps/core + mps/utils)
 
-Эталоны — подпроекты монолита `superapp-api` (`~/MPIProjects/mps/aina/superapp-api`):
+Исходные проекты правил и образца `stacks/php/examples/` — подпроекты монолита `superapp-api`. Отдельно их не читают: образец формы для агента — `{DF}/stacks/php/examples/`; таблица ниже нужна, когда задача идёт внутри `superapp-api` и подпроекты — соседний код:
 
 | Эталон | Кто писал | Как использовать |
 |---|---|---|
@@ -158,6 +158,7 @@ parking_app/                                   ← корень подпроек
 | unit: сервис, валидатор, Command/Query, компонент | `tests/Unit/{Подпроект}/…`, путь повторяет путь класса: `tests/Unit/ParkingApp/Domains/Billing/Tariffs/TariffDtoValidatorTest.php` |
 | feature: HTTP через приложение, БД | `tests/Feature/{Подпроект}/{Context}/{Domain}/…`, как `tests/Feature/ParkingApp/Lpm/…` |
 | моки зависимостей | `mock` в `definitions.php` (как `NoopTransactionManager`) |
+| тест границ `Common/` | `tests/Unit/{Подпроект}/Architecture/CommonBoundaryTest.php`: проходит по `{подпроект}/Common/**/*.php`, падает на `use` из `Domains\`, `Infrastructure\`, `Workflows\`, `Entrypoints\`, `Illuminate\` (кроме базового трейта enum ядра) и на конструкторе с зависимостями (`approaches/process/testing.md`) |
 | интеграционный без HTTP и БД (несколько процессов, реальная ФС) | рядом с unit-тестами компонента, `#[Group('integration')]`; обработчик подпроцесса — `Fixtures/` рядом (AINA-2744) |
 
 Большие тестовые данные (бомба, файл на десятки МБ) — разреженный файл (`ftruncate`) или поток, не строка в памяти: `str_repeat` на 50 МБ вместе с Laravel превышает `memory_limit` 128M и роняет весь набор (AINA-2744).

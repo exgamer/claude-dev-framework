@@ -74,7 +74,7 @@ glab api --paginate "projects/:fullpath/merge_requests/<iid>/discussions?per_pag
 
 | # | Префикс | Файл:строка | Ревьюер | Суть | Правило | Отношение | Статус в HEAD | Рекомендация | Решение |
 |---|---------|-------------|---------|------|---------|-----------|---------------|--------------|---------|
-| T1 | blocking | app/Http/Requests/StoreRequest.php:24 | ivanov | `exists:` в Request — запрос в БД из валидации | `php/checklist.md` п. 9a, тег `request-queries-db` | по правилу | открыто | исправить: проверка в сервисе через репозиторий | |
+| T1 | blocking | app/Http/Requests/StoreRequest.php:24 | ivanov | `exists:` в Request — запрос в БД из валидации | `php/checklist.md` п. 11, тег `request-queries-db` | по правилу | открыто | исправить: проверка в сервисе через репозиторий | |
 | T2 | nit | …Service.php:58 | petrov | убрать docblock, повторяющий имя | `core/style.md`, `comment-restates-name` | по правилу | открыто | исправить | |
 | T3 | — → suggestion | … | ivanov | вернуть массив вместо DTO «проще» | `php/conventions.md` п. 11a, P-18 | противоречит правилу | открыто | спор: правило P-18 — DTO по всей цепочке; рекомендую отклонить со ссылкой | |
 | T4 | question | … | sidorov | зачем транзакция вокруг одной записи | `design.md`, «Границы транзакций» | вопрос | — | ответить | |

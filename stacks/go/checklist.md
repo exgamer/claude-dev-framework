@@ -8,7 +8,7 @@
 
 1. **О** Файл лежит по `structure.md` (таблица путей, чеклист модуля); имя файла = что в нём объявлено, не `ports.go`/`utils.go`. — `conventions.md` п. 12, 16
 2. **О** Зависимости слоёв: домен не знает HTTP/БД/workflow, entrypoint не знает bootstrap. — `architecture/layers.md`
-3. **О** Service/Command/Query — только свой домен; 2+ домена → workflow; workflow берёт репозитории и сервисы любых доменов напрямую. — `architecture/layers.md` (O-7)
+3. **О** Service/Command/Query — только свой домен; 2+ домена → workflow; workflow берёт репозитории и сервисы любых доменов напрямую. Из домена чужой домен (сервис, репозиторий, сущность, enum) не импортируется: понятие двух и более доменов — `internal/common/` (enum, value-объекты, чистые функции; без DI и I/O); копия понятия — `duplicated-enum`, логика в `internal/common/` — `common-with-logic`. — `architecture/layers.md` (O-7), «Общий бизнес-словарь»
 4. **О** Хендлер тонкий: биндинг/формат → маппинг → сервис/workflow; формат входа — id > 0, границы у чисел и массивов, enum (`regulations/rest-api.md`, «Валидация входа»). Роль/право на операцию — middleware на маршруте (`RequirePermission`); доступ (здание/организация) — middleware контекста, в сервис — фильтром. Проверок ролей/прав в хендлере и домене нет. — `conventions.md` п. 7
 5. **О** Бизнес-логика только в сервисах/Command/workflow; маппер только маппит, репозиторий только запросы. — `conventions.md` п. 6, 15
 6. **О** Хранилища (БД, Redis, HTTP, файлы) — только через репозитории `internal/infrastructure`; исходящий HTTP — только `gosdk-http-request-builder`; репозиторий только запросы, «не найдено» — `nil, nil`, без `FindOrCreate`. — `conventions.md` п. 4, 5; `architecture/layers.md`, «Правила слоёв»
