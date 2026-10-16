@@ -48,3 +48,15 @@ for skill in "$DF_SRC"/skills/*/; do
   name="$(basename "$skill")"
   echo "When the user types \`/${name}\`, invoke the Skill tool with \`skill: \"${name}\"\` before doing anything else."
 done
+
+echo
+echo "Стопы для ~/.claude/settings.json (добавить вручную, если ещё нет) — спрашивать перед коммитом, пушем и разрушающим SQL:"
+cat <<'JSON'
+  "permissions": {
+    "ask": [
+      "Bash(git commit *)", "Bash(git push *)", "Bash(git -C * commit *)", "Bash(git -C * push *)",
+      "Bash(*DROP *)", "Bash(*drop *)", "Bash(*TRUNCATE *)", "Bash(*truncate *)",
+      "Bash(*DELETE FROM*)", "Bash(*delete from*)", "Bash(*ALTER TABLE*)", "Bash(*alter table*)"
+    ]
+  }
+JSON
