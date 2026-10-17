@@ -137,7 +137,7 @@ skills/          точки входа (роли)
 agents/          агенты df-* — роли как субагенты /dev (общие правила — approaches/process/subagent.md)
 tools/sdk-ref/   генераторы справочников SDK/ядра из исходников (go.sh, php.sh)
 tools/graph/     граф правил (graphify) для /dev-rule: найти все места темы, проверить правку, сверка на противоречия
-install.sh       симлинки в ~/.claude (фреймворк, скиллы, агенты)
+install.sh       симлинки: фреймворк в ~/.claude, скиллы и агенты — в .claude проекта
 ```
 
 **Приоритет:** правила проекта (`.claude/dev-rules.md` в корне проекта) > стек > архитектура > core.
@@ -182,7 +182,7 @@ install.sh       симлинки в ~/.claude (фреймворк, скиллы
 
 ## Источник истины
 
-Фреймворк правится **только в этом репозитории** (где бы он ни был склонирован; у автора — `~/AIProjects/dev-framework`). `~/.claude/dev-framework`, `~/.claude/skills/dev-*`, `~/.claude/agents/df-*` и копии в проектах — производные, обновляются из него (`install.sh`). Подробно — `core/rules-evolution.md`, «Где правится фреймворк».
+Фреймворк правится **только в этом репозитории** (где бы он ни был склонирован; у автора — `~/AIProjects/dev-framework`). `~/.claude/dev-framework`, `<проект>/.claude/skills/dev-*`, `<проект>/.claude/agents/df-*` и копии в проектах — производные, обновляются из него (`install.sh`). Подробно — `core/rules-evolution.md`, «Где правится фреймворк».
 
 ## Установка и настройка
 
@@ -203,26 +203,27 @@ install.sh       симлинки в ~/.claude (фреймворк, скиллы
 ```bash
 git clone https://github.com/exgamer/claude-dev-framework.git ~/AIProjects/dev-framework
 cd ~/AIProjects/dev-framework
-./install.sh
+./install.sh ~/GoProjects/<сервис>      # в каждый рабочий проект, где нужен /dev
 ```
 
-`install.sh` ставит **симлинки** на репозиторий, ничего не копирует и не удаляет:
+`install.sh <папка проекта>` ставит **симлинки** на репозиторий, ничего не копирует и не удаляет. Скиллы и агенты —
+**только в проект**: в `~/.claude` их описания грузились бы в каждую сессию любого проекта.
 
 | Ссылка | На что |
 |---|---|
-| `~/.claude/dev-framework` | весь репозиторий (правила читаются отсюда) |
-| `~/.claude/skills/dev`, `dev-*` | `skills/*` — команды `/dev`, `/dev-go`, … |
-| `~/.claude/agents/df-*.md` | `agents/*` — агенты, которых запускает `/dev` |
+| `~/.claude/dev-framework` | весь репозиторий (правила читаются отсюда; токенов не стоит) |
+| `<проект>/.claude/skills/dev`, `dev-*` | `skills/*` — команды `/dev`, `/dev-go`, … |
+| `<проект>/.claude/agents/df-*.md` | `agents/*` — агенты, которых запускает `/dev` |
+
+Симлинки проекта записываются в его `.git/info/exclude` — в репозиторий проекта не попадают.
+
+Переход со старой установки (скиллы и агенты в `~/.claude`): `rm ~/.claude/skills/dev ~/.claude/skills/dev-* ~/.claude/agents/df-*.md` (это симлинки) и убрать строки про `/dev*` из `~/.claude/CLAUDE.md` — иначе скиллы задвоятся и их описания так и будут грузиться в каждую сессию.
 
 Если путь уже занят не нашей ссылкой, скрипт пишет `skip` и не трогает его — разберитесь вручную (обычно это старая копия: удалить её и запустить `install.sh` ещё раз). Повторный запуск безопасен.
 
 ### 2. Триггеры команд
 
-В конце `install.sh` печатает строки вида
-```
-When the user types `/dev`, invoke the Skill tool with `skill: "dev"` before doing anything else.
-```
-Добавьте их в `~/.claude/CLAUDE.md` (по желанию с описанием, как у остальных скиллов). Скиллы видны и без этого, но так команда `/dev…` срабатывает надёжнее.
+Не нужны: Claude Code запускает скилл по `/dev…` сам. В `~/.claude/CLAUDE.md` строк про `/dev` не добавлять.
 
 ### 3. Перезапустить Claude Code и проверить
 
@@ -271,16 +272,16 @@ When the user types `/dev`, invoke the Skill tool with `skill: "dev"` before doi
 ### Обновление
 
 ```bash
-cd ~/AIProjects/dev-framework && git pull && ./install.sh
+cd ~/AIProjects/dev-framework && git pull && ./install.sh <папка проекта>
 ```
-Правки существующих файлов видны сразу (симлинки); `install.sh` нужен, когда появились новые скиллы или агенты — после него перезапустить Claude Code и добавить новые триггеры из его вывода.
+Правки существующих файлов видны сразу (симлинки); `install.sh <проект>` нужен, когда появились новые скиллы или агенты — после него перезапустить Claude Code.
 
 ### Удаление
 
 ```bash
-rm ~/.claude/dev-framework ~/.claude/skills/dev ~/.claude/skills/dev-* ~/.claude/agents/df-*.md
+./install.sh --remove <папка проекта>      # из проекта; совсем — ещё rm ~/.claude/dev-framework
 ```
-Удаляются только ссылки; строки `/dev*` из `~/.claude/CLAUDE.md` убрать вручную. IDE: `claude mcp remove idea --scope user` и строки `mcp__idea__*` из `permissions.allow` в `~/.claude/settings.json`.
+Удаляются только ссылки. IDE: `claude mcp remove idea --scope user` и строки `mcp__idea__*` из `permissions.allow` в `~/.claude/settings.json`.
 
 ### Где править
 
