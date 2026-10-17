@@ -11,3 +11,6 @@ __pycache__/
 # Временные выгрузки генераторов справочников (сами справочники в stacks/*/reference/ — коммитятся)
 tools/sdk-ref/out/
 tmp/
+
+# Граф правил (tools/graph): корпус — копия, собирается заново
+tools/graph/corpus/

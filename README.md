@@ -136,6 +136,7 @@ stacks/
 skills/          точки входа (роли)
 agents/          агенты df-* — роли как субагенты /dev (общие правила — approaches/process/subagent.md)
 tools/sdk-ref/   генераторы справочников SDK/ядра из исходников (go.sh, php.sh)
+tools/graph/     граф правил (graphify) для /dev-rule: найти все места темы, проверить правку, сверка на противоречия
 install.sh       симлинки в ~/.claude (фреймворк, скиллы, агенты)
 ```
 
