@@ -63,7 +63,7 @@
 ## Оформление
 
 33. **О** Используемые расширения PHP (`ext-zip`, `ext-intl`…) объявлены в `require` `composer.json` (AINA-2744). `declare(strict_types=1);` в каждом файле; форматирование — `composer csfix-validate`.
-34. **В** Docblock класса — одна строка по-русски + `@author`; описания, пересказывающие имя, и «ИИ-шные» комментарии не писать. Любой текст для людей (Swagger, ошибки клиенту, коммиты, ответы в MR) — по делу, без «ИИ-воды». — `style.md`, `core/style.md`, «Любой текст для людей»
+34. **В** Docblock класса — одна строка по-русски + `@author`; описания, пересказывающие имя, и «ИИ-шные» комментарии не писать. Любой текст для людей (Swagger, ошибки клиенту, коммиты, ответы в MR) — по делу, без «ИИ-воды»; нигде нет Claude/ИИ как автора или соавтора (`Co-Authored-By: Claude`, «Generated with Claude Code»). — `style.md`, `core/style.md`, «Любой текст для людей»
 35. **В** `final` у Command/Query/workflow/валидаторов; promotion `private readonly`, trailing comma. — `style.md`
 36. **В** Имена по таблице `style.md` (`{Entity}Dto`, `{Entity}CrudService`, `{Action}Workflow`, enum `UPPER_SNAKE` + `Enumerable`).
 37. **О** Модель: `@property` по-русски, `$table` со схемой (таблица в `public` — без префикса), `$fillable`, `$casts` (enum → enum). — `style.md`
