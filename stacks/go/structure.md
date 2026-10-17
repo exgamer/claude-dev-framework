@@ -63,7 +63,8 @@ Common         → любой слой        ✗
 ### Entrypoint Layer
 - **Что**: взаимодействие с внешним миром: HTTP и RabbitMQ.
 - **Состав**: `handler.go`, `routes.go`, `request.go`, `response.go`, `mapper.go`, `{module}_consumer.go`, `consumer_registry.go`.
-- **Порядок в handler**: валидация → маппинг Request→Domain → вызов сервиса → маппинг Domain→Response → HTTP ответ через `response.*`.
+- **Путь**: HTTP — `internal/entrypoints/{context}/http/{domain}/{module}/`, RabbitMQ — `internal/entrypoints/{context}/rabbit/{domain}/{module}/` (`entrypoints/admin/http/billing/tariff/`, `entrypoints/internal/rabbit/billing/tariff/`).
+- **Порядок в handler**: валидация → маппинг Request→Domain → вызов сервиса/workflow → маппинг Domain→Response → HTTP ответ через `response.*`. Бизнес-логики и запросов к хранилищам нет; маппинг Request ↔ Domain ↔ Response — только в `mapper.go`; каждый эндпойнт — со Swagger-аннотациями. HTTP — `go-sdk/entrypoint/http.md`, RabbitMQ — `go-sdk/entrypoint/rabbit.md`.
 - **`{context}`** — аудитория или точка входа API (пример: `admin`, `client`, `public`, `internal`, `partner`). Служебные эндпойнты (health, ready, metrics) — контекст `system`, с транспортом в пути: `entrypoints/system/http/healthcheck` (решение G-4); `entrypoints/system/healthcheck` без `http/` — старая форма. Определяется тем, *для кого* предназначен эндпойнт. Один эндпойнт для разных аудиторий — разные директории.
 
 ### Workflow Layer *(опциональный)*

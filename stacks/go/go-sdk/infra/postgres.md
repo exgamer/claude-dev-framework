@@ -157,10 +157,18 @@ err := w.txManager.Exec(ctx, func(ctx context.Context, sessionRepo sessiondomain
 ## Пагинация
 
 ```go
-func (r *PostgresRepository) Paginated(ctx context.Context, s *domain.Search) (*pagination.Paginated[domain.Product], error) {
-    helper := helpers.NewGormPaginatedHelper[domain.Product](ctx, r.client).SetPerPage(s.PerPage)
-    return helper.Paginated(s.Page, func(db *gorm.DB) *gorm.DB {
-        return db.WithContext(ctx).Select("*").Where("status = ?", 1).Order("id DESC")
-    })
+func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search) (*pagination.Paginated[tariffdomain.Tariff], error) {
+    return helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).
+        SetTimeout(10*time.Second).
+        SetPerPage(search.PerPage).
+        Paginated(search.Page, func(db *gorm.DB) *gorm.DB {
+            query := db.Model(&tariff{}).Where("deleted_at IS NULL")
+
+            if search.ParkingID != 0 {
+                query = query.Where("parking_id = ?", search.ParkingID)
+            }
+
+            return query.Order("id DESC")
+        })
 }
 ```

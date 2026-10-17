@@ -164,7 +164,7 @@ Swaggo-нотация для path-параметров использует `:id
 - `middleware.SentryMiddleware()`
 - `middleware.MetricsMiddleware(a)`
 
-`middleware.FormattedResponseMiddleware()` — указать если отсутствует, но не считать ошибкой: есть редкие случаи когда он не нужен.
+`middleware.FormattedResponseMiddleware()` — тоже обязателен (**[ОШИБКА]**): `response.Success`/`ErrorResponse`/`Raw*` только кладут данные в контекст, тело ответа пишет он — без него хендлер отдаёт пустой ответ. Не нужен только группе, где хендлеры не вызывают `response.*`.
 
 `LoggerMiddleware` на DEBUG пишет тело запроса целиком: группа с ручками, принимающими пароли, токены, секреты (логин, смена пароля, HMAC), — без него или с исключением этих ручек (`review-findings.md`, «Безопасность»).
 

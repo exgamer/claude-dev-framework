@@ -129,7 +129,8 @@ throw (new BadRequestAppException('...'))
 | Repository | Не бросать «не найдено» — `?Model`, `NotFoundAppException` бросает вызывающий (`../conventions.md` п. 12a) |
 | Service | Любое бизнес-исключение |
 | Command | Любое бизнес-исключение |
-| Job | `OperationFailedAppException`, `NotFoundAppException` |
+| Consumer RabbitMQ (`Entrypoints/Queue`) | Только временная ошибка — `OperationFailedAppException` (сообщение уйдёт в повтор). Постоянная (битый payload, нет поля, запись не появится) — без исключения: статус/лог и `return` (`jobs.md`) |
+| Отложенный Job (`Jobs/`, `ShouldQueue`) | `OperationFailedAppException`, `NotFoundAppException` |
 | Controller | Только перевод результата сервиса в HTTP: `NotFoundAppException`, если сервис вернул `null` (решение об ответе — у точки входа; из консоли/очереди «нет записи» обрабатывается по-своему). Бизнес-исключений (`BadRequestAppException`, `ValidationAppException` по инвариантам, проверки статусов) не бросает — это логика сервиса |
 | Request | `ValidationAppException` — через `failedValidation()` |
 

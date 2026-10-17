@@ -6,14 +6,14 @@ trigger: /dev-go
 
 # /dev-go
 
-Стек: **Go + Go SDK (gosdk-*)**. Не для PHP — там `/dev-php`.
+Стек: **Go + Go SDK (gosdk-*)**. Не для PHP — там `/dev-php`. Шаги общие с `skills/dev-php/SKILL.md` — правишь один, проверь второй.
 `{DF}` — `.claude/dev-framework` в проекте, иначе `~/.claude/dev-framework`.
 
 ## Шаг 1 — Правила
 
 1. `{DF}/stacks/go/checklist.md` — **памятка стека**: жёсткие правила одной строкой. Держишь её как основу всей работы.
 2. `{DF}/core/principles.md` и `{DF}/stacks/go/structure.md` — всегда.
-3. Остальное — **по задаче**, по ссылкам из пунктов памятки, которые задача задевает: `{DF}/stacks/go/conventions.md` и `style.md` (нужные пункты), `go-sdk/*.md` (те, что нужны задаче: `module.md`, `domain.md`, `workflow.md`, `infra/*.md`, `entrypoint/*.md`, `exceptions.md`, `di.md`), `{DF}/approaches/patterns/*.md` — те, на которые ссылаются разделы `design.md` (транзакции, конкурентность, производительность, кэш, outbox…).
+3. Остальное — **по задаче**, по ссылкам из пунктов памятки, которые задача задевает: `{DF}/stacks/go/conventions.md` и `style.md` (нужные пункты), `go-sdk/*.md` (те, что нужны задаче: `module.md`, `domain.md`, `workflow.md`, `infra/*.md`, `entrypoint/*.md`, `exceptions.md`, `di.md`; `app.md` — новый модуль или сервис; `main.md` — новый сервис), `{DF}/approaches/patterns/*.md` — те, на которые ссылаются разделы `design.md` (транзакции, конкурентность, производительность, кэш, outbox…).
 
 Локальные `.claude/dev-rules.md` проекта главнее.
 

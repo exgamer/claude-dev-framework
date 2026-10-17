@@ -38,7 +38,7 @@
 | Задача | Что взять |
 |---|---|
 | HTTP-сервер | `http-core/pkg/app.HttpKernel`; роутер — `http-core/pkg/di.GetRouter(container)` |
-| Стандартный стек middleware | `http-core/pkg/middleware`: `RequestInfoMiddleware(a)`, `LoggerMiddleware()`, `DebugMiddleware()`, `SentryMiddleware()`, `FormattedResponseMiddleware()` (обязателен и для `Raw*`), `MetricsMiddleware(a)`, `CorsMiddleware(a)` (`CORS_ALLOWED_ORIGINS`) |
+| Стандартный стек middleware | `http-core/pkg/middleware`: `RequestInfoMiddleware(a)`, `LoggerMiddleware()`, `DebugMiddleware()`, `SentryMiddleware()`, `FormattedResponseMiddleware()` (обязателен: тело любого ответа `response.*`, включая `Raw*`, пишет только он; см. `entrypoint/http.md`), `MetricsMiddleware(a)`, `CorsMiddleware(a)` (`CORS_ALLOWED_ORIGINS`) |
 | Валидация тела / query | `http-core/pkg/validators.ValidateRequestBody(c, &req)` / `ValidateRequestQuery(c, &req)`; request эмбедит `http-core/pkg/gin/validation.Request`; свои правила — `CustomValidationRules()` |
 | ID из пути | `validators.GetIntQueryParam(c, "id")` (положительное целое) |
 | Пагинация из запроса | `http-core/pkg/helpers.GetPagerRequest(c)`, `DefaultPaginationPage/PerPage` |

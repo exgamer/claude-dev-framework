@@ -55,7 +55,6 @@ class YourService extends CrudServiceDecorator implements YourServiceInterface
 
     // Стандартный CRUD доступен через __call
     // $this->deleteById($id)
-    // $this->search($dto)
 }
 ```
 
@@ -84,6 +83,6 @@ $periods = $this->periodRepository->allByAgreementIds($ids);   // свой до�
 ```php
 protected function beforeCreate(CommandDataObject $dto): void {}
 protected function afterCreate(CommandDataObject $dto): void {}
-protected function beforeSearch(SearchDataObject $dto): void {}
-protected function afterSearch(SearchDataObject $dto): void {}
 ```
+
+`search()`, `beforeSearch`/`afterSearch(SearchDataObject)` — старая форма (P-19): в новом коде список — метод репозитория `paginate…` (`../conventions.md` п. 2a); в существующем коде на `search()` — `repository.md`, «Старая форма».

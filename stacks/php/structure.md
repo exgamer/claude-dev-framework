@@ -19,7 +19,7 @@ parking_app/                                   ← корень подпроек
 ├── ServiceProvider.php                        ← регистрирует провайдеры доменов, инфраструктуры, точек входа
 ├── Common/                                    ← общий бизнес-словарь двух и более доменов (`architecture/layers.md`): Enums/, ValueObjects/, Support/ (чистые функции), Exceptions/; без DI и I/O
 ├── Core/                                      ← общее для подпроекта, не бизнес-логика
-│   ├── Database/Managers/                     ← TransactionManagerInterface, NoopTransactionManager
+│   ├── Database/Managers/                     ← TransactionManagerInterface, NoopTransactionManager — только при mps/core < 1.10; с 1.10 — из ядра, своих нет (`mps-core/transactions.md`)
 │   ├── Database/Query/PaginatedQueryHelper.php ← старая форма списка (P-19), новый код не использует
 │   ├── Requests/{Request,SearchRequest}.php   ← базовые FormRequest
 │   ├── Resources/                             ← форма пагинации (items/pagination) для {E}PaginatedResponse; PaginateResource — старая форма (P-19)
@@ -61,7 +61,7 @@ parking_app/                                   ← корень подпроек
     │   ├── Providers/ServiceProvider.php, definitions.php     ← RepositoryInterface → Repository
     │   ├── Providers/database/migrations/                     ← миграции домена
     │   └── {Module}/Models/{Entity}.php, Repositories/{Entity}Repository.php
-    ├── Postgres/Common/Providers/definitions.php              ← TransactionManagerInterface → DatabaseTransactionManager (mock: Noop)
+    ├── Postgres/Common/Providers/definitions.php              ← TransactionManagerInterface → DatabaseTransactionManager (mock: Noop) — только при mps/core < 1.10; с 1.10 биндинг регистрирует ядро
     ├── Redis/, Cache/{Domain}/{Module}/                       ← кэш-репозитории
     ├── Http/{Provider}/{Product}/                             ← адаптер внешней системы, по её имени (решение G-2)
     ├── Http/{Service}/{Module}/                               ← наш другой микросервис

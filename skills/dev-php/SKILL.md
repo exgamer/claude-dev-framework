@@ -6,14 +6,14 @@ trigger: /dev-php
 
 # /dev-php
 
-Стек: **Laravel + mps/core + mps/utils**. Не для Go — там `/dev-go`.
+Стек: **Laravel + mps/core + mps/utils**. Не для Go — там `/dev-go`. Шаги общие с `skills/dev-go/SKILL.md` — правишь один, проверь второй.
 `{DF}` — `.claude/dev-framework` в проекте, иначе `~/.claude/dev-framework`.
 
 ## Шаг 1 — Правила
 
 1. `{DF}/stacks/php/checklist.md` — **памятка стека**: жёсткие правила одной строкой. Держишь её как основу всей работы.
 2. `{DF}/core/principles.md` и `{DF}/stacks/php/structure.md` — всегда.
-3. Остальное — **по задаче**, по ссылкам из пунктов памятки, которые задача задевает: `{DF}/stacks/php/conventions.md` и `style.md` (нужные пункты), `mps-core/*.md` (те, что нужны задаче: `data-objects.md`, `repository.md`, `service.md`, `transactions.md`, `exceptions.md`, `http.md`, `swagger.md`, `migrations.md`, `jobs.md`, `tests.md`, `enums.md`, `rules.md`), `{DF}/approaches/patterns/*.md` — те, на которые ссылаются разделы `design.md` (транзакции, конкурентность, производительность, кэш, outbox…).
+3. Остальное — **по задаче**, по ссылкам из пунктов памятки, которые задача задевает: `{DF}/stacks/php/conventions.md` и `style.md` (нужные пункты), `mps-core/*.md` (те, что нужны задаче: `data-objects.md`, `repository.md`, `service.md`, `transactions.md`, `exceptions.md`, `http.md`, `swagger.md`, `migrations.md`, `jobs.md`, `tests.md`, `enums.md`, `rules.md`; `commands.md`, `queries.md` — Command/Query; `model.md` — модель; `cli.md` — Artisan-команда; `domain.md` — новый домен/модуль), `{DF}/approaches/patterns/*.md` — те, на которые ссылаются разделы `design.md` (транзакции, конкурентность, производительность, кэш, outbox…).
 
 Локальные `.claude/dev-rules.md` проекта главнее.
 

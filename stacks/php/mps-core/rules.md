@@ -2,10 +2,10 @@
 
 > Справочник по использованию `mps/core` / `mps/utils` (перенесён из `claude-skills/php-arch`, пути приведены к структуре фреймворка). **Где класть файлы — `../structure.md`**, что есть в ядре и с какой версии — `capabilities.md`, официальная дока — `official/`. При расхождении главнее они — в фактах API (что есть и как вызывается); что из этого использовать — по правилам фреймворка (`../conventions.md`): примеры `official/` с `expanded`, `*OrFail`, суффиксом `DTO` — не образец.
 
-## DI — рекомендуется через definitions.php
+## DI — только через definitions.php
 
 ```php
-// НЕ РЕКОМЕНДУЕТСЯ стандартный биндинг
+// НЕЛЬЗЯ ([ОШИБКА], ../conventions.md п. 7); $this->app->bind() в провайдере — только порт подпроекта с переопределением извне
 $app->singleton(SomeInterface::class, SomeClass::class);
 
 // ПРАВИЛЬНО — definitions.php домена или config/definitions.php
@@ -54,10 +54,10 @@ return [
 
 Новый домен — свои `definitions.php` в `Domains/{Domain}/` и `Infrastructure/Postgres/{Domain}/Providers/`. Не добавлять биндинги домена в глобальный `config/definitions.php`.
 
-## Исключения — рекомендуется из MPS\Core\Exceptions
+## Исключения — только из MPS\Core\Exceptions
 
 ```php
-// НЕ РЕКОМЕНДУЕТСЯ
+// НЕЛЬЗЯ ([ОШИБКА], ../conventions.md п. 13)
 throw new \Exception('...');
 throw new \RuntimeException('...');
 

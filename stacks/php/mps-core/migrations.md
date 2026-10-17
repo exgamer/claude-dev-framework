@@ -75,26 +75,16 @@ $table->foreign('product_offer_id')
 
 ---
 
-## Миграция изменений (ALTER TABLE)
+## Миграция изменений (ALTER TABLE) с заполнением данных
+
+Новая обязательная колонка в таблице с данными — три миграции: одна миграция — одно изменение, данные — отдельной миграцией (`approaches/patterns/migrations.md`).
 
 ```php
+// 1. ..._add_payment_system_to_orders_table.php — колонка nullable
 public function up(): void
 {
     Schema::table($this->tableName, function (Blueprint $table) {
         $table->string('payment_system')->nullable()->comment('Платежная система');
-    });
-
-    // Заполнение данных через сервис
-    /** @var OrderServiceInterface $orderService */
-    $orderService = app(OrderServiceInterface::class);
-    $orderService->getRepository()->update(
-        condition: ['payment_method' => PaymentMethodEnum::CARD->value],
-        data: ['payment_system' => PaymentSystemEnum::EPAY->value]
-    );
-
-    // Снять nullable после заполнения
-    Schema::table($this->tableName, function (Blueprint $table) {
-        $table->string('payment_system')->nullable(false)->change();
     });
 }
 
@@ -104,4 +94,36 @@ public function down(): void
 }
 ```
 
-Можно использовать `app(ServiceInterface::class)` для data-миграций.
+```php
+// 2. ..._fill_payment_system_in_orders_table.php — данные
+public function up(): void
+{
+    /** @var OrderRepositoryInterface $repository */
+    $repository = app(OrderRepositoryInterface::class);
+    $repository->fillPaymentSystem(PaymentMethodEnum::CARD, PaymentSystemEnum::EPAY);
+}
+
+public function down(): void
+{
+    // колонку вместе с данными удаляет down() миграции 1
+}
+```
+
+```php
+// 3. ..._make_payment_system_required_in_orders_table.php — снять nullable
+public function up(): void
+{
+    Schema::table($this->tableName, function (Blueprint $table) {
+        $table->string('payment_system')->nullable(false)->change();
+    });
+}
+
+public function down(): void
+{
+    Schema::table($this->tableName, function (Blueprint $table) {
+        $table->string('payment_system')->nullable()->change();
+    });
+}
+```
+
+Data-миграция пишет через типизированный метод репозитория или сервиса (`fillPaymentSystem(PaymentMethodEnum, PaymentSystemEnum)` — один `UPDATE … WHERE`, P-20), не массивом в `update()` ядра (`../conventions.md` п. 11a) и не через `getRepository()` у сервиса. Зависимость — `app(Interface::class)`: у миграции нет конструктора (`../conventions.md` п. 6).

@@ -18,7 +18,6 @@ namespace App\ParkingApp\Entrypoints\Queue\YourDomain\YourModule;
 
 use App\ParkingApp\Domains\YourDomain\Modules\YourModule\DTO\YourEventDto;
 use App\ParkingApp\Workflows\YourDomain\YourModule\HandleYourEventWorkflow;
-use MPS\Core\Exceptions\UnprocessableAppException;
 use MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job as UtilsJob;
 
 class YourEventHandler extends UtilsJob
@@ -33,10 +32,12 @@ class YourEventHandler extends UtilsJob
         // Payload — внешние данные: только через DTO, не $payload['id'] (../conventions.md п. 11b)
         $dto = YourEventDto::make()->fromArray((array) $payload);
         if ($dto->getId() === null) {
-            throw new UnprocessableAppException('В сообщении нет id');   // постоянная ошибка — без бесконечного повтора (outbox.md)
+            $this->errorLog('В сообщении нет id', (array) $payload);   // постоянная ошибка: повтор не поможет — лог и выход
+
+            return;
         }
 
-        $this->workflow->execute($dto);
+        $this->workflow->execute($dto);   // временная ошибка (OperationFailedAppException) уходит наверх — сообщение повторится
     }
 
     protected function logId(): string
@@ -46,7 +47,12 @@ class YourEventHandler extends UtilsJob
 }
 ```
 
-`process()` — хук ядра; публичный `handle(QueueJob $queueJob, array $payload)` реализует `UtilsJob`. Временная ошибка (внешняя система недоступна) — исключение наверх, сообщение уйдёт в повтор; постоянная (битый payload, нет конфигурации) — зафиксировать статус и выйти без исключения, иначе повтор бесконечный.
+`process()` — хук ядра; публичный `handle(QueueJob $queueJob, array $payload)` реализует `UtilsJob`. Ошибки — как в `approaches/patterns/async.md`, «Consumer»:
+
+- **временная** (внешняя система недоступна, сеть) — `OperationFailedAppException` наверх, сообщение уйдёт в повтор;
+- **постоянная** (битый payload, нет обязательного поля, нет конфигурации, запись не найдена и не появится) — зафиксировать (статус записи или `$this->errorLog(...)`) и `return`, без исключения. Своего исключения ядра для «битого payload» нет — не выдумывать.
+
+Почему: `UtilsJob::handle` ловит любое исключение из `process()`, пишет error-лог и Sentry и отправляет сообщение в повтор с задержками из `durability.delayed` конфига очереди, после последней — в failed_jobs. Для постоянной ошибки это N бесполезных попыток и N ошибок в Sentry. Так же — в `WhitelistChangeHandler` (`parking_app`, для справки, агент не открывает): отказ — `markRejected` и `return`, `OperationFailedAppException` — `markFailed` и `throw`.
 
 ### Регистрация в `config/queue.php`
 

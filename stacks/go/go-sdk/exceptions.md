@@ -67,8 +67,8 @@ Service → AppException → Handler → response.ErrorResponse(c, err) → JSON
 ## В сервисе / domain
 
 ```go
-city, err := s.cityService.GetById(ctx, m.CityID)
-if err != nil  { return nil, err }
-if city == nil { return nil, exception.NewNotFoundException(errors.New("city not found"), false) }
+tariff, err := s.repository.GetByID(ctx, id)
+if err != nil    { return nil, err }
+if tariff == nil { return nil, exception.NewNotFoundException(errors.New("тариф не найден"), false) }
 ```
 

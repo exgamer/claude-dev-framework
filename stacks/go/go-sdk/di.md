@@ -13,7 +13,7 @@ svc, err := di.Resolve[*MyService](a.Container)
 
 - Контейнер используется только внутри `App` (bootstrap, модули)
 - Никогда не передавай `a.Container` в бизнес-логику или репозитории
-- Резолвить зависимости через хелперы конкретного kernel — не через `di.Resolve` напрямую
+- Зависимости kernel (подключения, роутер, конфиг) — через хелперы kernel (`postgresDi.GetDefaultPostgresConnection`, `redisDi.GetRedisClient`, `di.GetRouter`), не через `di.Resolve`; свои типы — `di.Resolve[T]` в bootstrap/модуле (как в `examples/tariff`, `bootstrap/billing/tariff/module.go`)
 
 ## Что доступно из DI — core kernel
 Пакет: `github.com/exgamer/gosdk-core/pkg/di`
