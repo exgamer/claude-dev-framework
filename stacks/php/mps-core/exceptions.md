@@ -49,7 +49,7 @@ if ($order->status !== OrderStatusEnum::PENDING) {
 }
 
 // Ошибка внешнего сервиса
-$response = $this->paymentGateway->charge($amount);
+$response = $this->paymentRepository->charge($amount);
 if (! $response->isSuccessful()) {
     throw new OperationFailedAppException('Оплата не прошла');
 }
@@ -115,6 +115,8 @@ throw new UnTrackableAppException(
 throw (new BadRequestAppException('...'))
     ->setIsTrackable(false);
 ```
+
+Ошибку, которую намеренно не пробрасывают (побочный эффект после коммита), — в Sentry через `ExceptionHandler::report($e)`, не только в лог — `../conventions.md` п. 17a.
 
 Когда использовать `UnTrackableAppException` вместо `setIsTrackable(false)`:
 - Ошибка всегда ожидаема по природе — не должна попасть в Sentry ни при каких условиях

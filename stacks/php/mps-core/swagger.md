@@ -67,8 +67,10 @@ Query-параметры списка — на `IndexRequest`:
 ```php
 #[OA\Parameter(parameter: 'TariffsIndexRequestStatus', name: 'status', description: 'Статус', in: 'query', schema: new OA\Schema(ref: '#/components/schemas/TariffStatusEnum'))]
 #[OA\Parameter(parameter: 'TariffsIndexRequestSort', name: 'sort', description: 'Сортировка', in: 'query', schema: new OA\Schema(ref: '#/components/schemas/TariffSortEnum'))]
-class IndexRequest extends SearchRequest { … }
+class IndexRequest extends Request { … }
 ```
+
+Выше — форма (2) списка (P-19, `../conventions.md` п. 2a). В форме (1) (`IndexRequest extends SearchRequest`, раздел «Список» `design.md`) так же описываются `page`, `per_page` (с максимумом) и `sort` — строкой, допустимые значения из `$sortAttributes` (`name,-id`) в `description`; ответ — схема `PaginateResource` подпроекта.
 
 ## Response — схема
 

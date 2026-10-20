@@ -21,6 +21,7 @@ func createRequestToParams(request createRequest) *tariffworkflow.CreateTariffPa
 		Name:         request.Name,
 		Currency:     request.Currency,
 		GraceMinutes: request.GraceMinutes,
+		Price:        request.Price,
 	}
 }
 
@@ -42,7 +43,9 @@ func tariffToData(tariff *tariffdomain.Tariff) *tariffData {
 		Name:         tariff.Name,
 		Currency:     tariff.Currency,
 		IsDefault:    tariff.IsDefault,
+		IsActive:     tariff.IsActive,
 		GraceMinutes: tariff.GraceMinutes,
+		Price:        tariff.Price,
 	}
 }
 

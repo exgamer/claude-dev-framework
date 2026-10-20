@@ -15,7 +15,9 @@ func tariffToEntity(model *tariff) *tariffdomain.Tariff {
 		Name:         model.Name,
 		Currency:     model.Currency,
 		IsDefault:    model.IsDefault,
+		IsActive:     model.IsActive,
 		GraceMinutes: model.GraceMinutes,
+		Price:        model.Price,
 	}
 }
 
@@ -30,11 +32,12 @@ func tariffFromEntity(entity *tariffdomain.Tariff) *tariff {
 		Name:         entity.Name,
 		Currency:     entity.Currency,
 		IsDefault:    entity.IsDefault,
+		IsActive:     entity.IsActive,
 		GraceMinutes: entity.GraceMinutes,
+		Price:        entity.Price,
 	}
 }
 
-// patchToColumns Карта колонок строится только здесь: домен передаёт типизированный Patch
 func patchToColumns(patch *tariffdomain.Patch) map[string]any {
 	columns := map[string]any{}
 

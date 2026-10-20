@@ -20,6 +20,34 @@
 
 ---
 
+## Форма (1) — список через `search()` ядра
+
+Форма пагинации списка выбирается пользователем на задаче и записана в разделе «Список» `design.md` (P-19, `../conventions.md` п. 2a): (1) — ниже, (2) через `Page` (`paginate…({E}FilterDto, Page)`, рекомендация; эталон `../examples/parking_app` — на ней) — `../conventions.md` п. 2a, 12c, 12d. Существующий код на (1) — не нарушение. API (1) по справочнику ядра (`reference/mps-core-v1.10.2.md`): репозиторий — `CRUDRepository::search(array $params = [], $id = null, int $perPage = 30, ?int $page = null, ?BuilderContract $query = null): LengthAwarePaginatorContract|Collection` + хук `filterSearch()`; сервис — `search(SearchDataObject $dto): array` (`SearchAwareInterface`; `SearchDataObject`: `setParams`, `setPerPage`, `setPage`); запрос — наследник `Core/Requests/SearchRequest` подпроекта (`page`, `per_page`, `sort`, сортируемые поля — `$sortAttributes`); ответ — `Core/Resources/PaginateResource` подпроекта, помощник запроса — `Core/Database/Query/PaginatedQueryHelper`. API этих классов — по эталону: `../examples/parking_app/Core/Requests/SearchRequest.php`, `../examples/parking_app/Core/Resources/PaginateResource.php`, `../examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`.
+
+```php
+// Request: фильтры + page/per_page/sort от App\ParkingApp\Core\Requests\SearchRequest
+class IndexRequest extends SearchRequest
+{
+    protected array $sortAttributes = ['id', 'name'];
+
+    public function rules(): array
+    {
+        return array_merge(parent::rules(), [
+            'id' => ['nullable', 'integer'],
+            'name' => ['nullable', 'string'],
+        ]);
+    }
+}
+
+// контроллер: контекст из middleware — в params (../conventions.md п. 19a)
+$search = SearchDataObject::make()
+    ->setParams([...$request->validated(), 'parking_ids' => RequestHelper::getParkingIds($request)])
+    ->setPerPage((int) $request->validated('per_page', 20))
+    ->setPage($request->validated('page'));
+
+return response()->json(PaginateResource::make($this->service->search($search)));
+```
+
 ```php
 namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Repositories;   // реализация — в Infrastructure (P-10), интерфейс — в Domains/.../Repositories/
 
@@ -64,8 +92,6 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
     }
 }
 ```
-
-> **Старая форма (P-19, 2026-10-14).** `CRUDRepository::search()` + хук `filterSearch()` + `SearchDataObject` — форма ядра, на которой написаны легаси, `parking_app` и `super_app`. В новом коде она **не используется**: список — явный метод репозитория `paginate…({E}FilterDto, Page)`, один метод собирает один запрос, фильтры подряд (`conventions.md` п. 2a, 12c, 12d). Раздел ниже — для чтения и правок существующего кода на `search()`.
 
 **Правила filterSearch:**
 - Всегда явно указывать `select` — не `select *`

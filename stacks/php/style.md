@@ -15,15 +15,15 @@
    * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
    */
   ```
-  Для workflow — 1–3 строки **почему** он существует, а не что делает построчно:
+  Для workflow — так же одна строка о назначении сценария (что делает, с какими участниками), без объяснения архитектуры и связей (`core/style.md`, «Не пишутся»); эталон — `examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php`:
   ```php
   /**
-   * Создаёт тариф с предварительной проверкой существования парковки.
+   * Создание тарифа парковки: лимит цены реестра, существование парковки (Catalog), уведомление партнёрского биллинга.
    *
-   * Billing-сервис намеренно не знает о Catalog-домене — эта зависимость живёт здесь.
+   * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
    */
   ```
-- Шаблонные docblock-и вида `@package App\…`, «Реализует бизнес-логику управления…», «Обеспечивает типобезопасность…» (стиль части `super_app`) — **[ВНИМАНИЕ]**, это пересказ, а не смысл.
+- Шаблонные docblock-и вида `@package App\…`, «Реализует бизнес-логику управления…», «Обеспечивает типобезопасность…» (встречается в существующем коде) — **[ВНИМАНИЕ]**, это пересказ, а не смысл.
 - `@param`/`@return` в docblock — только если добавляют информацию сверх сигнатуры (`array<int, string[]>`, generic, `@throws`). Дублировать `@param int $id` при типизированной сигнатуре не нужно.
 - Что писать в комментариях и docblock, чего не писать, уровни и теги — `core/style.md`, «Комментарии». PHP-пример про описание, повторяющее имя (**[ИНФО]**, `comment-restates-name`):
 
@@ -49,7 +49,7 @@
 
 - `final` — для Command/Query, workflow, валидаторов, хелперов. Сервисы и репозитории — не `final` (наследуют ядро, подменяются моками).
 - Конструктор — promotion: `private readonly Type $name`, по одному на строку, trailing comma.
-- Модели: `@property` на каждое поле с комментарием по-русски, `$table` со схемой (`'parking.tariffs'`; таблица в схеме `public` — без префикса, `'organizations'`: как у соседей `super_app`; с префиксом `public.` не работают тесты на временной схеме — AINA-2978), `$fillable`, `$casts` (enum-поля кастуются в enum).
+- Модели: `@property` на каждое поле, описание по-русски — у неочевидных (единицы, формат, смысл `null`; `core/style.md`, «Комментарии»), `$table` со схемой (`'parking.tariffs'`; таблица в схеме `public` — без префикса, `'organizations'`; с префиксом `public.` не работают тесты на временной схеме — AINA-2978), `$fillable`, `$casts` (enum-поля кастуются в enum).
 
 ## Форма кода
 
@@ -163,10 +163,10 @@
 | Request | `Http/Requests/{Entity}/{Create,Update,Index}Request` | `Requests/Tariffs/CreateRequest` |
 | Response | `{Entity}Response`, `{Entity}PaginatedResponse` | `TariffResponse` |
 | Job | `{Action}Job` | `ActivatePlannedTariffJob` |
-| Метод репозитория | один — `get…By…`/`oneBy…` → `?Model`; много — `all…By…` → `Collection`; список — `paginate…({E}FilterDto, Page)`/`list…` (P-19); запись — `createFromDto`/`updateFromDto`/типизированный метод (п. 11a); `*OrFail` — нет (п. 12a) | `getDefaultByParkingId`, `allByParkingId`, `paginateByFilter` |
+| Метод репозитория | один — `get…By…`/`oneBy…` → `?Model`; много — `all…By…` → `Collection`; список — `paginate…({E}FilterDto, Page)`/`list…` (форма (2) P-19; в форме (1) — `search()` ядра); запись — `createFromDto`/`updateFromDto`/типизированный метод (п. 11a); `*OrFail` — нет (п. 12a) | `getDefaultByParkingId`, `allByParkingId`, `paginateByFilter` |
 | Публичный метод сервиса для точки входа | `findById(int $id, ?array $scope): ?Model` — `null` переводит в 404 контроллер (п. 12a) | `findById` |
 
-Имена DTO и Request — как в `parking_app` (решения P-5, P-7): `{Entity}Dto`, `Http/Requests/{Entity}/{Create,Update,Index}Request`. Суффикс в PHP — `Dto`, в Go — `DTO` (аббревиатуры заглавными) — различие стеков. Варианты `super_app` (`BuildingDataDTO`, `Requests/CreateRequest` без папки сущности) в новом коде — **[ВНИМАНИЕ]**. Междоменный класс — `{Action}Workflow` с `execute()` (решение P-2); `*Command` в `Workflows/` parking_app — старый нейминг, переименовывается только в рамках задачи.
+Имена DTO и Request — как в эталоне `stacks/php/examples/parking_app` (решения P-5, P-7): `{Entity}Dto`, `Http/Requests/{Entity}/{Create,Update,Index}Request`. Суффикс в PHP — `Dto`, в Go — `DTO` (аббревиатуры заглавными) — различие стеков. Варианты `BuildingDataDTO`, `Requests/CreateRequest` без папки сущности в новом коде — **[ВНИМАНИЕ]**. Междоменный класс — `{Action}Workflow` с `execute()` (решение P-2); `*Command` в `Workflows/` существующего кода — старый нейминг, переименовывается только в рамках задачи.
 
 ## Язык
 

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Controllers\TariffController;
 use Illuminate\Support\Facades\Route;
-use MPS\Utils\Http\Middleware\ApiResponseMiddleware;
 
 Route::middleware([
     'auth:admin-api',
     'parking.permission',
-    ApiResponseMiddleware::class,
+    'resolve.admin.parkings',
+    'api.response',
 ])
     ->prefix('parking/admin')
     ->as('parking.admin.')

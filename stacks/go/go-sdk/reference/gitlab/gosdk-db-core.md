@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-db-core v1.0.7
+# git.mpinnovations.kz/mps/go-packages/gosdk-db-core v1.0.10
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/debug`
 
@@ -25,9 +25,13 @@
 Package migration — тонкая обёртка над gormigrate для прогона версионированных миграций схемы через *gorm.DB. Полностью dialect-agnostic (как и остальной db-core) — ничего не знает про конкретную СУБД. В частности, здесь…
 
 - `func RollbackLast(db *gorm.DB, migrations []*Migration) error` — RollbackLast откатывает последнюю применённую миграцию из migrations, вызывая её Rollback. Пустой список — не ошибка: пишется лог, ничего не откатывается. Как и Run, не защищена от параллельного вызова из нескольких инст…
+- `func RollbackLastWithOptions(db *gorm.DB, migrations []*Migration, opts Options) error` — RollbackLastWithOptions RollbackLast с настройками opts
 - `func RollbackTo(db *gorm.DB, migrations []*Migration, migrationID string) error` — RollbackTo откатывает все применённые миграции из migrations, идущие после migrationID, в обратном порядке — саму migrationID не откатывает (семантика gormigrate.RollbackTo). Как и RollbackLast — ручная операция, без защ…
+- `func RollbackToWithOptions(db *gorm.DB, migrations []*Migration, migrationID string, opts Options) error` — RollbackToWithOptions RollbackTo с настройками opts
 - `func Run(db *gorm.DB, migrations []*Migration) error` — Run применяет все ещё не применённые migrations к db, по одной, в порядке объявления. Пустой список — не ошибка: пишется лог, Migrate не вызывается. Никакой защиты от параллельного вызова из нескольких инстансов сервиса …
+- `func RunWithOptions(db *gorm.DB, migrations []*Migration, opts Options) error` — RunWithOptions Run с настройками opts
 - `type Migration …` — Migration — ре-экспорт gormigrate.Migration, чтобы вызывающему коду не нужно было импортировать gormigrate напрямую.
+- `type Options struct` — Options Настройки прогона миграций. Нулевое значение — прежнее поведение (gormigrate.DefaultOptions)
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/helpers`
 

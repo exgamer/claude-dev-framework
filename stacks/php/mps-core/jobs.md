@@ -6,8 +6,8 @@
 
 | Что | Где лежит | Класс |
 |---|---|---|
-| **Обработчик сообщения RabbitMQ** (consumer) — точка входа, как контроллер: сообщение пришло извне | `Entrypoints/Queue/{Domain}/{Module}/{Event}Handler.php` (контекст `Queue`, `architecture/layers.md`: consumers — Entrypoint). Эталон — `parking_app/Entrypoints/Queue/Billing/WhitelistOutbox/WhitelistChangeHandler.php` | `MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job` |
-| **Отложенное действие домена** (Laravel queued job: активировать тариф в назначенное время) | `Domains/{Domain}/Modules/{Module}/Jobs/{Action}Job.php`. Пример — `ActivatePlannedTariffJob` в `superapp-api/parking_app` (в `examples/` его нет) | `ShouldQueue` + `Queueable` |
+| **Обработчик сообщения RabbitMQ** (consumer) — точка входа, как контроллер: сообщение пришло извне | `Entrypoints/Queue/{Domain}/{Module}/{Event}Handler.php` (контекст `Queue`, `architecture/layers.md`: consumers — Entrypoint). Например `Entrypoints/Queue/Billing/Tariffs/ParkingDeactivatedHandler.php` (образец — `stacks/php/examples/parking_app/Entrypoints/Queue/Billing/Tariffs/ParkingDeactivatedHandler.php`) | `MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job` |
+| **Отложенное действие домена** (Laravel queued job: активировать тариф в назначенное время) | `Domains/{Domain}/Modules/{Module}/Jobs/{Action}Job.php`. Например `Domains/Billing/Modules/Tariffs/Jobs/ActivatePlannedTariffJob.php` (ниже) | `ShouldQueue` + `Queueable` |
 
 ## Обработчик RabbitMQ
 
@@ -52,15 +52,25 @@ class YourEventHandler extends UtilsJob
 - **временная** (внешняя система недоступна, сеть) — `OperationFailedAppException` наверх, сообщение уйдёт в повтор;
 - **постоянная** (битый payload, нет обязательного поля, нет конфигурации, запись не найдена и не появится) — зафиксировать (статус записи или `$this->errorLog(...)`) и `return`, без исключения. Своего исключения ядра для «битого payload» нет — не выдумывать.
 
-Почему: `UtilsJob::handle` ловит любое исключение из `process()`, пишет error-лог и Sentry и отправляет сообщение в повтор с задержками из `durability.delayed` конфига очереди, после последней — в failed_jobs. Для постоянной ошибки это N бесполезных попыток и N ошибок в Sentry. Так же — в `WhitelistChangeHandler` (`parking_app`, для справки, агент не открывает): отказ — `markRejected` и `return`, `OperationFailedAppException` — `markFailed` и `throw`.
+Почему: `UtilsJob::handle` ловит любое исключение из `process()`, пишет error-лог и Sentry и отправляет сообщение в повтор с задержками из `durability.delayed` конфига очереди, после последней — в failed_jobs. Для постоянной ошибки это N бесполезных попыток и N ошибок в Sentry. Пример: отказ — `markRejected` и `return`, `OperationFailedAppException` — `markFailed` и `throw`.
 
 ### Регистрация в `config/queue.php`
 
+Обработчик — элемент `connections.rabbitmq.handler_map` (образец — `stacks/php/examples/config/queue.php`):
+
 ```php
-// секция consumers → handler_map
-[
-    'queue'   => config('app.rabbit-config.your-domain.action.queue-name'),
-    'handler' => \App\ParkingApp\Entrypoints\Queue\YourDomain\YourModule\YourEventHandler::class,
+'connections' => [
+    'rabbitmq' => [
+        'handler_map' => [
+            [
+                'queue' => config('app.rabbit-config.your-domain.your-event.queue-name'),
+                'exchange' => config('app.rabbit-config.your-domain.your-event.exchange'),
+                'routing_key' => config('app.rabbit-config.your-domain.your-event.routing-key'),
+                'handler' => \App\ParkingApp\Entrypoints\Queue\YourDomain\YourModule\YourEventHandler::class,
+                'durability' => ['delayed' => [60, 300, 900, 3600]],
+            ],
+        ],
+    ],
 ],
 ```
 
@@ -71,34 +81,30 @@ class YourEventHandler extends UtilsJob
 ```php
 namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Jobs;
 
+use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands\YourActionCommand;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
-class ActivatePlannedTariffJob implements ShouldQueue
+class YourActionJob implements ShouldQueue
 {
     use Queueable;
 
     public int $tries = 3;
 
     public function __construct(
-        private readonly int $tariffId,
+        private readonly int $id,
     ) {
         $this->onConnection('database');
     }
 
-    public function handle(TariffRepositoryInterface $repository, ActivatePlannedTariffCommand $command): void
+    public function handle(YourActionCommand $command): void
     {
-        $tariff = $repository->oneById($this->tariffId);
-        if (! $tariff || $tariff->status !== TariffStatusEnum::SCHEDULED) {
-            return;   // уже обработано или отменено — повтор безопасен
-        }
-
-        $command->execute($tariff);
+        $command->execute($this->id);   // проверка статуса («уже обработано — выход») и запись — в Command, повтор безопасен
     }
 }
 ```
 
-Ставится из сервиса/workflow после записи: `ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->starts_at)` (п. 17). Внутри — только вызов Command/сервиса своего домена, логики в `handle()` нет.
+Образец — `stacks/php/examples/parking_app/Domains/Billing/Modules/Tariffs/Jobs/ActivatePlannedTariffJob.php` (Command — `.../Tariffs/Commands/ActivatePlannedTariffCommand.php`). Ставится из сервиса/workflow после коммита: `ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->scheduled_at)` (`../conventions.md` п. 17). В `handle()` — только вызов Command/сервиса своего домена: ни репозитория, ни проверок.
 
 ## Что куда
 

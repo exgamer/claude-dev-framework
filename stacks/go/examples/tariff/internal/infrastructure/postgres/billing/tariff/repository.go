@@ -8,10 +8,18 @@ import (
 
 	"git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/helpers"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/pagination"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 )
+
+// defaultTariffUniqueIndex Частичный уникальный индекс «у парковки не больше одного тарифа по умолчанию» (миграция 20261020100200)
+const defaultTariffUniqueIndex = "tariffs_parking_id_default_unique"
+
+// uniqueViolationCode SQLSTATE нарушения уникальности Postgres
+const uniqueViolationCode = "23505"
 
 func NewPostgresRepository(client *gorm.DB) *PostgresRepository {
 	return &PostgresRepository{
@@ -23,22 +31,27 @@ type PostgresRepository struct {
 	client *gorm.DB
 }
 
-func (r *PostgresRepository) GetByID(ctx context.Context, id uint) (*tariffdomain.Tariff, error) {
+func (r *PostgresRepository) GetByID(ctx context.Context, id uint, parkingIDs []uint) (*tariffdomain.Tariff, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	var model tariff
-	result := r.client.WithContext(ctx).
+	query := r.client.WithContext(ctx).
 		Where("id = ?", id).
-		Where("deleted_at IS NULL").
-		First(&model)
+		Where("deleted_at IS NULL")
+
+	if parkingIDs != nil {
+		query = query.Where("parking_id IN ?", parkingIDs)
+	}
+
+	var model tariff
+	result := query.First(&model)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 
 	if result.Error != nil {
-		return nil, result.Error
+		return nil, fmt.Errorf("get tariff failed (tariff_id=%d): %w", id, result.Error)
 	}
 
 	return tariffToEntity(&model), nil
@@ -60,18 +73,22 @@ func (r *PostgresRepository) GetDefaultByParkingID(ctx context.Context, parkingI
 	}
 
 	if result.Error != nil {
-		return nil, result.Error
+		return nil, fmt.Errorf("get default tariff failed (parking_id=%d): %w", parkingID, result.Error)
 	}
 
 	return tariffToEntity(&model), nil
 }
 
-func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search) (*pagination.Paginated[tariffdomain.Tariff], error) {
-	return helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).
+func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search, parkingIDs []uint) (*pagination.Paginated[tariffdomain.Tariff], error) {
+	paginated, err := helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).
 		SetTimeout(10*time.Second).
 		SetPerPage(search.PerPage).
 		Paginated(search.Page, func(db *gorm.DB) *gorm.DB {
 			query := db.Model(&tariff{}).Where("deleted_at IS NULL")
+
+			if parkingIDs != nil {
+				query = query.Where("parking_id IN ?", parkingIDs)
+			}
 
 			if search.ParkingID != 0 {
 				query = query.Where("parking_id = ?", search.ParkingID)
@@ -79,6 +96,11 @@ func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain
 
 			return query.Order("id DESC")
 		})
+	if err != nil {
+		return nil, fmt.Errorf("paginate tariffs failed (parking_id=%d, page=%d): %w", search.ParkingID, search.Page, err)
+	}
+
+	return paginated, nil
 }
 
 func (r *PostgresRepository) Create(ctx context.Context, entity *tariffdomain.Tariff) (*tariffdomain.Tariff, error) {
@@ -104,20 +126,73 @@ func (r *PostgresRepository) Update(ctx context.Context, id uint, patch *tariffd
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	return r.client.WithContext(ctx).
+	err := r.client.WithContext(ctx).
 		Model(&tariff{}).
 		Where("id = ?", id).
 		Updates(columns).
 		Error
+	if err != nil {
+		return fmt.Errorf("update tariff failed (tariff_id=%d): %w", id, err)
+	}
+
+	return nil
 }
 
 func (r *PostgresRepository) SetDefault(ctx context.Context, id uint, isDefault bool) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	return r.client.WithContext(ctx).
+	err := r.client.WithContext(ctx).
 		Model(&tariff{}).
 		Where("id = ?", id).
 		Update("is_default", isDefault).
 		Error
+
+	return setDefaultError(err, id)
+}
+
+// setDefaultError Ошибка записи флага: нарушение индекса тарифа по умолчанию — tariffdomain.ErrDefaultTariffTaken, прочее — с ID тарифа
+func setDefaultError(err error, id uint) error {
+	if err == nil {
+		return nil
+	}
+
+	if isUniqueViolation(err, defaultTariffUniqueIndex) {
+		return fmt.Errorf("set default tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrDefaultTariffTaken)
+	}
+
+	return fmt.Errorf("set default tariff failed (tariff_id=%d): %w", id, err)
+}
+
+// isUniqueViolation Нарушение именно индекса index: SQLSTATE 23505 и имя ограничения из ошибки драйвера; чужой индекс — не оно
+func isUniqueViolation(err error, index string) bool {
+	var pgErr *pgconn.PgError
+
+	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode && pgErr.ConstraintName == index
+}
+
+func (r *PostgresRepository) DeactivateByParkingID(ctx context.Context, parkingID uint) ([]uint, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var models []tariff
+	result := r.client.WithContext(ctx).
+		Model(&models).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
+		Where("parking_id = ?", parkingID).
+		Where("is_active = TRUE").
+		Where("deleted_at IS NULL").
+		Update("is_active", false)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("deactivate tariffs failed (parking_id=%d): %w", parkingID, result.Error)
+	}
+
+	ids := make([]uint, 0, len(models))
+
+	for _, model := range models {
+		ids = append(ids, model.ID)
+	}
+
+	return ids, nil
 }

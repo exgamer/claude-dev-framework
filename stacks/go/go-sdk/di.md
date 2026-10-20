@@ -13,7 +13,7 @@ svc, err := di.Resolve[*MyService](a.Container)
 
 - Контейнер используется только внутри `App` (bootstrap, модули)
 - Никогда не передавай `a.Container` в бизнес-логику или репозитории
-- Зависимости kernel (подключения, роутер, конфиг) — через хелперы kernel (`postgresDi.GetDefaultPostgresConnection`, `redisDi.GetRedisClient`, `di.GetRouter`), не через `di.Resolve`; свои типы — `di.Resolve[T]` в bootstrap/модуле (как в `examples/tariff`, `bootstrap/billing/tariff/module.go`)
+- Зависимости kernel (подключения, роутер, конфиг) — через хелперы kernel (`postgresDI.GetDefaultPostgresConnection`, `redisDI.GetRedisClient`, `di.GetRouter`), не через `di.Resolve`; свои типы — `di.Resolve[T]` в bootstrap/модуле (как в `examples/tariff`, `bootstrap/billing/tariff/module.go`)
 
 ## Что доступно из DI — core kernel
 Пакет: `github.com/exgamer/gosdk-core/pkg/di`
@@ -26,13 +26,13 @@ baseConfig, err := di.GetBaseConfig(a.Container)  // *config.BaseConfig
 Пакет: `github.com/exgamer/gosdk-postgres-core/pkg/di`
 ```go
 // основной коннект
-conn, err := postgresDi.GetDefaultPostgresConnection(a.Container) // *gorm.DB
+conn, err := postgresDI.GetDefaultPostgresConnection(a.Container) // *gorm.DB
 
 // добавить дополнительный коннект
-err := postgresDi.AddPostgresConnection(a.Container, "name", &config.PostgresDbConfig{})
+err := postgresDI.AddPostgresConnection(a.Container, "name", &config.PostgresDbConfig{})
 
 // получить дополнительный коннект
-conn, err := postgresDi.GetPostgresConnection(a.Container, "name") // *gorm.DB
+conn, err := postgresDI.GetPostgresConnection(a.Container, "name") // *gorm.DB
 ```
 
 ## Что доступно из DI — http kernel
@@ -46,13 +46,13 @@ metColl, err    := httpDi.GetMetricsCollector(a.Container) // *metrics.Collector
 ## Что доступно из DI — redis kernel
 Пакет: `github.com/exgamer/gosdk-redis-core/pkg/di`
 ```go
-redisClient, err := redisDi.GetRedisClient(a.Container) // *redis.Client
+redisClient, err := redisDI.GetRedisClient(a.Container) // *redis.Client
 ```
 
 ## Что доступно из DI — rabbit kernel
 Пакет: `github.com/exgamer/gosdk-rabbit-core/pkg/di`
 ```go
-rabbitClient, err  := rabbitDi.GetRabbitClient(a.Container)             // *rabbitmq.Consumer
-consumersReg, err  := rabbitDi.GetRabbitConsumersRegistry(a.Container)  // *app.ConsumersRegistry
-publishersReg, err := rabbitDi.GetRabbitPublishersRegistry(a.Container) // *app.PublisherRegistry
+rabbitClient, err  := rabbitDI.GetRabbitClient(a.Container)             // *rabbitmq.Consumer
+consumersReg, err  := rabbitDI.GetRabbitConsumersRegistry(a.Container)  // *app.ConsumersRegistry
+publishersReg, err := rabbitDI.GetRabbitPublishersRegistry(a.Container) // *app.PublisherRegistry
 ```

@@ -28,7 +28,7 @@
 
 ## Что через IDE
 
-Проверено на IDEA 2026.2.3: `search_symbol`, `get_symbol_info` — PHP (`superapp-api`) и Go (`stacks/go/examples/tariff`); `search_structural`, `lint_files` — PHP, на Go-проекте ещё не проверялись (в эталоне нет `go.mod`) — не сработали, режим grep для этого вопроса:
+Проверено на IDEA 2026.2.3: `search_symbol`, `get_symbol_info` — PHP-проект и Go (`stacks/go/examples/tariff`); `search_structural`, `lint_files` — PHP, на Go-проекте ещё не проверялись, режим grep для этого вопроса:
 
 | Вопрос | Инструмент | Вместо |
 |---|---|---|

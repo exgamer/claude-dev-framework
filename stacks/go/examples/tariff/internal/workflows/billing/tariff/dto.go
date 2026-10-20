@@ -6,4 +6,5 @@ type CreateTariffParams struct {
 	Name         string
 	Currency     string
 	GraceMinutes uint
+	Price        uint
 }

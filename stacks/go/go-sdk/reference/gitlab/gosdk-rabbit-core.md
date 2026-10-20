@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core v1.0.6
+# git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core v1.0.10
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/app`
 
@@ -50,7 +50,7 @@
 - `type PublisherConfig struct`
 - `type PublisherDefinition struct`
   - `func NewPublisherDefinition(name string, cfg ...Config) PublisherDefinition`
-- `type RabbitConfig struct`
+- `type RabbitConfig struct` — RabbitConfig Данные для соединения с RabbitMQ
   - `func InitRabbitConfig() (*RabbitConfig, error)` — InitRabbitConfig Инициализация конфига
   - `func (c RabbitConfig) AmqpURI() string` — AmqpURI - собирает connection string в формате amqp://user:pass@host:port/vhost.
 

@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-http-core v1.0.11
+# git.mpinnovations.kz/mps/go-packages/gosdk-http-core v1.0.14
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/app`
 
@@ -70,6 +70,7 @@
 - `func FormattedErrorWithHttpInfo(ctx context.Context, httpInfo *config2.HttpInfo, message string)` — FormattedErrorWithHttpInfo Форматированный лог ошибки для RequestData
 - `func FormattedInfo(ctx context.Context, method string, uri string, status int, requestId string, message string)` — FormattedInfo Форматированный лог
 - `func FormattedLogWithHttpInfo(ctx context.Context, httpInfo *config2.HttpInfo, message string)` — FormattedLogWithHttpInfo Форматированный лог для RequestData
+- `func FormattedWarning(ctx context.Context, method string, uri string, status int, requestId string, message string)` — FormattedWarning Форматированный лог предупреждения
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/metrics`
 

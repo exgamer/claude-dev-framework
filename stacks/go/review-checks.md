@@ -42,9 +42,9 @@
 0. **Запросы к хранилищам вне `internal/infrastructure`** — всегда, механически (`conventions.md` п. 4; тег `service-direct-db-query`):
    ```
    grep -rnE "gorm\.|sqlx?\.|pgx\.|redis\.(Client|UniversalClient)|\.QueryRow|\.Table\(|\.Model\(" \
-     --include='*.go' . | grep -vE "/infrastructure/|/bootstrap/|_test\.go|/vendor/"
+     --include='*.go' . | grep -vE "/infrastructure/|/bootstrap/|/migrations/|_test\.go|/vendor/"
    ```
-   Строка в `domains/**`, `workflows/**`, `entrypoints/**` — **[ОШИБКА]** `service-direct-db-query`: запрос переносится в репозиторий, слой получает метод интерфейса. Исключения: `bootstrap/` (DI — клиент создаётся и раздаётся репозиториям, отфильтрован), `entrypoints/system/healthcheck` (пингует БД напрямую — так в эталоне). `.Exec(`/`.Raw(` в паттерне нет намеренно: так называются методы workflow и `httpresponse` в SDK. Проверено на `parking-session-service` 2026-10-14: кроме healthcheck срабатываний нет.
+   Строка в `domains/**`, `workflows/**`, `entrypoints/**` — **[ОШИБКА]** `service-direct-db-query`: запрос переносится в репозиторий, слой получает метод интерфейса. Исключения отфильтрованы: `bootstrap/` (DI: клиент создаётся и раздаётся репозиториям) и `internal/migrations/` (миграция получает `*gorm.DB` по контракту мигратора). Пробы healthcheck, которые пингуют БД и Redis напрямую, лежат там же: `bootstrap/system/healthcheck/module.go` эталона; обработчик `entrypoints/system/http/healthcheck/` клиентов не трогает. Пинг клиента в `entrypoints/**` — та же находка: пробу перенести в bootstrap. `.Exec(`/`.Raw(` в паттерне нет намеренно: так называются методы workflow и `httpresponse` в SDK. Прогон на эталоне `stacks/go/examples/tariff`: срабатываний нет.
 0a. **Повторённая обработка формата** (`duplicated-format-logic`, `core/principles.md`, «Повторяющаяся обработка — один хелпер»):
    ```
    grep -rnE "unicode\.IsDigit|strings\.Map\(|regexp\.MustCompile\(\"\[\^0-9\]|\"\+7\"|TrimPrefix\(.*\"(\+7|8|7)\"" \

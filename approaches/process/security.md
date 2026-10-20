@@ -87,7 +87,7 @@
 
 ### A — Периметр
 
-- Без пути → весь код сервиса: Go — `internal/` (`domains`, `entrypoints`, `infrastructure`, `workflows`); PHP — подпроект (`parking_app/`, `super_app/`…) или `app/`.
+- Без пути → весь код сервиса: Go — `internal/` (`domains`, `entrypoints`, `infrastructure`, `workflows`); PHP — подпроект (`{subproject}/`) или `app/`.
 - С путём → ограничить им.
 - Собери список доменов/модулей верхнего уровня (`find internal -maxdepth 3 -type d`) — единицы
   распределения между агентами. Для сервисов с несколькими платёжными шлюзами (`{kaspi,halyk,kassa24,...}`)

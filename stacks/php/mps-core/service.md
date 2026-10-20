@@ -28,7 +28,7 @@ class YourService extends CRUDService implements YourServiceInterface
 
 ## Сложный сервис (CrudServiceDecorator)
 
-> **Версия:** `MPS\Core\Components\CRUD\Services\Database\Eloquent\CrudServiceDecorator` есть с **mps/core 1.7.0**. В проекте со старым ядром (superapp-api — 1.6.0) — `extends MPS\Core\Services\Service`, свой интерфейс, CRUD через репозиторий (как `TariffCrudService` в `../examples/`).
+> **Версия:** `MPS\Core\Components\CRUD\Services\Database\Eloquent\CrudServiceDecorator` есть с **mps/core 1.7.0**. В проекте со старым ядром (например 1.6.0) — `extends MPS\Core\Services\Service`, свой интерфейс, CRUD через репозиторий (как `TariffCrudService` в `../examples/`).
 
 Когда нужны кастомные сигнатуры или сложный флоу с использованием готовых операций Crud:
 
@@ -85,4 +85,4 @@ protected function beforeCreate(CommandDataObject $dto): void {}
 protected function afterCreate(CommandDataObject $dto): void {}
 ```
 
-`search()`, `beforeSearch`/`afterSearch(SearchDataObject)` — старая форма (P-19): в новом коде список — метод репозитория `paginate…` (`../conventions.md` п. 2a); в существующем коде на `search()` — `repository.md`, «Старая форма».
+`search()`, `beforeSearch`/`afterSearch(SearchDataObject)` — форма (1) списка (P-19): `repository.md`, «Форма (1)»; в форме (2) список — метод репозитория `paginate…` (`../conventions.md` п. 2a). Какая форма — раздел «Список» `design.md`.

@@ -8,65 +8,65 @@ import (
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/exception"
 )
 
-func NewSetDefaultTariffCommand(
-	repository Repository,
-	cacheRepository CacheRepository,
-	txManager DefaultTariffTxManager,
-) *SetDefaultTariffCommand {
+func NewSetDefaultTariffCommand(cacheRepository CacheRepository, txManager DefaultTariffTxManager) *SetDefaultTariffCommand {
 	return &SetDefaultTariffCommand{
-		repository:      repository,
 		cacheRepository: cacheRepository,
 		txManager:       txManager,
 	}
 }
 
-// SetDefaultTariffCommand Назначение тарифа по умолчанию. Вынесен из Service: две записи в транзакции и сброс кеша обоих тарифов
+// SetDefaultTariffCommand Назначение тарифа по умолчанию; прежний тариф по умолчанию той же парковки теряет флаг
 type SetDefaultTariffCommand struct {
-	repository      Repository
 	cacheRepository CacheRepository
 	txManager       DefaultTariffTxManager
 }
 
-func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint) error {
-	tariff, err := c.repository.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
+// Exec Тариф ищется в пределах парковок parkingIDs (nil — без ограничения); чужой — 404.
+// Поиск прежнего и снятие его флага — для обычного случая; от параллельной смены защищает уникальный индекс: ErrDefaultTariffTaken → 422, транзакция откатывается
+func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, parkingIDs []uint) error {
+	var changedIDs []uint
 
-	if tariff == nil {
-		return exception.NewNotFoundException(errors.New("тариф не найден"), false)
-	}
+	err := c.txManager.Exec(ctx, func(ctx context.Context, repository Repository) error {
+		tariff, err := repository.GetByID(ctx, id, parkingIDs)
+		if err != nil {
+			return err
+		}
 
-	if tariff.IsDefault {
-		return nil
-	}
+		if tariff == nil {
+			return exception.NewNotFoundException(errors.New("тариф не найден"), false)
+		}
 
-	var previousID uint
+		if tariff.IsDefault {
+			return nil
+		}
 
-	err = c.txManager.Exec(ctx, func(ctx context.Context, repository Repository) error {
 		previous, err := repository.GetDefaultByParkingID(ctx, tariff.ParkingID)
 		if err != nil {
 			return err
 		}
 
 		if previous != nil {
-			previousID = previous.ID
-
 			if err := repository.SetDefault(ctx, previous.ID, false); err != nil {
 				return err
 			}
+
+			changedIDs = append(changedIDs, previous.ID)
 		}
+
+		changedIDs = append(changedIDs, tariff.ID)
 
 		return repository.SetDefault(ctx, tariff.ID, true)
 	})
+	if errors.Is(err, ErrDefaultTariffTaken) {
+		return exception.NewValidationException(map[string]any{"is_default": "тариф по умолчанию этой парковки только что изменён другим запросом, обновите данные и повторите"}, false)
+	}
+
 	if err != nil {
 		return err
 	}
 
-	c.invalidate(ctx, tariff.ID)
-
-	if previousID != 0 {
-		c.invalidate(ctx, previousID)
+	for _, changedID := range changedIDs {
+		c.invalidate(ctx, changedID)
 	}
 
 	return nil

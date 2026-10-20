@@ -1,12 +1,6 @@
 # Структура PHP-сервиса (Laravel + mps/core + mps/utils)
 
-Исходные проекты правил и образца `stacks/php/examples/` — подпроекты монолита `superapp-api`. Отдельно их не читают: образец формы для агента — `{DF}/stacks/php/examples/`; таблица ниже нужна, когда задача идёт внутри `superapp-api` и подпроекты — соседний код:
-
-| Эталон | Кто писал | Как использовать |
-|---|---|---|
-| `parking_app/` (`App\ParkingApp\`) | автор фреймворка | **основной** — форма модулей, нейминг, стиль |
-| `super_app/` (`App\SuperApp\`) | команда | второй — где совпадает с `parking_app`, это подтверждённая практика; где расходится — спор (P-* в `core/decisions.md`) |
-| `app/` | легаси | **не эталон**. Новый код туда не пишется (см. `approaches/process/legacy-refactor.md`) |
+Образец формы для агента — эталон `{DF}/stacks/php/examples/` (подпроект `parking_app`). Соседние подпроекты проекта — не образец: где их код расходится с правилами и эталоном, в новом коде — как в эталоне; открытые расхождения — споры P-* в `core/decisions.md`. Легаси `app/` — не образец, новый код туда не пишется (см. `approaches/process/legacy-refactor.md`).
 
 Слои те же, что в Go (`architecture/layers.md`); здесь — как они выглядят в Laravel. Соответствие Go ↔ PHP — в конце файла.
 
@@ -20,9 +14,10 @@ parking_app/                                   ← корень подпроек
 ├── Common/                                    ← общий бизнес-словарь двух и более доменов (`architecture/layers.md`): Enums/, ValueObjects/, Support/ (чистые функции), Exceptions/; без DI и I/O
 ├── Core/                                      ← общее для подпроекта, не бизнес-логика
 │   ├── Database/Managers/                     ← TransactionManagerInterface, NoopTransactionManager — только при mps/core < 1.10; с 1.10 — из ядра, своих нет (`mps-core/transactions.md`)
-│   ├── Database/Query/PaginatedQueryHelper.php ← старая форма списка (P-19), новый код не использует
-│   ├── Requests/{Request,SearchRequest}.php   ← базовые FormRequest
-│   ├── Resources/                             ← форма пагинации (items/pagination) для {E}PaginatedResponse; PaginateResource — старая форма (P-19)
+│   ├── Database/Query/Page.php                ← страница списка для paginate…(FilterDto, Page): `make(int, int)`, `fromRequest()`, `getNumber()`, `getPerPage()` (форма (2) списка P-19; P-22 — **тестовый вариант** API `Page`; эталон — `examples/parking_app/Core/Database/Query/Page.php`)
+│   ├── Database/Query/PaginatedQueryHelper.php ← форма (1) списка (P-19, `conventions.md` п. 2a) — `search()` ядра; эталон — `examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`
+│   ├── Requests/Request.php                   ← базовый FormRequest, от него и IndexRequest; `Requests/SearchRequest.php` — форма (1) списка (P-19), эталон — `examples/parking_app/Core/Requests/SearchRequest.php`
+│   ├── Resources/                             ← `PaginatedResource` — форма пагинации (items/pagination), от неё наследуется {E}PaginatedResponse (форма (2), P-22); `PaginateResource` — форма (1) (P-19), эталон — `examples/parking_app/Core/Resources/PaginateResource.php`
 │   ├── Http/Middleware/
 │   ├── Rules/                                 ← свои правила валидации — только когда нет в ядре (RegexRule + RegexEnum::MOBILE_PHONE, mps-core/capabilities.md)
 │   └── Enums/, Helpers/, OpenApi/
@@ -53,7 +48,7 @@ parking_app/                                   ← корень подпроек
 │       ├── Requests/{Entity}/{Create,Update,Index}Request.php
 │       └── Responses/{Entity}Response.php, {Entity}PaginatedResponse.php
 ├── Entrypoints/Queue/{Domain}/{Module}/{Event}Handler.php   ← обработчики RabbitMQ (контекст Queue, mps-core/jobs.md)
-├── Entrypoints/Console/{Domain}/{Module}/…Command.php        ← консоль (mps-core/cli.md)
+├── Entrypoints/Console/{Domain}/{ServiceProvider,commands}.php, {Module}/{Action}ConsoleCommand.php   ← консоль (mps-core/cli.md)
 │
 └── Infrastructure/
     ├── ServiceProvider.php
@@ -63,22 +58,27 @@ parking_app/                                   ← корень подпроек
     │   └── {Module}/Models/{Entity}.php, Repositories/{Entity}Repository.php
     ├── Postgres/Common/Providers/definitions.php              ← TransactionManagerInterface → DatabaseTransactionManager (mock: Noop) — только при mps/core < 1.10; с 1.10 биндинг регистрирует ядро
     ├── Redis/, Cache/{Domain}/{Module}/                       ← кэш-репозитории
-    ├── Http/{Provider}/{Product}/                             ← адаптер внешней системы, по её имени (решение G-2)
+    ├── Http/{Provider}/Providers/ServiceProvider.php, definitions.php ← интерфейс порта → адаптер (+ mock) всех продуктов провайдера
+    ├── Http/{Provider}/{Product}/                             ← адаптер внешней системы, по её имени (решение G-2): {Provider}{Product}Repository.php или …Notifier.php — по роли порта (architecture/integrations.md), Mocks/
     ├── Http/{Service}/{Module}/                               ← наш другой микросервис
-    └── RabbitMQ/
+    └── RabbitMQ/{Domain}/{Module}/Publishers/{E}Publisher.php, Mocks/; провайдер — `RabbitMQ/{Domain}/Providers/`   ← публикатор в брокер (порт `…PublisherInterface` домена в `Repositories/`); эталон — `examples/parking_app/Infrastructure/RabbitMQ/Billing/OutboxTariffEvents/Publishers/`
 ```
 
-**Infrastructure — всегда с типом** (решение P-10): `Infrastructure/{Postgres,Redis,Http,RabbitMQ,…}/…`. `Infrastructure/{Domain}/` без типа (как `super_app/Infrastructure/Acms`, `Infrastructure/User/Models`) в новом коде — **[ВНИМАНИЕ]**.
+**Провайдер `Infrastructure/Http/{Provider}`** — `Providers/ServiceProvider.php` (extends `MPS\Core\Modules\ModuleServiceProvider`, подхватывает `definitions.php` рядом) и `Providers/definitions.php` (`abstract` — интерфейс порта домена/workflow, `concrete` — адаптер, `mock` — `{Product}/Mocks/…Mock`); один провайдер на внешнюю систему, как `Postgres/{Domain}/Providers/`. Эталон — `examples/parking_app/Infrastructure/Http/CityParking/Providers/`.
 
-**`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` (как в `super_app`) в новом коде не заводится. Бизнес-понятия, нужные двум и более доменам (enum, value-объекты, чистые функции над ними), — не в `Core/`, а в `Common/` (`architecture/layers.md`, «Общий бизнес-словарь»). Техническая библиотека подпроекта без бизнес-логики (над расширением PHP или ФС: архивы, файлы) — `Core/{Lib}/{Services,Drivers,DTO,Enums,Exceptions}`, интерфейсы рядом с реализацией, регистрация — `Core/definitions.php` (AINA-2744).
+**Контроллер** наследует базовый контроллер приложения Laravel (`App\Http\Controllers\Controller`, как в эталоне `examples/parking_app/Entrypoints/Admin/Billing/Tariffs/Http/Controllers/TariffController.php`); свой базовый контроллер в `Core/` не заводится, пока нет общей логики контроллеров подпроекта.
 
-**Хелперы (`Core/Helpers/{Thing}Helper.php`)** — чистые преобразования формата (`core/principles.md`, «Повторяющаяся обработка — один хелпер»): `PhoneHelper::normalize(string $raw): ?string`, `PhoneHelper::format(string $digits): string`, `IinHelper`, `CardHelper`, `MoneyHelper`. `final class`, только `public static` методы, без конструктора и DI, без `DB::`/моделей/конфига, без доменных типов; одна тема — один класс (не `StrHelper` с телефоном, картой и датами внутри). Тесты — `tests/Unit/Core/Helpers/{Thing}HelperTest.php`. Вызывается из `prepareForValidation()` Request'а (нормализация входа), из Response (формат вывода), из консольных команд; в сервисе и репозитории преобразований формата нет — им приходит уже нормализованное значение. Эталон формы — `super_app/Core/Helpers/PhoneHelper.php`; `app/Helpers/StrHelper.php` с телефоном внутри — не образец.
+**Infrastructure — всегда с типом** (решение P-10): `Infrastructure/{Postgres,Redis,Http,RabbitMQ,…}/…`. `Infrastructure/{Domain}/` без типа (`Infrastructure/Acms`, `Infrastructure/User/Models`) в новом коде — **[ВНИМАНИЕ]**.
 
-**Слой `Contexts/` из `Backend_Architecture_Reglament.md` проекта = `Entrypoints/`** (решение P-9): отдельной папки `Contexts/` нет, контекст — первый уровень внутри `Entrypoints/` (`Entrypoints/Admin/…`). Пустую `parking_app/Contexts/` образцом не считать.
+**`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` в новом коде не заводится. Бизнес-понятия, нужные двум и более доменам (enum, value-объекты, чистые функции над ними), — не в `Core/`, а в `Common/` (`architecture/layers.md`, «Общий бизнес-словарь»). Техническая библиотека подпроекта без бизнес-логики (над расширением PHP или ФС: архивы, файлы) — `Core/{Lib}/{Services,Drivers,DTO,Enums,Exceptions}`, интерфейсы рядом с реализацией, регистрация — `Core/definitions.php` (AINA-2744).
 
-**Контексты (`{Context}`)** — для кого точка входа: `Admin`, `Mobile`, `Integration`, `Lpm` (железо/партнёр), `Console`, `Queue`. Один и тот же модуль для разных контекстов — разные директории и разные контроллеры (см. `Backend_Architecture_Reglament.md` проекта: «контексты — разные продукты, а не роли», `if ($isAdmin)` запрещён).
+**Хелперы (`Core/Helpers/{Thing}Helper.php`)** — чистые преобразования формата (`core/principles.md`, «Повторяющаяся обработка — один хелпер»): `PhoneHelper::normalize(string $raw): ?string`, `PhoneHelper::format(string $digits): string`, `IinHelper`, `CardHelper`, `MoneyHelper`. `final class`, только `public static` методы, без конструктора и DI, без `DB::`/моделей/конфига, без доменных типов; одна тема — один класс (не `StrHelper` с телефоном, картой и датами внутри). Тест — путь полностью повторяет путь класса (раздел «Тесты» ниже): `tests/Unit/{Подпроект}/Core/Helpers/{Thing}HelperTest.php`, как `tests/Unit/ParkingApp/Core/Helpers/SignatureHelperTest.php` эталона. Вызывается из `prepareForValidation()` Request'а (нормализация входа), из Response (формат вывода), из консольных команд; в сервисе и репозитории преобразований формата нет — им приходит уже нормализованное значение. Форма — `PhoneHelper` выше; `StrHelper` с телефоном внутри — не образец.
 
-**Без `src/`** (решение P-3): `Domains/{D}/Modules/{M}/`, `Entrypoints/{Ctx}/{D}/{M}/`, один PSR-4 на подпроект. Вариант `super_app` (`Domains/{D}/src/…` + PSR-4 на каждый домен) в новом коде не используется; существующие модули `super_app` не переписываются без задачи.
+**Слой `Contexts/` из регламента архитектуры бэкенда проекта = `Entrypoints/`** (решение P-9): отдельной папки `Contexts/` нет, контекст — первый уровень внутри `Entrypoints/` (`Entrypoints/Admin/…`). Пустую папку `Contexts/` в подпроекте образцом не считать.
+
+**Контексты (`{Context}`)** — для кого точка входа: `Admin`, `Mobile`, `Integration`, `Lpm` (железо/партнёр), `Console`, `Queue`. Healthcheck (liveness/readiness) своим кодом не пишется: `MPS\Utils\Components\HealthCheck` из `mps/utils` (`GET /health/liveness`, `/health/readiness` — БД, кеш, RabbitMQ; `mps-core/capabilities.md`) — его `ServiceProvider` регистрирует корневой провайдер подпроекта (`$utilsProviders` в `examples/parking_app/ServiceProvider.php`), настройки — секция `health_check` в `config/mps-utils.php` (`examples/config/mps-utils.php`). Один и тот же модуль для разных контекстов — разные директории и разные контроллеры (регламент архитектуры проекта: «контексты — разные продукты, а не роли», `if ($isAdmin)` запрещён).
+
+**Без `src/`** (решение P-3): `Domains/{D}/Modules/{M}/`, `Entrypoints/{Ctx}/{D}/{M}/`, один PSR-4 на подпроект. Вариант `Domains/{D}/src/…` + PSR-4 на каждый домен в новом коде не используется; существующие модули в такой форме не переписываются без задачи.
 
 ---
 
@@ -155,12 +155,12 @@ parking_app/                                   ← корень подпроек
 
 | Что | Где |
 |---|---|
-| unit: сервис, валидатор, Command/Query, компонент | `tests/Unit/{Подпроект}/…`, путь повторяет путь класса: `tests/Unit/ParkingApp/Domains/Billing/Tariffs/TariffDtoValidatorTest.php` |
-| feature: HTTP через приложение, БД | `tests/Feature/{Подпроект}/{Context}/{Domain}/…`, как `tests/Feature/ParkingApp/Lpm/…` |
+| unit: сервис, валидатор, Command/Query, компонент | `tests/Unit/{Подпроект}/…`, путь полностью повторяет путь класса, без сокращений: класс `parking_app/Domains/Billing/Modules/Tariffs/Validators/TariffDtoValidator.php` → `tests/Unit/ParkingApp/Domains/Billing/Modules/Tariffs/Validators/TariffDtoValidatorTest.php` |
+| feature: HTTP через приложение, БД | `tests/Feature/{Подпроект}/{Context}/{Domain}/…`, как `tests/Feature/ParkingApp/Integration/Billing/TariffSignatureTest.php` эталона |
 | моки зависимостей | `mock` в `definitions.php` (как `NoopTransactionManager`) |
 | тест границ `Common/` | `tests/Unit/{Подпроект}/Architecture/CommonBoundaryTest.php`: проходит по `{подпроект}/Common/**/*.php`, падает на `use` из `Domains\`, `Infrastructure\`, `Workflows\`, `Entrypoints\`, `Illuminate\` (кроме базового трейта enum ядра) и на конструкторе с зависимостями (`approaches/process/testing.md`) |
 | интеграционный без HTTP и БД (несколько процессов, реальная ФС) | рядом с unit-тестами компонента, `#[Group('integration')]`; обработчик подпроцесса — `Fixtures/` рядом (AINA-2744) |
 
 Большие тестовые данные (бомба, файл на десятки МБ) — разреженный файл (`ftruncate`) или поток, не строка в памяти: `str_repeat` на 50 МБ вместе с Laravel превышает `memory_limit` 128M и роняет весь набор (AINA-2744).
 
-Тест внутри подпроекта (`parking_app/…/Tests/`) в новом коде — **[ВНИМАНИЕ]**. Известный случай: `TariffCalculatorTest` лежит рядом с кодом, а набор «Tariff Component» в `phpunit.xml` указывает на несуществующий `parking_app/Domains/Billing/src/`, поэтому тест не запускается.
+Тест внутри подпроекта (`{подпроект}/…/Tests/`) в новом коде — **[ВНИМАНИЕ]**. Почему: тест рядом с кодом выпадает из наборов `phpunit.xml` — известный случай, набор указывал на несуществующий путь `Domains/Billing/src/`, и тест не запускался.

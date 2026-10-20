@@ -2,8 +2,11 @@
 
 Перед тем как писать хелпер, обёртку, клиент или middleware — найти задачу в этой таблице. Есть в SDK → использовать SDK; своя реализация того, что есть в SDK, — **[ОШИБКА]** (`conventions.md`, п. 22).
 
-- Таблица собрана по `reference/*.md` — полному списку пакетов, типов и функций, сгенерированному из исходников (внутренний SDK `git.mpinnovations.kz/mps/go-packages`, свежие версии из кэша на 2026-10-07: core v1.0.5, db-core v1.0.7, http-core v1.0.11, postgres-core v1.0.6, redis-core v1.0.4, rabbit-core v1.0.6, request-builder v1.0.1, sentry-core v1.0.2, websocket v1.0.4, console-core v1.0.3).
-- Версия на задаче может быть другой (спрашивается по п. 23 `conventions.md`). Если отличается — пересобрать справочник под неё: `tools/sdk-ref/go.sh <out> --gomod <go.mod проекта>` и сверять с ним. Функции нет в справочнике нужной версии — значит её нет, не выдумывать.
+- Таблица собрана по справочнику — полному списку пакетов, типов и функций из исходников. Источника SDK два, версии у них разные (`conventions.md` п. 23), справочник — по источнику из `design.md` («SDK»):
+  - `reference/gitlab/*.md` — `git.mpinnovations.kz/mps/go-packages`, версии `go.mod` эталона `stacks/go/examples/tariff` (2026-10-20): core v1.0.9, db-core v1.0.10, http-core v1.0.14, postgres-core v1.0.8, redis-core v1.0.7, rabbit-core v1.0.10, request-builder v1.0.2, sentry-core v1.0.5, console-core v1.0.6; websocket v1.0.4 — прежняя сборка;
+  - `reference/github/*.md` — `github.com/exgamer`, свежие из module cache (2026-10-20): core v1.0.28, db-core v1.0.21, http-core v1.0.38, postgres-core v1.0.23, redis-core v1.0.14, rabbit-core v1.0.12, request-builder v1.0.15, sentry-core v1.0.4, console-core v1.0.4.
+  Номера версий двух источников не соответствуют друг другу; версия в шапке каждого файла справочника. Таблица ниже написана по GitLab; для GitHub вызов сверяется с `reference/github/`.
+- Версия на задаче может быть другой (источник и версия — из `go.mod` проекта или ответа пользователя, п. 23 `conventions.md`, раздел «SDK» в `design.md`). Если отличается — пересобрать справочник под неё: `tools/sdk-ref/go.sh <out> --gomod <go.mod проекта>` и сверять с ним. Функции нет в справочнике нужной версии — значит её нет, не выдумывать.
 - Пути импорта ниже — без префикса модуля: `core/pkg/x` = `<sdk>/gosdk-core/pkg/x`.
 
 ---
@@ -15,7 +18,7 @@
 | Приложение, kernels, модули, graceful shutdown | `core/pkg/app`: `NewApp()`, `RegisterAndInitKernels`, `RegisterAndInitModules`, `RunAll`, `WaitForShutdown`; свой kernel — `KernelInterface{Name, Init, Start, Stop}`, модуль — `ModuleInterface{Name, Init}` |
 | Действие при остановке (закрыть свой ресурс) | `app.AddStopHook(func(ctx) error)` |
 | Env-файлы | `app.SetEnvFiles(...)` / `config.LoadEnv(...)` |
-| Конфиг из env в структуру | `core/pkg/config.InitConfig[E](&cfg)`; базовый — `config.BaseConfig`, `di.GetBaseConfig` |
+| Конфиг из env в структуру | `core/pkg/config.InitConfig[E](&cfg)`; базовый — `config.BaseConfig`, `di.GetBaseConfig`; `time.Duration` из env не разбирает — таймаут в секундах (`../structure.md`, «config.go») |
 | Таймзона сервиса | `core/pkg/di.GetLocation(container)` |
 | DI | `core/pkg/di`: `Register[T]`, `Resolve[T]`, `MustResolve[T]` (только старт), именованные — `RegisterNamed`/`ResolveNamed`, проверка — `Has[T]`. Только в app/bootstrap |
 | Консольные команды (миграции, ручные операции) | `console-core/pkg/app.NewConsoleKernel("console").AddCommand(cobraCmd...)` — отдельный бинарник `cmd/console` |
@@ -29,7 +32,7 @@
 | Некритичная ошибка, есть fallback (Redis упал → БД) | `core/pkg/errorreporter.CaptureSoft(ctx, err, tags)` — не прерывает выполнение |
 | Отправить в трекер и пробросить одной строкой | `errorreporter.CaptureError(ctx, err, tags)` / `Capture(ctx, err, Options)` |
 | Перед выходом one-shot процесса дождаться отправки | `errorreporter.Flush(timeout)` |
-| Подключить Sentry | `sentry-core/pkg/app.SentryKernel` в `RegisterAndInitKernels` — других вызовов sentry-go в коде нет |
+| Подключить Sentry | **отдельный модуль** `gosdk-sentry-core` (`go get …/gosdk-sentry-core`) + `&sentry-core/pkg/app.SentryKernel{}` в `RegisterAndInitKernels`, env `SENTRY_DSN`. Без этого ядра `errorreporter`, `NewAppException(…, true)`, `SentryMiddleware` и `SlowSqlSentryMiddleware` молча не отправляют события (пустой `SENTRY_DSN` — так же no-op) — ни ошибки, ни паники: `http-core`/`rabbit-core` Sentry больше не инициализируют (`official/gosdk-sentry-core-v1.0.2-README.md`, «breaking change»). Других вызовов sentry-go в коде нет |
 | Лог | `core/pkg/logger`: `Info/Warning/Error/Debug/Trace(ctx, msg)`; уровень — `SetLevel`, `IsDebugLevel` |
 | Шаги в debug-блоке ответа | `core/pkg/debug.AddDebugStep(ctx, "…")` |
 
@@ -44,7 +47,7 @@
 | Пагинация из запроса | `http-core/pkg/helpers.GetPagerRequest(c)`, `DefaultPaginationPage/PerPage` |
 | Ответы | `response.Success / SuccessCreated / SuccessDeleted`; ошибки — `BadRequest, NotFound, Forbidden, Unauthorized, Conflict, UnprocessableEntity, TooManyRequests, InternalServerError`; без обёртки `success/data` — `Raw*`-варианты |
 | Swagger-структуры ответов | `http-core/pkg/structures`: `Response[T]`, `BadRequestErrorResponse`, `NotFoundErrorResponse`, `ForbiddenErrorResponse`, `ValidationErrorResponse`, `InternalServerResponse` |
-| Данные запроса (request id, язык, город, пользователь) | `http-core/pkg/gin.GetHttpInfoFromContext(ctx)`; имена заголовков — `http-core/pkg/constants.*HeaderName` |
+| Данные запроса (request id, язык, город, пользователь) | `http-core/pkg/gin.GetHttpInfoFromContext(ctx)` — вне HTTP-запроса `nil`; имена заголовков — `http-core/pkg/constants.*HeaderName`; Request ID в исходящий запрос — хелпер проекта `pkg/requestid` (`infra/http.md`) |
 | Метрики Prometheus | `MetricsMiddleware` / `di.GetMetricsCollector` |
 | WebSocket | `gosdk-websocket`: `NewServer(routerGroup, cfg)`, `NewHub(ctx)`, `Server.Serve(path, hub)` (push-only) / `ServeFunc(hub, onConnect)`; рассылка — `Hub.Publish(eventType, data)` |
 

@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-sentry-core v1.0.2
+# git.mpinnovations.kz/mps/go-packages/gosdk-sentry-core v1.0.5
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-sentry-core/pkg/app`
 

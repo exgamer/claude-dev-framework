@@ -58,7 +58,7 @@ type PostgresRepository struct {
     client *gorm.DB
 }
 
-func (r *PostgresRepository) GetById(ctx context.Context, id uint) (*domain.Product, error) {
+func (r *PostgresRepository) GetByID(ctx context.Context, id uint) (*domain.Product, error) {
     ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
     defer cancel()
 

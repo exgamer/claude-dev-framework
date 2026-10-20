@@ -13,6 +13,7 @@
 
 | Тег | Когда использовать |
 |---|---|
+| `workflow-calls-workflow` | Workflow вызывает другой workflow (через конструктор, `app()`, `new`) — [ОШИБКА]; общая логика — в сервисы/Command/Query доменов (`architecture/layers.md`) |
 | `request-missing-bounds` | Число/массив в Request без верхней границы (`max:`/`between:`) — DoS через тело запроса |
 | `request-queries-db` | Request ходит в БД: `exists:`/`unique:`, `Rule::exists/unique`, своё правило или замыкание с моделью/`DB::`/репозиторием, запрос в `prepareForValidation`/`withValidator`/`after` (P-17) |
 | `request-business-rule-in-validation` | Бизнес-правило (не enum допустимых значений) проверяется в Request вместо сервиса |
@@ -24,7 +25,7 @@
 | `repository-returns-mapped-structure` | Repository делает `keyBy`/`map`/сборку структур вместо сырых данных |
 | `expanded-param-used` | Параметр `expanded`/`{E}ExpandEnum`/`hasExpand()` — клиент выбирает состав ответа; связанные данные — всегда, методом своего репозитория пачкой по id (`conventions.md`, «Модели и внешние системы») |
 | `repository-cross-domain-access` | Repository пишет в таблицу чужого домена, вызывает его репозиторий или несёт его бизнес-логику; read-only подзапрос (`EXISTS`/`JOIN`) с комментарием, чья таблица, — не находка (`architecture/cross-domain.md`) |
-| `repository-reinvents-core-helper` | Самописная замена готового класса ядра/`Core/` подпроекта (`LoggerAwareTrait`, `TransactionManagerInterface`, базовые Request, `QueryFilters\V2` в коде на старой форме `search()`) — `mps-core/capabilities.md` |
+| `repository-reinvents-core-helper` | Самописная замена готового класса ядра/`Core/` подпроекта (`LoggerAwareTrait`, `TransactionManagerInterface`, базовые Request, `QueryFilters\V2` в коде на форме (1) списка `search()`) — `mps-core/capabilities.md` |
 | `service-direct-db-query` | Прямой запрос к БД (`DB::`, `Model::where`/`query()`/`find`, `->get()` по модели) в сервисе, Command/Query **или workflow** вместо метода репозитория; тег один для всех трёх |
 | ~~`service-orchestrates-foreign-repository`~~ | не используется (O-7): сервис домена не трогает чужой домен ни через репозиторий, ни через сервис — тег `domain-cross-domain-access` |
 | `workflow-without-transaction` | Workflow пишет без `TransactionManagerInterface::run()` и без причины в `design.md` (O-8) |
@@ -34,14 +35,14 @@
 | `service-status-branching-duplicated` | Ветвление по статусам (`if`/`elseif`) продублировано в нескольких методах вместо state machine |
 | `service-side-effect-timing-wrong` | Побочный эффект (Storage/HTTP/очередь) не снаружи транзакции или до записи вместо после |
 | ~~`controller-manual-response-wrapper`~~ | не используется — тот же паттерн, что `response-double-wrap` |
-| `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`superAppApi`) |
+| `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`api.response`) |
 | `service-thin-wrapper` | Метод-обёртка над одной проверкой/вызовом в сервисе или репозитории (`findByIdOrFail`/любой `*OrFail`, `assertValid`, внутренний `getById` → свой репозиторий); публичный `findById(): ?Model` для точки входа — не находка |
 | `constant-not-enum` | Значение-ключ или значение домена (тип, статус) константой класса/интерфейса вместо enum; повтор значения существующего enum — [ОШИБКА] |
 | `duplicated-enum` | Копия понятия другого домена (тот же набор значений под другим именем) вместо переноса в `Common/`; импорт enum чужого домена (`architecture/layers.md`, «Общий бизнес-словарь») — [ОШИБКА] |
 | `common-with-logic` | В `Common/` — класс с зависимостями в конструкторе, ввод-вывод, сущность, сервис, процесс (`architecture/layers.md`, «Общий бизнес-словарь») — [ОШИБКА] |
 | `search-filter-outside-dto` | Контекст-фильтр списка (здания, организация) передан в сервис отдельным аргументом и вписывается в параметры внутри него вместо поля `{E}FilterDto`, выставленного в контроллере (`conventions.md` п. 19a) |
 | `list-without-default-sort` | Метод списка без явного `orderBy` по умолчанию (`conventions.md` п. 12c) |
-| `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не попадает в `{E}FilterDto` / не применяется в методе списка репозитория (старая форма — `filterSearch`) |
+| `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не попадает в `{E}FilterDto` / не применяется в методе списка репозитория (в форме (1) списка — в `filterSearch`) |
 | `request-access-check` | Проверка доступа (здание/организация пользователя) в правилах FormRequest вместо middleware |
 | `route-middleware-not-aliased` | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` |
 | `access-check-outside-middleware` | Права/контекст (роль или право на операцию, здания, организация) проверяются или вычисляются в контроллере или сервисе, а не в middleware на маршруте → атрибуты запроса → `RequestHelper` (для Go — тот же тег) |
@@ -55,9 +56,9 @@
 | `enum-contains-business-logic` | `match`/условие с бизнес-решением внутри enum вместо `labels()`/`values()` |
 | `model-has-eloquent-relations` | `BelongsTo`/`HasMany` в модели вместо сборки через репозитории |
 | `model-wrong-domain-location` | Модель лежит не в домене/инфраструктуре своей сущности |
-| `gateway-named-as-service` | Клиент внешней системы называется `*Service` вместо `*Gateway` |
-| `gateway-config-via-global` | `app()`/`config()` внутри метода вместо инъекции в конструктор |
-| `gateway-missing-config-validation` | Отсутствующий обязательный конфиг даёт молчаливый дефолт вместо `InvalidConfigurationAppException` |
+| `adapter-named-not-by-role` | Порт/адаптер внешней системы назван не по роли (`*Gateway`, `*Service`, `*Client`, имя системы в имени порта) вместо `…Repository` (данные) / `…Notifier`, `…Publisher`, `…Sender` (отправка) — `architecture/integrations.md` |
+| `adapter-config-via-global` | `app()`/`config()` внутри метода вместо инъекции в конструктор |
+| `adapter-missing-config-validation` | Отсутствующий обязательный конфиг даёт молчаливый дефолт вместо `InvalidConfigurationAppException` |
 | `error-swallowed-silently` | `catch` без rethrow и без `AppException` с контекстом |
 | `exception-not-domain-type` | `\RuntimeException`/`\Exception` вместо `*AppException` ядра |
 | `console-failure-not-reported` | Fail консольной команды/крона уходит только в `$this->error()`, не в Sentry |
@@ -81,7 +82,8 @@
 | `comment-restates-name` | Описание метода/класса пересказывает его имя («Неудалённые здания по набору id» над `findAliveByIds`) |
 | `nested-call-chain` | Вложенный вызов глубже одного уровня — один уровень с коротким аргументом (`handle(Mapper::toDto($request))`) не находка (`array_values(array_unique(array_filter(array_map(…))))`), индекс или метод по результату вызова (`handle([getByKey($key)])[0]`, `foo(...)->bar()`), замыкание-поведение в свой метод (`$this->service(static fn ($q) => …)`, `->when($cond, fn …)` вместо `if`), лямбда длиннее строки/с ветвлением, параметр замыкания затеняет внешнюю переменную, глубина блоков > 2 (`core/style.md`, «Форма кода»; `stacks/php/style.md`) |
 | `repository-multi-query` | Публичный метод репозитория выполняет больше одного запроса: «заблокировать и удалить», «прочитать модель → `save()`», «удалить и вставить», «вставить и перечитать» — шаги разделить на методы, порядок и транзакцию отдать сервису/Command/workflow; постраничная выборка пагинатором и пакетный `upsert` — один запрос (`architecture/layers.md`; `conventions.md` п. 2b) |
-| `query-split-into-pieces` | Запрос репозитория собран из приватных методов-кусков (`activeQuery()`, `service(Closure)`, `withBuilding($q)`), колонки — константой `COLUMNS` вместо явного списка в `select`, один подзапрос в 4+ методах (повтор join и простых `where` — не находка), или запрос-монстр на 3+ подзапроса по чужим таблицам вместо сборки из нескольких репозиториев в сервисе/workflow; фильтры списка — в том же методе; `CRUDRepository::search()`/`filterSearch()` в новом коде не используются (P-19, `conventions.md` п. 2a) |
+| `query-split-into-pieces` | Запрос репозитория собран из приватных методов-кусков (`activeQuery()`, `service(Closure)`, `withBuilding($q)`), колонки — константой `COLUMNS` вместо явного списка в `select`, один подзапрос в 4+ методах (повтор join и простых `where` — не находка), или запрос-монстр на 3+ подзапроса по чужим таблицам вместо сборки из нескольких репозиториев в сервисе/workflow; фильтры списка — в том же методе |
+| `list-form-not-as-designed` | Новый список не по форме из раздела «Список» `design.md` (P-19, `conventions.md` п. 2a): выбрана форма (2) `Page`, а написан `search()`/`filterSearch()`, или наоборот; раздела нет — вопрос, не находка. Код на форме (1), написанный до задачи, — не находка. **[ВНИМАНИЕ]** |
 
 Если ни один тег не подходит — придумай новый в этом же формате.
 

@@ -1,7 +1,7 @@
 # Замечания из реальных MR-тредов (PHP)
 
 Эмпирический слой поверх архитектурных правил: каждое замечание ниже ревьюеры MPS уже оставляли в реальных MR
-(superapp-api, parking_system; выгрузки тредов лежат в `docs/raw/` соответствующих репозиториев).
+(superapp-api, parking_system).
 Применять **вместе** с `conventions.md`, `mps-core/rules.md` и тематическими файлами — здесь только то, чего там нет
 или что команда ловит особенно часто.
 
@@ -22,11 +22,11 @@
 - Нет своих `*OrFail`-методов (ни в репозитории, ни в сервисе — п. 12a, SRP): `get…` возвращает `?Model`, `NotFoundAppException` бросает вызывающий. Тег `service-thin-wrapper`.
 - Нет `keyBy` / `map` / сборки структур — репозиторий отдаёт сырые данные, маппинг в Service.
 - **Метод репозитория — один запрос** (mobile-api-rewrite, пользователь: «две выборки — это бизнес-логика»): найдено в `aina_app` — `MediaRepository::deleteForOwner` (`lockForUpdate()->pluck()` + `delete()`), `PushTokenRepository::rebindToUser` (`delete()` + `upsert()`), `OtpRepository::create` (`save()` + `first()`), восемь методов «`first()` → `fill()->save()`» в CommunityCard/Biometric/User. Тег `repository-multi-query`, [ОШИБКА].
-- **Запрос виден целиком** (mobile-api-rewrite MR !3773, пользователь): запрос метода не собран из приватных кусков (`service(Closure)`, `activeQuery()`), колонки — явным списком в `select`, не константой; фильтры списка — в том же методе, `search()`/`filterSearch()` не используются (P-19); слишком большой запрос — сборка из нескольких репозиториев в сервисе/workflow (`conventions.md` п. 2a). Тег `query-split-into-pieces`, [ВНИМАНИЕ].
+- **Запрос виден целиком** (mobile-api-rewrite MR !3773, пользователь): запрос метода не собран из приватных кусков (`service(Closure)`, `activeQuery()`), колонки — явным списком в `select`, не константой; фильтры списка — в том же методе (в форме (1) P-19 — в `filterSearch()`); список не по форме из «Список» `design.md` — отдельный тег `list-form-not-as-designed` ([ВНИМАНИЕ]); слишком большой запрос — сборка из нескольких репозиториев в сервисе/workflow (`conventions.md` п. 2a). Тег `query-split-into-pieces`, [ВНИМАНИЕ].
 - **Запись массивом** (AINA-2978, пользователь: «всегда DTO, массивы плохо») — `updateById($id, $dto->toArrayWithSnakeKeys())`, `updateById($id, ['is_default' => true])`, `create($data)` из сервиса/Command; то же в контроллере: `$this->service->update($id, $request->validated())`. По всей цепочке записи — DTO или типизированные аргументы (`conventions.md` п. 11a). Тег `write-array-instead-of-dto`, [ОШИБКА].
 - Нет обращения к таблице чужого домена: репозиторий пишет только в свои таблицы; данные двух доменов собирает workflow. Допустим read-only подзапрос (`EXISTS`/`JOIN`) к чужой таблице с комментарием, чья она (`architecture/cross-domain.md`).
 - Локальные phpstan-обёртки над `getQuery()` (типизированные прокси ради generics) не плодить — либо в `mps/core`, либо в ignore.
-- До самописа — посмотреть `mps-core/capabilities.md` (ядро: `QueryFilters\V2\StringFilter`, `LoggerAwareTrait`, …) и `Core/` подпроекта (`PaginatedQueryHelper`). «Уже есть в core» — частый реджект.
+- До самописа — посмотреть `mps-core/capabilities.md` (ядро: `QueryFilters\V2\StringFilter`, `LoggerAwareTrait`, …) и `Core/` подпроекта (`Page`/`PaginatedResource` для формы (2), `PaginatedQueryHelper` для формы (1) списка). «Уже есть в core» — частый реджект.
 
 ## Service
 
@@ -41,17 +41,17 @@
 ## Controller
 
 - Тонкий. Имена методов — `index / view / create / update / delete`.
-- **Обёртка `success/data` в Response-классе или контроллере при `superAppApi`/`ApiResponseMiddleware` на маршруте** (AINA-2628: «не надо оборачивать, это делает мидлвар») — Response отдаёт только данные; в Swagger-описании метода контроллера обёртка `success`/`data` при этом описывается (это реальный формат ответа). Тег `response-double-wrap`, [ОШИБКА].
+- **Обёртка `success/data` в Response-классе или контроллере при `api.response`/`ApiResponseMiddleware` на маршруте** (AINA-2628: «не надо оборачивать, это делает мидлвар») — Response отдаёт только данные; в Swagger-описании метода контроллера обёртка `success`/`data` при этом описывается (это реальный формат ответа). Тег `response-double-wrap`, [ОШИБКА].
 - **Ответ через макрос фасада** (AINA-2628, blocking: «mixin для Response не юзаем») — `Response::ok($data)` / `Response::created()` / `Response::deleted()` из `Response::mixin(new JsonResponseMixin)` провайдера проекта. Grep по `use` такую зависимость не видит. Замена — `response()->json(new {E}Response(...), Response::HTTP_CREATED)` (`conventions.md`, п. 19). Тег `controller-response-macro`, [ОШИБКА].
 - Swagger на каждый эндпоинт, с `404` и `500` в ответах (см. `swagger.md`).
-- `per_page` в пагинации задаётся явно (в `SearchRequest` и в аннотации), не «по умолчанию где-то в ядре».
+- `per_page` в пагинации задаётся явно (в `IndexRequest`/`SearchRequest` — по форме списка, и в аннотации), не «по умолчанию где-то в ядре».
 - Текущий пользователь — `request()->user` / `$request->user()`, не `Auth::id()` в глубине сервиса.
 - **Middleware в маршруте через `::class`** (AINA-2628: «давай регать как остальные мидлвары») — свой middleware подключается строковым алиасом из `bootstrap/app.php` (`$middleware->alias`), как остальные (`conventions.md`, п. 20). Тег `route-middleware-not-aliased`, [ВНИМАНИЕ] (памятка п. 26).
 - **Метод-обёртка над одной проверкой/вызовом** (AINA-2628: «`findByIdOrFail` не делай таких функций», «`assertValid` — то же самое», «какой смысл от `getById`, когда внутри вызов своей же репы») — `conventions.md`, п. 12a. Тег `service-thin-wrapper`, [ВНИМАНИЕ].
 - **Константа вместо enum / константа в интерфейсе** (AINA-2628: «зачем константы в интерфейсе репы, константы в enum»; mobile-api-rewrite, волна 9: `private const SERVICE_TYPE_COWORKING = 'COWORKING'` в репозитории при готовом `OrderServiceTypeEnum`, ревью пропустило — смотрели только ключи) — `conventions.md`, п. 12b. Тег `constant-not-enum`, [ВНИМАНИЕ]; повтор значения существующего enum и константа в интерфейсе — [ОШИБКА]. Ищется механически — `review-checks.md` 5.5, п. 0c.
-- **Контекст-фильтр отдельным аргументом поиска** (AINA-2628: «что мешает сразу DTO засетить `building_ids` в контроллере?») — `search($dto, $buildingIds)` с вписыванием в параметры внутри сервиса; фильтр выставляет контроллер полем `{E}FilterDto` (в старой форме — `SearchDataObject`) (`conventions.md`, п. 19a). Тег `search-filter-outside-dto`, [ИНФО].
+- **Контекст-фильтр отдельным аргументом поиска** (AINA-2628: «что мешает сразу DTO засетить `building_ids` в контроллере?») — `search($dto, $buildingIds)` с вписыванием в параметры внутри сервиса; фильтр выставляет контроллер полем `{E}FilterDto` (в форме (1) — параметром `SearchDataObject`) (`conventions.md`, п. 19a). Тег `search-filter-outside-dto`, [ИНФО].
 - **Список без сортировки** (AINA-2628: «не задан `orderBy()`, читать как параметр + дефолт») — `conventions.md`, п. 12c. Тег `list-without-default-sort`, [ВНИМАНИЕ].
-- **Фильтр валидируется, но не применяется** (AINA-2628: «IndexRequest валидирует `description` и `id_one_c`, но `filterSearch` их не применяет»; в новой форме — поле `IndexRequest` не доходит до `{E}FilterDto` или метода списка) — `conventions.md`, п. 12d. Тег `request-filter-not-applied`, [ВНИМАНИЕ].
+- **Фильтр валидируется, но не применяется** (AINA-2628: «IndexRequest валидирует `description` и `id_one_c`, но `filterSearch` их не применяет»; в форме (2) — поле `IndexRequest` не доходит до `{E}FilterDto` или метода списка) — `conventions.md`, п. 12d. Тег `request-filter-not-applied`, [ВНИМАНИЕ].
 - **Проверка доступа в FormRequest** (AINA-2628, blocking: «запрос в Request»; «валидация входных данных не место для проверки доступов») — правило вида `new AccessibleBuilding()` на `building_id`: ходит в БД за правами и дублирует middleware. Доступ к `building_id` из тела/фильтра проверяет middleware контекста (403), в Request — только `['required', 'integer', 'gt:0']`. Тег `request-access-check`, [ОШИБКА].
 - **Проверка прав в сервисе/контроллере** (AINA-2628: «проверка прав не совсем зона сервиса») — резолвер доступа в контроллере, параметр `$accessibleBuildingIds` в сервисе. Права и контекст — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр (`conventions.md`, п. 19a). Тег `access-check-outside-middleware`, [ОШИБКА].
 
@@ -60,6 +60,7 @@
 - **Читается сверху вниз** (mobile-api-rewrite MR !3773, пользователь): замыкание не передаёт поведение в свой метод, цепочки `array_values(array_unique(array_filter(array_map(…))))` → `foreach`, лямбда длиннее строки → метод или first-class callable, параметр замыкания не затеняет внешнюю переменную (`core/style.md`, «Форма кода»). Тег `nested-call-chain`, [ВНИМАНИЕ]; касается всех слоёв, не только workflow.
 
 - Workflow берёт репозитории и сервисы любых доменов напрямую (O-7); Command/Query домена — только своего домена (`domain-cross-domain-access`).
+- **Workflow не вызывает другой workflow** (`workflow-calls-workflow`, [ОШИБКА]; решение пользователя 2026-10-20) — общая логика уходит в сервисы/Command/Query доменов, `architecture/layers.md`, «Зависимости».
 - **Запросов к БД в workflow нет** (`service-direct-db-query`): ни `DB::`, ни `Model::where`/`query()`/`find`. Кейс 2026-10-14: фреймворк написал запросы прямо в workflow — памятка говорила только «в сервисе», и workflow прочитали как исключение. Нужна выборка из таблицы домена — метод в репозитории этого домена, workflow его вызывает; выборка по двум таблицам — два метода двух репозиториев и сборка в workflow, либо read-only `EXISTS`/`JOIN` внутри репозитория владельца с комментарием (раздел Repository).
 - Workflow и Command не доверяют транспортному Request: доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (P-8), потому что тот же сценарий вызывается из консоли и очереди, где Request нет.
 
@@ -84,11 +85,11 @@
 - **Enum без `Enumerable`** (AINA-2628, nit: «Имплементить Enumerable из mps/core») — каждый enum: `implements \MPS\Core\Enums\Enumerable` и `use EnumerableTrait;` первой строкой тела (`mps-core/enums.md`). Тег `enum-not-enumerable`, [ИНФО].
 - Eloquent-связи (`BelongsTo`, `HasMany`) в моделях не используются — данные собираются через репозитории; параметр `expanded` не используется (`mps-core/service.md`, «Связанные данные — без `expanded`»), тег `expanded-param-used`.
 - Модель лежит в домене/инфраструктуре **своей** сущности, не рядом с тем, кто её первым использовал.
-- **Известное расхождение (superapp-api):** `MPS\Core\Enums\EnumerableTrait::labels()` vs `App\Traits\EnumLabelTranslatable::getLabels()` — две конвенции, не сводить молча.
+- **Известное расхождение (PHP-монолит):** `MPS\Core\Enums\EnumerableTrait::labels()` vs `App\Traits\EnumLabelTranslatable::getLabels()` — две конвенции, не сводить молча.
 
 ## Внешние интеграции (`Infrastructure/*/Integrations`, `Infrastructure/Http/*`)
 
-- Клиент внешней системы называется `*Gateway`, не `*Service` (сервис — доменный слой).
+- Порт и адаптер внешней системы — по роли: данные — `…Repository`, отправка — `…Notifier`/`…Publisher`/`…Sender`; не `*Gateway`, не `*Service`, без имени системы в имени порта (`architecture/integrations.md`).
 - Зависимости (HTTP-клиент, конфиг) — в конструктор, не `app()`/`config()` внутри методов.
 - Отсутствующий обязательный конфиг → `InvalidConfigurationAppException`, не молчаливый дефолт `?? ''`.
 - **Индекс массива без проверки** (`array-key-unchecked`, `conventions.md` п. 11b) — `$payload['x']`, `$response['data'][0]`, `[$a, $b] = explode(...)`, `$byId[$id]` по внешним или динамическим данным: локально ключ есть, на проде нет → Warning, `null`, `TypeError`. Внешний массив — в DTO через `fromArray()` на границе; обязательный ключ без значения — исключение с именем поля, не дефолт.
@@ -114,13 +115,13 @@
 ### Мульти-тенантный скоуп — самый частый класс находок
 
 Из security-аудита `superapp-api` (2026-09): системный паттерн, повторившийся ~10 раз в разных доменах —
-`index`/`search`/дашборд-эндпоинт принимает id сущности-владельца (в `superapp-api` это `building_id`/
+`index`/`search`/дашборд-эндпоинт принимает id сущности-владельца (в исходном проекте это `building_id`/
 `organization_id`/`company_id`; в другом проекте это может быть `tenant_id`/`department_id`/`client_id`/
 `project_id` — название своё в каждом проекте, суть паттерна не в имени поля) как **необязательный**
 клиентский параметр вместо обязательного скоупа, выводимого сервером из прав/принадлежности текущего
-пользователя (в `superapp-api` — `auth()->user()->getBuildingIds()`; в другом проекте искать аналог — как
+пользователя (в исходном проекте — `auth()->user()->getBuildingIds()`; в другом проекте искать аналог — как
 там вообще выражается «какими сущностями управляет текущий актор»). Без параметра — отдаёт данные всех
-сущностей; с чужим id — отдаёт чужую. Конкретные реальные кейсы из `superapp-api`
+сущностей; с чужим id — отдаёт чужую. Конкретные реальные кейсы аудита
 (для калибровки, что именно искать — сама форма бага переносится на любой проект с похожей моделью прав):
 
 - Список пользователей/сотрудников по объекту — `IndexRequest` без поля фильтрации по объекту вообще, при
@@ -135,7 +136,8 @@
 **Что проверять при ревью:** любой новый/изменённый `index`/`search`/`show`/`update`/`destroy` в
 мульти-тенантном домене — параметр сущности-владельца обязателен и валидируется на сервере против
 принадлежности текущего пользователя (аналог `getBuildingIds()` в этом проекте — найти его перед ревью), а
-не просто «если передан — фильтруем».
+не просто «если передан — фильтруем». Где это делается — `architecture/layers.md`, «Принадлежность записи
+скоупу — два случая»: id владельца из запроса — 403 в middleware, по ID записи — фильтр в репозитории, 404.
 
 ### Fail-open авторизация — постоянная, а не временная
 

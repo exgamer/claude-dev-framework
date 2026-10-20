@@ -17,10 +17,15 @@
 | `HttpKernel`     | `gosdk-http-core/pkg/app`     | Gin роутер, регистрация в DI                            |
 | `RedisKernel`    | `gosdk-redis-core/pkg/app`    | Redis клиент, регистрация в DI                          |
 | `RabbitKernel`   | `gosdk-rabbit-core/pkg/app`   | AMQP соединение, consumers/publishers registry в DI     |
+| `SentryKernel`   | `gosdk-sentry-core/pkg/app`   | Отправка ошибок `errorreporter` в Sentry (`SENTRY_DSN`); отдельный модуль — без него события молча не уходят (`capabilities.md`) |
+
+## Консольное приложение
+
+`cmd/console` — отдельный бинарник со своим набором ядер (`PostgresKernel`, `RabbitKernel` с `EnablePublisher()` при отправке в брокер, `ConsoleKernel`) и модулями консоли (`&outbox_tariff_event.Module{Console: consoleKernel}`); `HttpKernel` и consumer-ы сервиса туда не входят. Путь команд, модуль консоли, `commands_factory.go`, миграции — `../structure.md`, «Entrypoint Layer»; эталон — `examples/tariff` (README, `app/bootstrap/billing/outbox_tariff_event/`).
 
 ## Порядок модулей важен
 
-Если модуль B зависит от сервиса модуля A через DI — A должен быть зарегистрирован первым. Но делать модули зависимыми запрещается
+Если модуль B берёт сервис модуля A через DI — A регистрируется первым (`&auth.Module{}` перед `&tariff.Module{}` в `examples/tariff/internal/app/app.go`). Допустимые формы зависимости и что запрещено — `../structure.md`, «Зависимости модулей bootstrap».
 
 ## Шаблон
 
@@ -34,6 +39,7 @@ import (
     postgresCore "github.com/exgamer/gosdk-postgres-core/pkg/app"
     rediscore "github.com/exgamer/gosdk-redis-core/pkg/app"
 	rabbitcore "github.com/exgamer/gosdk-rabbit-core/pkg/app"
+    sentrycore "github.com/exgamer/gosdk-sentry-core/pkg/app"
 )
 
 type App struct {
@@ -46,6 +52,7 @@ func NewApp() (*App, error) {
     }
 
     err := appInstance.RegisterAndInitKernels(
+        &sentrycore.SentryKernel{},
         &postgresCore.PostgresKernel{},
         &http.HttpKernel{},
         &rediscore.RedisKernel{},

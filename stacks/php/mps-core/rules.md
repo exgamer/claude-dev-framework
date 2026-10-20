@@ -113,7 +113,7 @@ public function updateFromDto(Tariff $tariff, TariffDto $dto): void
 Версию смотреть в `composer.lock`, API — в `capabilities.md`, «Кеш и Redis».
 
 ```php
-// utils < 2.6.4 (например superapp-api, 2.6.2) — другого API нет:
+// utils < 2.6.4 (например 2.6.2) — другого API нет:
 $cache->getOrCreate($key, fn () => ..., $ttl);
 
 // utils ≥ 2.6.4 — getOrCreate и getCacheKeyByParts @deprecated:

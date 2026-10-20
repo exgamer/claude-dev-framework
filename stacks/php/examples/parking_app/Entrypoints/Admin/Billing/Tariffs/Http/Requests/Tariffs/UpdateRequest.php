@@ -9,14 +9,20 @@ use Illuminate\Validation\Rule;
 use MPS\Core\Enums\CurrencyEnum;
 use OpenApi\Attributes as OA;
 
+/**
+ * Полная замена тарифа (PUT).
+ *
+ * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ */
 #[OA\Schema(
     schema: 'TariffUpdateRequest',
     description: 'PUT — полная замена: все поля обязательны к передаче, null очищает необязательное поле',
-    required: ['parking_id', 'name', 'currency', 'grace_minutes'],
+    required: ['parking_id', 'name', 'currency', 'price', 'grace_minutes'],
     properties: [
         new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
         new OA\Property(property: 'name', description: 'Название тарифа', type: 'string', example: 'Стандарт'),
-        new OA\Property(property: 'currency', description: 'Валюта', type: 'string', example: 'KZT', nullable: true),
+        new OA\Property(property: 'currency', description: 'Валюта', type: 'string', example: 'KZT'),
+        new OA\Property(property: 'price', description: 'Цена часа в минимальных единицах валюты', type: 'integer', example: 50000),
         new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
     ],
     type: 'object'
@@ -33,8 +39,8 @@ class UpdateRequest extends Request
         return [
             'parking_id' => ['required', 'integer', 'gt:0'],
             'name' => ['required', 'string', 'max:255'],
-            // PUT — полные данные: ключ обязателен, null — очистить (stacks/php/conventions.md, п. 12)
-            'currency' => ['present', 'nullable', 'string', Rule::enum(CurrencyEnum::class)],
+            'currency' => ['required', 'string', Rule::enum(CurrencyEnum::class)],
+            'price' => ['required', 'integer', 'min:0', 'max:100000000'],
             'grace_minutes' => ['present', 'nullable', 'integer', 'min:0', 'max:1440'],
         ];
     }

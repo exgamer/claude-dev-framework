@@ -78,7 +78,7 @@ if (! $dto->validated()) {
 
 ## DataObjectCollection
 
-Типизированная коллекция `DataObject`-ов. Элементы приходят из массивов и гидрируются в объекты. Имя — `{Entity}ItemsDto` (как `PermissionItemsDto` в `parking_app`), `final`, `@extends DataObjectCollection<{Entity}Dto>`.
+Типизированная коллекция `DataObject`-ов. Элементы приходят из массивов и гидрируются в объекты. Имя — `{Entity}ItemsDto` (например `PermissionItemsDto`), `final`, `@extends DataObjectCollection<{Entity}Dto>`.
 
 ```php
 /**

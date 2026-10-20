@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-console-core v1.0.3
+# git.mpinnovations.kz/mps/go-packages/gosdk-console-core v1.0.6
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-console-core/pkg/app`
 

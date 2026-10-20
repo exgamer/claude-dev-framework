@@ -26,7 +26,7 @@ Service/Command домена — когда одна операция затра
 
 ## Откуда брать интерфейс — mps/core
 
-> **Версия:** `MPS\Core\Components\Database\Transaction\*` есть с **mps/core 1.10.0** (сверено по v1.10.2, официальная дока — `official/core-v1.10.2/transactions.md`). В проектах с core < 1.10 (superapp-api — 1.6.0) — проектный `Core/Database/Managers/TransactionManagerInterface` (см. `../examples/`); при обновлении ядра — переключить биндинг на ядро, сигнатура `run()` совместима.
+> **Версия:** `MPS\Core\Components\Database\Transaction\*` есть с **mps/core 1.10.0** (сверено по v1.10.2, официальная дока — `official/core-v1.10.2/transactions.md`). В проектах с core < 1.10 (например 1.6.0) — проектный `Core/Database/Managers/TransactionManagerInterface` (см. `../examples/`); при обновлении ядра — переключить биндинг на ядро, сигнатура `run()` совместима.
 
 Начиная с `mps/core` **v1.10.0** менеджер транзакций живёт в ядре, отдельная реализация в
 проекте не нужна:

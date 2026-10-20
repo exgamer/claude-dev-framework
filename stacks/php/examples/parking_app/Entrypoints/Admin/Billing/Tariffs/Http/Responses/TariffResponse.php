@@ -7,6 +7,11 @@ namespace App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Responses;
 use Illuminate\Http\Resources\Json\JsonResource;
 use OpenApi\Attributes as OA;
 
+/**
+ * Тариф в ответе админки.
+ *
+ * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ */
 #[OA\Schema(
     schema: 'TariffResponse',
     title: 'Tariff',
@@ -16,9 +21,11 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
         new OA\Property(property: 'name', description: 'Название тарифа', type: 'string', example: 'Стандарт'),
         new OA\Property(property: 'currency', description: 'Валюта', type: 'string', example: 'KZT'),
+        new OA\Property(property: 'price', description: 'Цена часа в минимальных единицах валюты', type: 'integer', example: 50000),
         new OA\Property(property: 'is_default', description: 'Тариф по умолчанию', type: 'boolean', example: true),
-        new OA\Property(property: 'status', description: 'Статус: active, archived', type: 'string', example: 'active'),
+        new OA\Property(property: 'status', ref: '#/components/schemas/TariffStatusEnum'),
         new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
+        new OA\Property(property: 'scheduled_at', description: 'Дата активации; у действующего и архивного — null', type: 'string', format: 'date-time', nullable: true),
         new OA\Property(property: 'created_at', description: 'Дата создания', type: 'string', format: 'date-time'),
         new OA\Property(property: 'updated_at', description: 'Дата обновления', type: 'string', format: 'date-time'),
     ],

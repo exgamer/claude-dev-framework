@@ -19,6 +19,7 @@ type createRequest struct {
 	Name         string `json:"name" binding:"required" validate:"required,max=255"`
 	Currency     string `json:"currency" binding:"required" validate:"required,len=3"`
 	GraceMinutes uint   `json:"grace_minutes" validate:"lte=1440"`
+	Price        uint   `json:"price" binding:"required" validate:"required,gt=0,lte=100000000"`
 }
 
 // updateRequest Частичное обновление тарифа: отсутствующее поле не меняется

@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core v1.0.6
+# git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core v1.0.8
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/app`
 

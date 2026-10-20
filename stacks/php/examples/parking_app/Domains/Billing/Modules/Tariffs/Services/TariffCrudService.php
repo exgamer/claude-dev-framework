@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Services;
 
-use App\ParkingApp\Core\Database\Query\PaginatedQueryHelper;
+use App\ParkingApp\Core\Database\Query\Page;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Validators\TariffDtoValidator;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
-use MPS\Core\Components\CRUD\DataObjects\SearchDataObject;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use MPS\Core\Exceptions\NotFoundAppException;
+use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Core\Exceptions\ValidationAppException;
 use MPS\Core\Services\Service;
 
 /**
- * CRUD-сервис тарифов. Тариф создаётся не дефолтным: дефолт назначает SetDefaultTariffCommand.
+ * CRUD-сервис тарифов.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -24,18 +28,49 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
 {
     public function __construct(
         private readonly TariffRepositoryInterface $repository,
+        private readonly TariffCacheRepositoryInterface $cacheRepository,
+        private readonly ExceptionHandler $exceptionHandler,
     ) {
     }
 
-    public function findById(int $id): ?Tariff
+    public function findById(int $id, ?array $parkingIds): ?Tariff
     {
-        /** @var ?Tariff */
-        return $this->repository->oneById($id);
+        $cached = null;
+
+        try {
+            $cached = $this->cacheRepository->getById($id);
+        } catch (OperationFailedAppException $e) {
+            // Кеш недоступен — тариф читается из БД, запрос не падает
+            $this->exceptionHandler->report($e);
+        }
+
+        if ($cached) {
+            // Кеш хранит тариф без скоупа: чужой парковки — null, как из БД
+            if ($parkingIds !== null && ! in_array($cached->parking_id, $parkingIds, true)) {
+                return null;
+            }
+
+            return $cached;
+        }
+
+        $tariff = $this->repository->getByIdInParkings($id, $parkingIds);
+
+        if (! $tariff) {
+            return null;
+        }
+
+        try {
+            $this->cacheRepository->set($tariff);
+        } catch (OperationFailedAppException $e) {
+            $this->exceptionHandler->report($e);
+        }
+
+        return $tariff;
     }
 
-    public function search(SearchDataObject $dto): array
+    public function paginate(TariffFilterDto $filter, Page $page): LengthAwarePaginator
     {
-        return PaginatedQueryHelper::instance($this->repository)->search($dto);
+        return $this->repository->paginateTariffs($filter, $page);
     }
 
     /**
@@ -49,17 +84,31 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
 
-        return $this->repository->createFromDto($dto, TariffStatusEnum::ACTIVE, false);
+        // С датой активации — запланированный: действующим и тарифом по умолчанию его сделает ActivatePlannedTariffJob
+        $status = $dto->getScheduledAt() !== null ? TariffStatusEnum::SCHEDULED : TariffStatusEnum::ACTIVE;
+
+        return $this->repository->createFromDto($dto, status: $status, isDefault: false);
+    }
+
+    public function deactivateByParkingId(int $parkingId): int
+    {
+        $ids = $this->repository->allNotArchivedIdsByParkingId($parkingId);
+        $archived = $this->repository->archiveNotArchivedByParkingId($parkingId);
+
+        foreach ($ids as $id) {
+            $this->forgetCached($id);
+        }
+
+        return $archived;
     }
 
     /**
      * @throws NotFoundAppException
      * @throws ValidationAppException
      */
-    public function update(int $id, TariffDto $dto): Tariff
+    public function update(int $id, ?array $parkingIds, TariffDto $dto): Tariff
     {
-        /** @var ?Tariff $tariff */
-        $tariff = $this->repository->oneById($id);
+        $tariff = $this->repository->getByIdInParkings($id, $parkingIds);
 
         if (! $tariff) {
             throw new NotFoundAppException('Тариф не найден');
@@ -71,9 +120,21 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
 
-        // PUT — полные данные: UpdateRequest требует все поля, DTO пишется целиком (conventions.md, п. 12)
         $this->repository->updateFromDto($tariff, $dto);
+        $this->forgetCached($tariff->id);
 
         return $tariff;
+    }
+
+    /**
+     * Запись уже сохранена: сбой сброса кеша её не отменяет, устаревший тариф живёт до TTL — ошибка уходит в Sentry.
+     */
+    private function forgetCached(int $id): void
+    {
+        try {
+            $this->cacheRepository->forget($id);
+        } catch (OperationFailedAppException $e) {
+            $this->exceptionHandler->report($e);
+        }
     }
 }

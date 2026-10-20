@@ -12,7 +12,10 @@
 
 Тонкий: Request → DTO → сервис/workflow → `response()->json(new {E}Response(...))`. Запросов к БД, ветвлений и сборки массивов нет (п. 1). Перевод результата в HTTP — здесь: сервис вернул `null` → `NotFoundAppException` (`exceptions.md`, «Где бросать»).
 
+Базовый класс — контроллер приложения Laravel `App\Http\Controllers\Controller`, своего в `Core/` нет (`../structure.md`, «Контроллер»).
+
 ```php
+use App\Http\Controllers\Controller;
 use App\ParkingApp\Core\Http\RequestHelper;
 use Illuminate\Http\JsonResponse;
 use MPS\Core\Exceptions\NotFoundAppException;
@@ -31,10 +34,10 @@ class TariffController extends Controller
     #[OA\Get(path: '/parking/admin/tariffs', summary: 'Список тарифов', tags: ['Admin Parking: Тарифы'], /* parameters, responses */)]
     public function index(IndexRequest $request): JsonResponse
     {
-        // Список — явный метод репозитория paginate…({E}FilterDto, Page) (P-19, п. 2a); контекст из middleware — полем DTO (п. 19a)
+        // Список в форме (2) — явный метод репозитория paginate…({E}FilterDto, Page) (форма — по «Список» design.md, P-19, п. 2a); контекст из middleware — полем DTO (п. 19a)
         $filter = TariffFilterDto::make()
             ->fromArray($request->validated())
-            ->setBuildingIds(RequestHelper::getBuildingIds($request));
+            ->setParkingIds(RequestHelper::getParkingIds($request));
 
         return response()->json(new TariffPaginatedResponse($this->service->paginate($filter, Page::fromRequest($request))));
     }
@@ -42,7 +45,7 @@ class TariffController extends Controller
     #[OA\Get(path: '/parking/admin/tariffs/{id}', summary: 'Тариф по ID', tags: ['Admin Parking: Тарифы'], /* … */)]
     public function view(int $id, Request $request): JsonResponse
     {
-        $tariff = $this->service->findById($id, RequestHelper::getBuildingIds($request));
+        $tariff = $this->service->findById($id, RequestHelper::getParkingIds($request));
         if (! $tariff) {
             throw new NotFoundAppException('Тариф не найден');
         }
@@ -80,7 +83,7 @@ class TariffController extends Controller
 
 ## Requests
 
-Базовые классы — подпроекта: `Core/Requests/Request` (наследует `MPS\Core\Http\Requests\FormRequest`) и `Core/Requests/SearchRequest` (наследует `MPS\Core\Http\Requests\SearchRequest`). `CommandRequest`/`ByIdsSearchRequest`/`StatusChangeRequest` ядра — для готовых компонентов (`StatusChangeServiceTrait`), в обычном модуле не нужны.
+Базовый класс — подпроекта: `Core/Requests/Request` (наследует `MPS\Core\Http\Requests\FormRequest`); от него наследуются все Request модуля, включая `IndexRequest` списка в форме (2) (P-19, эталон — `examples/parking_app/.../Requests/Tariffs/IndexRequest.php`). В форме (1) `IndexRequest` наследует `Core/Requests/SearchRequest` (над `MPS\Core\Http\Requests\SearchRequest`: `page`, `per_page`, `sort` по `$sortAttributes`) — `repository.md`, «Форма (1)». `CommandRequest`/`ByIdsSearchRequest`/`StatusChangeRequest` ядра — для готовых компонентов (`StatusChangeServiceTrait`), в обычном модуле не нужны.
 
 Только формат (п. 9): `gt:0` для id, `max:` для строк и массивов, `Rule::enum()`, вложенная коллекция — `list` + `{поле}.*: array`. Без SQL (`exists:`/`unique:` — P-17), без проверки доступа (middleware, п. 19a). Нормализация входа (телефон) — `prepareForValidation()` вызовом хелпера (`core/principles.md`, «Повторяющаяся обработка — один хелпер»).
 
@@ -110,7 +113,7 @@ class CreateRequest extends Request
 'currency' => ['present', 'nullable', 'string', Rule::enum(CurrencyEnum::class)],
 
 // IndexRequest: каждое поле → поле {E}FilterDto → условие в paginate… (п. 12d); сортировка — enum (п. 12c)
-class IndexRequest extends SearchRequest
+class IndexRequest extends Request
 {
     public function rules(): array
     {
@@ -135,7 +138,7 @@ Query-параметры `IndexRequest` описываются `#[OA\Parameter]`
 ```php
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:admin-api', 'permission:parking.tariffs', 'superAppApi'])   // алиасы из bootstrap/app.php, не ::class
+Route::middleware(['auth:admin-api', 'permission:parking.tariffs', 'api.response'])   // алиасы из bootstrap/app.php, не ::class
     ->prefix('parking/admin')                                                        // {подпроект}/{context}
     ->as('parking.admin.')
     ->whereNumber('id')
@@ -153,7 +156,7 @@ Route::middleware(['auth:admin-api', 'permission:parking.tariffs', 'superAppApi'
 
 ## Responses
 
-`{E}Response` и `{E}PaginatedResponse` — `JsonResource` (`Illuminate\Http\Resources\Json\JsonResource`), на классе — `#[OA\Schema]` с полями ответа; в контроллере — `new TariffResponse($model)`. Форма пагинации (`items`, `pagination`) — одним классом подпроекта в `Core/Resources` (P-19), `{E}PaginatedResponse` его наследует. Данные отдаются как есть, без `success/data`.
+`{E}Response` и `{E}PaginatedResponse` — `JsonResource` (`Illuminate\Http\Resources\Json\JsonResource`), на классе — `#[OA\Schema]` с полями ответа; в контроллере — `new TariffResponse($model)`. Форма (2) списка: пагинация (`items`, `pagination`) — одним классом подпроекта в `Core/Resources` (P-22), `{E}PaginatedResponse` его наследует. Данные отдаются как есть, без `success/data`.
 
 ```php
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -169,7 +172,7 @@ class TariffResponse extends JsonResource
 }
 ```
 
-Старая форма (`PaginateResource::make($service->search($search))`, `SearchDataObject`) — только в существующем коде `parking_app`/`super_app`, в новом не пишется (P-19).
+Форма (1) списка — `PaginateResource::make($service->search($search))` над `SearchDataObject` (`repository.md`, «Форма (1)»). Какую писать — раздел «Список» `design.md` (P-19, `../conventions.md` п. 2a).
 
 ## Entrypoint ServiceProvider
 

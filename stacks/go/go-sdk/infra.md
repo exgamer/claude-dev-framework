@@ -11,8 +11,8 @@
 | Что | Путь | Пример |
 |---|---|---|
 | своя БД / кэш | `infrastructure/{postgres,redis}/{domain}/{module}/` | `postgres/billing/tariff` |
-| внешний провайдер | `infrastructure/http/{provider}/{product}/`; у провайдера один API — просто `http/{provider}/` | `http/kaspi/autopay`, `http/webkassa` |
-| наш другой микросервис | `infrastructure/http/{service}/{module}/` | `http/parking-session/session_event` |
+| внешний провайдер | `infrastructure/http/{provider}/{product}/`; у провайдера один API — просто `http/{provider}/` | `http/cityparking/pricelimits`, `http/partnerbilling/tariffs` (`examples/tariff`) |
+| наш другой микросервис | `infrastructure/http/{service}/{module}/` | `http/{service}/{module}` (в эталоне нет) |
 | другая технология (не HTTP) | `infrastructure/{tech}/{domain}/{module}/` | `jwt/identity/admin` |
 
 - Группировка по типу услуги (`http/fiscalization/webkassa`) не используется — сразу провайдер.
@@ -22,7 +22,7 @@
 
 ## Правила
 
-- Реализует интерфейсы репозиториев из domain слоя — не создаёт свои контракты
+- Реализует интерфейсы репозиториев из domain слоя (порт внешней системы — и из workflow, `workflow.md`) — не создаёт свои контракты
 - Маппинг между инфра-моделью и доменной сущностью — только через `mapper.go`; прямых зависимостей структур между слоями нет
 - Доменный слой не знает о существовании инфра-слоя
 - Может использовать сущности и константы доменного слоя (`entity`, `_enum.go`)

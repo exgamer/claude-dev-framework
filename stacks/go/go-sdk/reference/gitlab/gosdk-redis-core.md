@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-redis-core v1.0.4
+# git.mpinnovations.kz/mps/go-packages/gosdk-redis-core v1.0.7
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-redis-core/pkg/app`
 

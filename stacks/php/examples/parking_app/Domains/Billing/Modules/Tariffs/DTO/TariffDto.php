@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO;
 
+use Carbon\Carbon;
 use MPS\Core\DataObjects\DataObject;
 use MPS\Core\Enums\CurrencyEnum;
 
@@ -20,7 +21,13 @@ class TariffDto extends DataObject
 
     private CurrencyEnum $currency = CurrencyEnum::KZT;
 
+    /** Цена часа в минимальных единицах валюты (тиын для KZT) */
+    private int $price;
+
     private ?int $graceMinutes = null;
+
+    /** Дата активации: задана — тариф создаётся запланированным, null — сразу действующим */
+    private ?Carbon $scheduledAt = null;
 
     public function getParkingId(): int
     {
@@ -58,6 +65,18 @@ class TariffDto extends DataObject
         return $this;
     }
 
+    public function getPrice(): int
+    {
+        return $this->price;
+    }
+
+    public function setPrice(int $value): self
+    {
+        $this->price = $value;
+
+        return $this;
+    }
+
     public function getGraceMinutes(): ?int
     {
         return $this->graceMinutes;
@@ -66,6 +85,18 @@ class TariffDto extends DataObject
     public function setGraceMinutes(?int $value): self
     {
         $this->graceMinutes = $value;
+
+        return $this;
+    }
+
+    public function getScheduledAt(): ?Carbon
+    {
+        return $this->scheduledAt;
+    }
+
+    public function setScheduledAt(?Carbon $value): self
+    {
+        $this->scheduledAt = $value;
 
         return $this;
     }

@@ -11,9 +11,9 @@
 {service-name}:{entity}:{field1}:{field2}   // составной ключ если нужно
 
 # Примеры:
-parking-session-service:tariff:123
-parking-session-service:tariff-periods:123
-parking-session-service:session:42:A123BC    // parkingId:licensePlate
+{service}:tariff:123
+{service}:tariff-periods:123
+{service}:session:42:A123BC    // parkingId:licensePlate
 ```
 
 ## Helper методы
@@ -34,7 +34,7 @@ value, err := helper.GetString("key")
 ## Пример репозитория
 
 ```go
-const keyPrefix = "parking-session-service:tariff:"
+const keyPrefix = "{service}:tariff:"
 
 func NewRedisRepository(client *redis.Client) *RedisRepository {
     return &RedisRepository{client: client}
@@ -47,7 +47,7 @@ func (r *RedisRepository) Set(ctx context.Context, m *domain.Tariff) error {
         SetStruct(keyPrefix+strconv.FormatUint(uint64(m.ID), 10), *m, 2*time.Hour)
 }
 
-func (r *RedisRepository) GetById(ctx context.Context, id uint) (*domain.Tariff, error) {
+func (r *RedisRepository) GetByID(ctx context.Context, id uint) (*domain.Tariff, error) {
     return rediscore.NewHelper[domain.Tariff](ctx, r.client).
         GetStruct(keyPrefix + strconv.FormatUint(uint64(id), 10))
 }
@@ -57,8 +57,8 @@ func (r *RedisRepository) Invalidate(ctx context.Context, id uint) error {
     idStr := strconv.FormatUint(uint64(id), 10)
     return r.client.Unlink(
         ctx,
-        "parking-session-service:tariff:"+idStr,
-        "parking-session-service:tariff-periods:"+idStr,
+        "{service}:tariff:"+idStr,
+        "{service}:tariff-periods:"+idStr,
     ).Err()
 }
 ```

@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-core v1.0.5
+# git.mpinnovations.kz/mps/go-packages/gosdk-core v1.0.9
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app`
 
@@ -42,7 +42,7 @@
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/config`
 
-- `func InitConfig[E any](config *E) error` — InitConfig Инициализирует конфиг из переменок окружения
+- `func InitConfig[E any](config *E) error` — InitConfig Инициализирует конфиг из переменок окружения. Значение из окружения процесса приводится к типу поля (int*, uint*, float*, bool); неверное значение — ошибка с именем переменной, остальные поля при этом заполняю…
 - `func LoadEnv(paths ...string) (string, error)` — LoadEnv читает env файлы по порядку + всегда включает OS ENV. Первый найденный файл используется.
 - `type AppInfo struct` — AppInfo Данные приложения
   - `func GetInstanceAppInfo(appConfig *BaseConfig) *AppInfo`

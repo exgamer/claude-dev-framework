@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-http-request-builder v1.0.1
+# git.mpinnovations.kz/mps/go-packages/gosdk-http-request-builder v1.0.2
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-http-request-builder/pkg/builder`
 

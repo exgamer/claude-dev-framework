@@ -22,6 +22,8 @@
 | Технические сервисы без данных домена — время, ID, отправка событий и сообщений, планирование (`Clock`, `IDGenerator`, `ChangeNotifier`, публикатор); спорный случай — `../conventions.md` п. 12 | `system.go` |
 | Сервис | `service.go` |
 | Константы (используются в нескольких местах) | `{name}_enum.go` |
+| Sentinel-ошибки домена (`var Err… = errors.New(...)`), которые проверяют через `errors.Is` | `errors.go` |
+| Значение домена в `context.Context` (ключ — unexported тип, `With{X}`/`FromContext`) | `context.go` |
 | DTO операций | `dto.go` |
 | Сложная бизнес-логика изменения | `{конкретное_действие}_command.go` |
 | Сложная бизнес-логика чтения | `{конкретное_действие}_query.go` |
@@ -68,7 +70,7 @@ import (
 
 type Repository interface {
     Paginated(ctx context.Context, s *Search) (*pagination.Paginated[Product], error)
-    GetById(ctx context.Context, id uint) (*Product, error)
+    GetByID(ctx context.Context, id uint) (*Product, error)
     Create(ctx context.Context, m *Product) (*Product, error)
     Update(ctx context.Context, m *Product) error
     Delete(ctx context.Context, id uint) error
@@ -76,7 +78,7 @@ type Repository interface {
 
 type CacheRepository interface {
     Set(ctx context.Context, m *Product) error
-    GetById(ctx context.Context, id uint) (*Product, error)
+    GetByID(ctx context.Context, id uint) (*Product, error)
     Invalidate(ctx context.Context, id uint) error
 }
 ```
@@ -103,8 +105,8 @@ func NewService(repository Repository) *Service {
     return &Service{repository: repository}
 }
 
-func (s *Service) GetById(ctx context.Context, id uint) (*Product, error) {
-    return s.repository.GetById(ctx, id)
+func (s *Service) GetByID(ctx context.Context, id uint) (*Product, error) {
+    return s.repository.GetByID(ctx, id)
 }
 
 func (s *Service) Paginated(ctx context.Context, search *Search) (*pagination.Paginated[Product], error) {

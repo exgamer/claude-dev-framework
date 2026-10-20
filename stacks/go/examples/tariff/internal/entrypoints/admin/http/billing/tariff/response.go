@@ -12,7 +12,9 @@ type tariffData struct {
 	Name         string `json:"name"`
 	Currency     string `json:"currency"`
 	IsDefault    bool   `json:"is_default"`
+	IsActive     bool   `json:"is_active"`
 	GraceMinutes uint   `json:"grace_minutes"`
+	Price        uint   `json:"price"`
 }
 
 type tariffResponse struct {

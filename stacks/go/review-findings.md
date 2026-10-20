@@ -24,7 +24,7 @@
 
 - `context.WithoutCancel` и вызовы БД без таймаута — «если БД зависнет, конект останется навсегда, проверить везде» (!93). В репозиториях — `context.WithTimeout(ctx, 10*time.Second)` или аналог; `context.Background()` внутри бизнес-логики запрещён (`conventions.md`, п. 1).
 - Проглоченные ошибки — «игнорируется ошибка при сериализации» (!93): `json.Marshal` / `strconv` / `Close()` с `_` — реджект (`conventions.md`, п. 8).
-- Ошибки → в Sentry через hub из контекста, не только в лог. Оборачивать `errors.Wrap` / `fmt.Errorf("...: %w", err)`, чтобы цепочка не терялась.
+- Ошибки → через контракт `errorreporter` (`CaptureSoft`/`CaptureError`, `go-sdk/capabilities.md`), не только в лог; Sentry — лишь его реализация (`SentryKernel`), к sentry-go и hub код приложения не обращается. Оборачивать `errors.Wrap` / `fmt.Errorf("...: %w", err)`, чтобы цепочка не терялась.
 - **Таймаут на вызов Redis есть, но не действует** (gateway 2026-09: зависший Redis держал запрос 10–15 с при `context.WithTimeout` на каждом вызове) — go-redis не прерывает чтение из сокета по дедлайну контекста, пока в клиенте не включён `ContextTimeoutEnabled`: вызов ждёт `ReadTimeout` × повторы. С `gosdk-redis-core` ≥ v1.0.3 — `REDIS_CONTEXT_TIMEOUT_ENABLED=true` в конфиге окружения. Проверять не только наличие `WithTimeout`, но и этот флаг; лучше — проверка на старте, что он включён.
 - **`logger.Warning`/`logger.Error` вместо `errorreporter`** для намеренно не пробрасываемых ошибок (MR!151, многократно: "сокрытие ошибки. Использовать errorreporter sdk", "тут и везде где такое") — `gosdk-core/pkg/errorreporter.CaptureSoft`/`CaptureError(ctx, err, tags)` уходит в Sentry и дедуплицирует повтор через слои; голый `logger.*` — нет. См. `conventions.md`, п. 19.
 
@@ -65,13 +65,13 @@
 
 - Очереди/exchange объявляются при старте (`declareRetryQueue` и подобные), не лениво в consumer.
 - Новый consumer переживает недоступность rabbit на старте: ретрай подключения, не молчаливый пропуск регистрации.
-- **Своё `amqp.Dial` для декларации топологии без consumer-а** (MR!151, kulzhambekov.o: "пересмотреть полностью. реализация является антипаттерном. создается еще одно соединение внутри outboxrabbit.DeclareTopology") — лишнее соединение в обход kernel-а. С `gosdk-rabbit-core >= v1.0.5` — `rabbitDi.GetRabbitConnection` + `rabbitmq.DeclareTopology`; сама функция — bootstrap-код (kulzhambekov.o: "это bootstrap слой"), не infra. См. `go-sdk/entrypoint/rabbit.md`.
+- **Своё `amqp.Dial` для декларации топологии без consumer-а** (MR!151, kulzhambekov.o: "пересмотреть полностью. реализация является антипаттерном. создается еще одно соединение внутри outboxrabbit.DeclareTopology") — лишнее соединение в обход kernel-а. С `gosdk-rabbit-core >= v1.0.5` — `rabbitDI.GetRabbitConnection` + `rabbitmq.DeclareTopology`; сама функция — bootstrap-код (kulzhambekov.o: "это bootstrap слой"), не infra. См. `go-sdk/entrypoint/rabbit.md`.
 - **Две независимые реализации одного и того же transport-фикса** (MR!151: `session_event/marshaler.go` vs `fiscalization/marshaler.go` — обработка `x-death`, "одно и тоже разными способами") — частный случай общего правила о недопустимости дублирования не-бизнесовой логики, см. `conventions.md` п. 22 и `go-sdk/entrypoint/rabbit.md`.
 - **`Publisher` оборачивает `Publisher`** (MR!151: `type Publisher struct { publisher *rabbitmq.Publisher }` в `fiscal_receipt/publisher.go`; "шедулер по сути просто паблишер, зачем обертка в обертке это нечитабельно") — доменный интерфейс, инфра-структура и SDK-тип с одним именем. Называть инфра-адаптер иначе (`RabbitPublisher`/с префиксом домена).
 
 ## Структура и стиль (что ревьюеры пишут построчно)
 
-- **Много аргументов функции** (4+) → структура `Params`/`Input` (!93; автор так и починил).
+- **Много аргументов функции** (4+, не конструктор — `core/style.md`) → структура `Params`/`Input` (!93; автор так и починил).
 - **DTO / константы / типы не в файле сервиса** — отдельные `dto.go`, `{name}_enum.go` (G-5; `const.go`/`enum.go` без имени — устаревшее) (!93 «почему в сервисе лежат и ДТО и константы и типы?»); файл называется по содержимому — `dto.go` / `entity.go`, а не `types.go` для всего подряд (!99). См. `conventions.md`, п. 13.
 - **Mapper только маппит** — «это не маппер», «этому не место в маппере, лишняя обёртка» (!93). Условия, запросы, форматирование бизнес-смысла — в сервис/workflow.
 - **Доменный слой без HTTP-типов** (!99 «В доменном слое Http») — `gin`, `http.Request`, request/response-структуры entrypoint'а в `internal/domains` не импортируются.
@@ -79,7 +79,7 @@
 - **Транзакции на workflow** — «транзакция надо как будто» (!100, !103): workflow с записью без транзакции — ждать вопроса. Правило — `approaches/patterns/transactions.md` (O-8).
 - **`gofmt` обязателен** — по отступам придираются построчно (!93).
 - **Имя не отражает поведение** (MR!151, серия комментариев подряд в одном файле: "почему функция называется положить в очередь а по факту создает запись в БД?", "почему менеджер называется положить в очередь а по факту транзакция?", "почему функция которая просто создает записи называется dispatch?") — `Enqueue`/`EnqueueTxManager`/`dispatch` присвоены синхронной записи в БД и прямому вызову без какой-либо очереди. См. `conventions.md`, п. 20.
-- **Название файла интерфейса слишком абстрактное** (MR!151: `ports.go` вместо `publisher.go`/`repository.go` — "что за название файла? название слишком абстрактное") — файл называется по объявляемому интерфейсу, не hexagonal-термином; в модуле домена — файлы групп `repository.go`/`tx_manager.go`/`modules.go`/`system.go` (G-6). См. `conventions.md`, п. 12.
+- **Название файла интерфейса слишком абстрактное** (MR!151: `ports.go` вместо `publisher.go`/`repository.go` — "что за название файла? название слишком абстрактное") — файл называется по объявляемому интерфейсу, не hexagonal-термином; в модуле домена и workflow — файлы групп `repository.go`/`tx_manager.go`/`modules.go`/`system.go` (G-6; у workflow без `modules.go`). См. `conventions.md`, п. 12.
 - **«ИИ-шные» комментарии** (MR!151, kulzhambekov.o дословно: "убери эти ИИшиные коменты, бессмысленные, если надо напиши чтобы было понятно (тут и везде)") — длинные комментарии, пересказывающие код построчно вместо одной мысли о неочевидном. См. `style.md`, раздел «Комментарии».
 - **`nil` как обязательная зависимость в конструктор** (MR!151: "ты в фабрике создаешь сервис с publisher = nil эта функция потенциально выкинет ошибку. так нельзя делать") — мина для любого будущего вызова через этот инстанс. См. `conventions.md`, п. 21.
 - **Домен собирает `map[string]any` с именами колонок** (gateway 2026-09, по образцу parking-session-service) — `Repository.Update(ctx, id, map[string]any{"path_pattern": …})` значит, что домен знает схему БД, а опечатка в ключе ловится только SQL-ошибкой. Частичное обновление — через DTO из `dto.go` (`Patch` с указателями), `map` с колонками строится только в infra (`mapper.go`). [ОШИБКА], архитектура.
@@ -94,9 +94,9 @@
 
 ## Известные споры (фиксировать как спор, не как свежую находку)
 
-- Сборка workflow в `services_factory` (!99 «Почему workflow собирается в services_factory?») — **[ВНИМАНИЕ]**, собирать в `workflows_factory.go` (решение 2026-10-07, `core/decisions-log.md`). Существующий parking написан по-старому: в новом коде — по правилу, массово старое не переписывать без задачи.
-- Файл `*_command.go` / `*_query.go` в `internal/workflows/` — **[ВНИМАНИЕ]** (решение G-1): если сценарий междоменный — переименовать в `*_workflow.go` (`sync_outbox_event_command.go`: handbook + session); если однодоменный — это Command/Query домена, перенести в модуль-владелец результата в `internal/domains/` (`fiscalize_receipt_command.go` → `domains/billing/fiscal_receipt/`, решение O-6).
-- Инфра-адаптер внешней системы не по имени провайдера (`http/fiscalization/webkassa` → `http/webkassa`) или внешняя система под нашим доменом (`http/billing/payment` для Kaspi) — **[ВНИМАНИЕ]** (решение G-2, `go-sdk/infra.md`). В parking `http/kaspi/kaspiautopay` по форме уже верно.
+- Сборка workflow в `services_factory` (!99 «Почему workflow собирается в services_factory?») — **[ВНИМАНИЕ]**, собирать в `workflows_factory.go` (решение 2026-10-07, `core/decisions-log.md`). Существующий код по-старому: в новом коде — по правилу, массово старое не переписывать без задачи.
+- Файл `*_command.go` / `*_query.go` в `internal/workflows/` — **[ВНИМАНИЕ]** (решение G-1): если сценарий междоменный — переименовать в `*_workflow.go`; если однодоменный — это Command/Query домена, перенести в модуль-владелец результата в `internal/domains/` (`fiscalize_receipt_command.go` → `domains/billing/fiscal_receipt/`, решение O-6; доставка outbox — Command домена outbox, `approaches/patterns/outbox.md`).
+- Инфра-адаптер внешней системы не по имени провайдера (`http/fiscalization/webkassa` → `http/webkassa`) или внешняя система под нашим доменом (`http/billing/payment` для Kaspi) — **[ВНИМАНИЕ]** (решение G-2, `go-sdk/infra.md`). По форме верно — `http/cityparking/pricelimits`, `http/partnerbilling/tariffs` эталона `examples/tariff`.
 - Расположение тестов (!103) — решено (O-3): unit рядом с кодом, e2e в `tests/`, см. `structure.md`, «Тесты».
 
 ## За пределами файла

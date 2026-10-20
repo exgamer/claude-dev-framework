@@ -3,9 +3,9 @@
 Перед тем как писать хелпер, клиент, кеш, фильтр или middleware — найти задачу здесь. Есть в ядре → использовать ядро; самописная замена — **[ОШИБКА]** (`../conventions.md`, «Пакеты ядра»).
 
 - Собрано по `reference/*.md` — полному списку классов и public-методов, сгенерированному из исходников:
-  - `mps-core-v1.6.0.md`, `mps-utils-v2.6.2.md` — версии superapp-api (`vendor/`);
+  - `mps-core-v1.6.0.md`, `mps-utils-v2.6.2.md` — версии из `vendor/` PHP-монолита;
   - `mps-core-v1.10.2.md` — последний тег `mps/core` (2026-09-25);
-  - `mps-utils-v2.8.4.md` — локальный репозиторий `~/MPIProjects/mps/utils` (v2.8.4 + 16 коммитов).
+  - `mps-utils-v2.8.4.md` — исходники `mps/utils` (v2.8.4 + 16 коммитов).
 - Официальная документация пакетов — `official/core-v1.10.2/`, `official/utils-v2.8.4/`: как пользоваться компонентом подробно. При расхождении с этим файлом — верна официальная дока нужной версии.
 - Версия в проекте — из `composer.lock`; методы сверять с `vendor/mps/*` проекта. Пересобрать справочник под проект: `tools/sdk-ref/php.sh <out> <project-dir>`. Метода нет в справочнике версии проекта — его нет.
 - Пометка «utils ≥ 2.6.4» и т.п. — с какой версии есть; в более старом проекте не использовать.
@@ -17,9 +17,9 @@
 | Задача | Что взять |
 |---|---|
 | DTO | `MPS\Core\DataObjects\DataObject`: `::make()`, `fromArray()`, `toArray()`, `toArrayWithSnakeKeys()`, `toArrayWithCamelKeys()`, `validated()`; коллекция — `DataObjectCollection` (`pushItem`) |
-| Репозиторий БД | `MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository` (+ `CRUDRepositoryInterface`): `create`, `oneById`, `oneByIdOrFail` (не вызывать — `*OrFail` не используются, `conventions.md` п. 12a), `oneByCondition`, `allByCondition`, `countByCondition`, `isUnique`, `search`, `update`, `updateById`, `upsert`, `delete`, `deleteById`; запросы — `getQuery()`; `search`/`filterSearch()`/`SearchDataObject` — старая форма списка, в новом коде не используются (P-19, `conventions.md` п. 2a) |
+| Репозиторий БД | `MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository` (+ `CRUDRepositoryInterface`): `create`, `oneById`, `oneByIdOrFail` (не вызывать — `*OrFail` не используются, `conventions.md` п. 12a), `oneByCondition`, `allByCondition`, `countByCondition`, `isUnique`, `search`, `update`, `updateById`, `upsert`, `delete`, `deleteById`; запросы — `getQuery()`; `search`/`filterSearch()`/`SearchDataObject` — форма (1) списка; какая форма — раздел «Список» `design.md` (P-19, `conventions.md` п. 2a) |
 | Сервис | `MPS\Core\Services\Service`; сложный сервис поверх CRUD — `CrudServiceDecorator` (core ≥ 1.7.0); CRUD целиком — `Components\CRUD\Services\Database\Eloquent\CRUDService` (`create/update/delete(*CommandDataObject)`, `searchById`, `deleteById`), поиск — `SearchAwareTrait` (`search`, `searchById`, `searchByIds`) |
-| Параметры поиска (старая форма `search()`, P-19 — только для существующего кода) | `Components\CRUD\DataObjects\SearchDataObject` (`setParams`, `setPerPage`, `setPage`) |
+| Параметры поиска (форма (1) списка `search()`, P-19) | `Components\CRUD\DataObjects\SearchDataObject` (`setParams`, `setPerPage`, `setPage`) |
 | События CRUD | `Components\CRUD\Events\{Before,After}{Modify,Delete}Event`, `AfterSearchEvent` |
 | Модель | `MPS\Core\Models\Model` |
 | Enum с метками | нативный `enum` + `MPS\Core\Enums\Enumerable` + `EnumerableTrait` (класс `MPS\Core\Enums\Enum` — deprecated с core 1.7.0): `values()`, `labels()`, `list()`, `label()`, `getLabel()`; готовые — `CurrencyEnum`, `LocaleEnum`, `EnvEnum`, `StringCaseEnum`, `StatusEnum` |
@@ -55,11 +55,11 @@
 
 | Задача | Что взять |
 |---|---|
-| Базовый FormRequest | `MPS\Core\Http\Requests\FormRequest`, поиск — `SearchRequest`, по ID-шникам — `ByIdsSearchRequest`, смена статуса — `StatusChangeRequest` |
+| Базовый FormRequest | `MPS\Core\Http\Requests\FormRequest`, поиск — `SearchRequest` (в форме (1) списка наследуется `Core/Requests/SearchRequest` подпроекта, P-19), по ID-шникам — `ByIdsSearchRequest`, смена статуса — `StatusChangeRequest` |
 | Ответ | `MPS\Core\Http\Responses\Response` / `JsonResponse` (JsonResource); обёртка `success/data` — middleware `MPS\Utils\Http\Middleware\ApiResponseMiddleware` |
 | Локаль из запроса | `MPS\Utils\Http\Middleware\LocaleMiddleware` |
 | Basic Auth на группу маршрутов | `MPS\Utils\Components\Authenticate\Basic\BasicAuthMiddleware` |
-| Health-check (liveness/readiness) | `MPS\Utils\Components\HealthCheck` — контроллер, консольные команды, `HealthCheckManagerInterface` |
+| Health-check (liveness/readiness) | `MPS\Utils\Components\HealthCheck` — контроллер, консольные команды, `HealthCheckManagerInterface`; подключение — `ServiceProvider` компонента + `config/mps-utils.php` (`health_check`), образец — `../examples/parking_app/ServiceProvider.php`, `../examples/config/mps-utils.php`; своего healthcheck не писать |
 | Метрики Prometheus | `MPS\Utils\Components\Prometheus` — `MetricMiddleware`, `MetricController`, `MetricManagerInterface` |
 | Правило валидации по regex | `MPS\Utils\Validation\RegexRule`, `MultipleRegexRule`; готовые шаблоны — `MPS\Utils\Enums\RegexEnum` (`MOBILE_PHONE`, `EMAIL`, `SLUG`…) |
 | Swagger | `MPS\Utils\Components\Documentation\Swagger` (`SwaggerHelper`, команда сканера) |
@@ -145,11 +145,12 @@
 
 ---
 
-## Чего в ядре нет (живёт в `Core/` подпроекта — см. `parking_app/Core`)
+## Чего в ядре нет (живёт в `Core/` подпроекта — см. `../examples/parking_app/Core`)
 
-- `PaginatedQueryHelper` — `App\ParkingApp\Core\Database\Query\PaginatedQueryHelper` (в ядре нет).
+- `Page` (номер и размер страницы) и базовый `PaginatedResource` для списка в форме (2) — `Core/Database/Query/Page`, `Core/Resources/PaginatedResource` подпроекта (P-22, тестовый вариант); образец — `../examples/parking_app/Core/`.
+- Форма (1) списка (P-19) — три класса подпроекта: `Core/Requests/SearchRequest`, `Core/Resources/PaginateResource`, `Core/Database/Query/PaginatedQueryHelper`; образец — `../examples/parking_app/Core/Requests/SearchRequest.php`, `../examples/parking_app/Core/Resources/PaginateResource.php`, `../examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`.
 - Менеджер транзакций при `mps/core` < 1.10 — `Core/Database/Managers/TransactionManagerInterface` + `Infrastructure/Postgres/Database/Managers/DatabaseTransactionManager` (+ `NoopTransactionManager` как mock). С **core ≥ 1.10.0** — в ядре: `MPS\Core\Components\Database\Transaction\{TransactionManagerInterface, TransactionManager, NoopTransactionManager}` (`run`, `afterCommit`, `begin/commit/rollBack`, `onConnection`), биндинг регистрирует ядро.
 - `Repository::transaction()` в ядре есть, но в сервисах/workflow его не использовать — только `TransactionManagerInterface` (`../conventions.md`).
-- Базовые `Request` / `SearchRequest` / `PaginateResource` подпроекта — в `Core/Requests`, `Core/Resources`.
+- Базовый `Request` подпроекта — `Core/Requests/Request` (образец — `../examples/parking_app/Core/Requests/Request.php`).
 
 Если нужна общая для нескольких проектов вещь, которой нет в ядре, — не писать «универсальный» класс в проекте молча, а спросить пользователя: «добавить в mps/utils?».

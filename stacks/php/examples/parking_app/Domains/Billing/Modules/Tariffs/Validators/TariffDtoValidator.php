@@ -7,7 +7,7 @@ namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Validators;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 
 /**
- * Доменные инварианты тарифа (форма запроса проверяется в FormRequest).
+ * Доменные инварианты тарифа.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -21,18 +21,17 @@ final class TariffDtoValidator
         $errors = [];
 
         if (trim($dto->getName()) === '') {
-            self::add($errors, 'name', 'Название обязательно');
+            $errors['name'][] = 'Название обязательно';
         }
 
         if ($dto->getGraceMinutes() !== null && $dto->getGraceMinutes() > 1440) {
-            self::add($errors, 'grace_minutes', 'Льготный период не может превышать сутки');
+            $errors['grace_minutes'][] = 'Льготный период не может превышать сутки';
+        }
+
+        if ($dto->getScheduledAt() !== null && $dto->getScheduledAt()->isPast()) {
+            $errors['scheduled_at'][] = 'Дата активации не может быть в прошлом';
         }
 
         return $errors;
-    }
-
-    private static function add(array &$errors, string $field, string $message): void
-    {
-        $errors[$field][] = $message;
     }
 }

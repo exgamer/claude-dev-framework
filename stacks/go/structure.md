@@ -25,26 +25,10 @@
 (*) опциональный слой — только для cross-domain сценариев
 ```
 
-**Допустимые зависимости:**
-```
-Entrypoint     ──→  Workflow / Domain
-Workflow       ──→  Domain          (интерфейсы репозиториев/сервисов доменов; к БД, кэшу, HTTP — только через них, `architecture/cross-domain.md`)
-Infrastructure ──→  Domain
-Bootstrap      ──→  Entrypoint + Workflow + Infrastructure + Domain
-все слои       ──→  Common          (Common → только стандартная библиотека и сам Common; `architecture/layers.md`, «Общий бизнес-словарь»)
-```
-
-**Запрещённые зависимости (нарушение = ошибка ревью):**
-```
-Domain         → Infrastructure    ✗
-Domain         → Entrypoint        ✗
-Domain         → Workflow          ✗
-Workflow       → Entrypoint        ✗
-Entrypoint     → Bootstrap         ✗
-Infrastructure → Entrypoint        ✗
-Domain {A}     → Domain {B}        ✗  (понятие двух доменов — Common, сценарий двух доменов — Workflow)
-Common         → любой слой        ✗
-```
+**Зависимости слоёв** — допустимые и запрещённые (нарушение = **[ОШИБКА]** ревью) — `architecture/layers.md`, «Направление зависимостей» и «Зависимости» (O-7, workflow). Go-специфика:
+- `internal/common` → только стандартная библиотека и сам `common` (`architecture/layers.md`, «Общий бизнес-словарь»; тест границ — `review-checks.md`);
+- Infrastructure реализует интерфейсы домена и порт workflow неявно, без импорта workflow;
+- `domains/{A}` → `domains/{B}` — запрещено: понятие двух доменов — `internal/common`, сценарий двух доменов — workflow.
 
 ---
 
@@ -61,21 +45,27 @@ Common         → любой слой        ✗
 - **Правило**: mapper обязателен на каждом слое; прямых зависимостей структур между слоями нет.
 
 ### Entrypoint Layer
-- **Что**: взаимодействие с внешним миром: HTTP и RabbitMQ.
-- **Состав**: `handler.go`, `routes.go`, `request.go`, `response.go`, `mapper.go`, `{module}_consumer.go`, `consumer_registry.go`.
-- **Путь**: HTTP — `internal/entrypoints/{context}/http/{domain}/{module}/`, RabbitMQ — `internal/entrypoints/{context}/rabbit/{domain}/{module}/` (`entrypoints/admin/http/billing/tariff/`, `entrypoints/internal/rabbit/billing/tariff/`).
+- **Что**: взаимодействие с внешним миром: HTTP, RabbitMQ, консольные команды.
+- **Состав**: `handler.go`, `routes.go`, `request.go`, `response.go`, `mapper.go`, `{module}_consumer.go`, `consumer_registry.go`, `{module}_command.go` (консоль).
+- **Путь**: HTTP — `internal/entrypoints/{context}/http/{domain}/{module}/`, RabbitMQ — `internal/entrypoints/{context}/rabbit/{domain}/{module}/`, консоль — `internal/entrypoints/system/console/{domain}/{module}/` (`entrypoints/admin/http/billing/tariff/`, `entrypoints/consumer/rabbit/billing/tariff/`, `entrypoints/system/console/billing/outbox_tariff_event/` в `examples/tariff`).
+- **Маршруты с телом** (`POST`/`PUT`/`PATCH` с телом запроса) принимают только JSON — `RequireJSONMiddleware` (иное — 415), тело — строго один объект с пределом размера (`architecture/layers.md`, «Принадлежность записи скоупу»).
 - **Порядок в handler**: валидация → маппинг Request→Domain → вызов сервиса/workflow → маппинг Domain→Response → HTTP ответ через `response.*`. Бизнес-логики и запросов к хранилищам нет; маппинг Request ↔ Domain ↔ Response — только в `mapper.go`; каждый эндпойнт — со Swagger-аннотациями. HTTP — `go-sdk/entrypoint/http.md`, RabbitMQ — `go-sdk/entrypoint/rabbit.md`.
-- **`{context}`** — аудитория или точка входа API (пример: `admin`, `client`, `public`, `internal`, `partner`). Служебные эндпойнты (health, ready, metrics) — контекст `system`, с транспортом в пути: `entrypoints/system/http/healthcheck` (решение G-4); `entrypoints/system/healthcheck` без `http/` — старая форма. Определяется тем, *для кого* предназначен эндпойнт. Один эндпойнт для разных аудиторий — разные директории.
+- **`{context}`** — аудитория или точка входа API (пример: `admin`, `client`, `public`, `integration`, `partner`, `consumer` — для consumer событий). Каталог `internal` в контексте нельзя: `internal/` в пути Go закрывает пакет от `app/bootstrap` (`entrypoints/internal/rabbit/...` не компилируется) — consumer событий брокера — контекст `consumer` (`entrypoints/consumer/rabbit/{domain}/{module}/`), вебхуки и межсервисный HTTP — `integration`. Служебные эндпойнты (health, ready, metrics) — контекст `system`, с транспортом в пути: `entrypoints/system/http/healthcheck` (решение G-4); `entrypoints/system/healthcheck` без `http/` — старая форма. Определяется тем, *для кого* предназначен эндпойнт. Один эндпойнт для разных аудиторий — разные директории.
+- **Консоль** (cron, ручные операции, миграции): отдельный бинарник `cmd/console` — `PostgresKernel`, при отправке в брокер `RabbitKernel` с `EnablePublisher()`, `ConsoleKernel` (`console-core/pkg/app.NewConsoleKernel`, `go-sdk/capabilities.md`); модуль консоли — `app/bootstrap/{domain}/{module}/` с полем `Console *consoleapp.ConsoleKernel`, в `Init` — `commands_factory.go` (cobra-команды из Command/сервисов домена) → `m.Console.AddCommand(...)` до `Start` ядра. Команда — `New{Action}Command(...) *cobra.Command`, `Use: "{module-kebab}:{action}"` (`outbox-tariff-event:retry`), тонкая: один вызов Command домена, итог — в лог. Сборка консольного приложения — `internal/console/app.go` (`cmd/console/main.go` вызывает `console.NewApp()`, `RunAll()`, `Close()`): ядра, `migrate`, модули консоли; у разовой команды `WaitForShutdown` нет — соединения ядер закрывает `Close()` в обратном порядке. Команда `migrate` (`up`, `down`, `down-to <id>`) — `internal/console/migrate.go`, добавляется в `ConsoleKernel` прямо в `console/app.go`, без модуля и `commands_factory`: миграции общие для сервиса, не принадлежат модулю. Эталон — `examples/tariff`: `cmd/console/main.go`, `internal/console/{app,migrate}.go`, `entrypoints/system/console/billing/outbox_tariff_event/outbox_tariff_event_command.go`, `app/bootstrap/billing/outbox_tariff_event/{module,commands_factory}.go`, README эталона.
+- **Миграции** — `internal/migrations/`: файл `{YYYYMMDDHHMMSS}_{что_делает}.go` (`20261020100100_create_outbox_tariff_events_table.go`) с функцией `migration{YYYYMMDDHHMMSS}() *migration.Migration` (`db-core/pkg/migration`), `ID` — имя файла без `.go` (`20261020100000_add_is_active_to_tariffs_table`), `Migrate` и `Rollback`; `registry.go` — `All()` в порядке применения, катит консольная команда через `postgres-core/pkg/app.NewMigrator(db, migrations.All()...)` (kernel миграции не катит). Эталон — `examples/tariff/internal/migrations/`.
+- **Middleware** — `internal/entrypoints/{context}/http/middleware/`, один на контекст (`admin`, `integration`): файл по назначению в snake_case (`jwt_auth.go`, `require_permission.go`, `resolve_admin_parkings.go`, `signature_auth.go`, `api_key.go`), функция — с суффиксом `Middleware`, как в SDK (`middleware.CorsMiddleware`): `JWTAuthMiddleware(...) gin.HandlerFunc`, `RequirePermissionMiddleware(permission string)`. Значение, которое middleware кладёт в контекст, читает экспортированная функция того же пакета (`ParkingIDsFromContext(ctx)`): нет значения — ошибка, а не «без ограничения». Зависимости (доменный сервис, настройки) — аргументами; ставит middleware на маршруты `routes.go` модуля, сборку берёт из DI `module.go`. Эталон — `examples/tariff/internal/entrypoints/admin/http/middleware/`, `examples/tariff/internal/entrypoints/integration/http/middleware/`.
 
 ### Workflow Layer *(опциональный)*
 - **Что**: оркестрирует несколько доменных сервисов для бизнес-процесса, не принадлежащего ни одному домену.
-- **Состав**: `{конкретное_действие}_workflow.go` (оркестратор), `dto.go` (Input/Result), `tx_manager.go` (интерфейс транзакции, если workflow пишет — O-8).
-- **Правила**: зависит только от Domain — берёт интерфейсы репозиториев и сервисов доменов напрямую (O-7); не знает про HTTP/Gin/очереди и инфраструктуру. Своего репозитория у workflow нет: нужен запрос — метод в репозитории того домена, чья таблица; свой интерфейс workflow объявляет только для того, чего у доменов нет (`TxManager`, `go-sdk/domain.md`, «Cross-domain зависимость»).
+- **Состав**: `{конкретное_действие}_workflow.go` (оркестратор), `dto.go` (Input/Result), `tx_manager.go` (интерфейс транзакции, если workflow пишет — O-8); по необходимости — `repository.go` / `system.go` (порт внешней системы, которого нет в домене, и системное — по критерию `conventions.md` п. 12, `go-sdk/workflow.md`).
+- **Правила**: зависит только от Domain — берёт репозитории доменов интерфейсами, сервисы и Command доменов — конкретным типом или интерфейсом, который объявил сам workflow, когда он нужен (O-7, `go-sdk/workflow.md`); не знает про HTTP/Gin/очереди и инфраструктуру. Самостоятельность, логика агрегата, таблицы — домену — `architecture/layers.md`, «Зависимости»; свои интерфейсы workflow объявляет только для того, чего у доменов нет (`TxManager`, системное, порт внешней системы — `go-sdk/workflow.md`; `go-sdk/domain.md`, «Cross-domain зависимость»).
 - **Когда использовать**: операция охватывает 2+ доменов как равноправных участников; бизнес-процесс из нескольких шагов; нужно переиспользовать из разных точек входа (HTTP + Consumer).
 
 ### Bootstrap / Application Layer
 - **Что**: собирает приложение: создаёт зависимости, регистрирует маршруты и consumers.
-- **Состав**: `app.go`, `{module}/module.go`, `{module}/repositories_factory.go`, `{module}/services_factory.go`, `{module}/workflows_factory.go` (если есть workflow), `{module}/handlers_factory.go`, `{module}/consumers_factory.go`.
+- **Состав**: `app.go`, `{module}/module.go`, `{module}/config.go` (конфиг модуля из env — внешние системы, лимиты), `{module}/repositories_factory.go`, `{module}/services_factory.go`, `{module}/workflows_factory.go` (если есть workflow), `{module}/handlers_factory.go`, `{module}/consumers_factory.go`, `{module}/commands_factory.go` (консоль).
+- **Одна настройка — одно место:** переменную env, которую читают несколько процессов или модулей (сервис и консоль, два модуля), объявляет и читает `config.go` модуля-владельца настройки; остальные bootstrap берут значение у него, а не читают ту же переменную сами (имя, обязательность и умолчание не расходятся). Эталон — `OUTBOX_TARIFF_EVENT_MAX_ATTEMPTS` в `stacks/go/examples/tariff/internal/app/bootstrap/billing/outbox_tariff_event/config.go`.
+- **`config.go`** — unexported структура с тегами `mapstructure`/`json`, `load{Name}Config()` через `config.InitConfig`; настройку, которую берут другие модули, владелец отдаёт экспортированной `Load{Name}() ({тип}, error)` (`outbox_tariff_event.LoadMaxAttempts()`), структура остаётся unexported; обязательное значение пусто — ошибка, модуль не стартует; URL проверяется и нормализуется здесь (`regulations/service-requirements.md`, «Конфиг»). Таймаут в env — целые секунды (`*_TIMEOUT_SECONDS uint`), в `time.Duration` переводит метод конфига: `InitConfig` `time.Duration` из env не разбирает (значение остаётся строкой, сверено по `gosdk-core` v1.0.9, `pkg/config/env_value.go`). Эталон — `examples/tariff/internal/app/bootstrap/billing/tariff/config.go`.
 - **Цепочка**: `DB Client → Repository (infra) → Service (domain) → Handler (entrypoint) → Routes`.
 - **Путь**: `bootstrap/{module}/` или `bootstrap/{domain}/{module}/` — выбирается по необходимости группировки.
 
@@ -93,8 +83,10 @@ internal/
 │           ├── repositories_factory.go
 │           ├── services_factory.go
 │           ├── workflows_factory.go        ← опционально, только сборка workflow
+│           ├── config.go                   ← опционально: конфиг модуля из env
 │           ├── handlers_factory.go
-│           └── consumers_factory.go        ← опционально
+│           ├── consumers_factory.go        ← опционально
+│           └── commands_factory.go         ← опционально, модуль консоли
 │
 ├── common/                                 ← общий бизнес-словарь двух и более доменов (`architecture/layers.md`): `{понятие}_enum.go`, value-объекты, чистые функции, их ошибки; без зависимостей, I/O, DI
 │
@@ -108,19 +100,32 @@ internal/
 │           ├── modules.go                  ← опционально: интерфейсы соседних модулей домена (O-6)
 │           ├── system.go                   ← опционально: Clock, IDGenerator, ChangeNotifier…
 │           ├── service.go
+│           ├── {name}_enum.go              ← опционально: константы (`go-sdk/domain.md`)
+│           ├── errors.go                   ← опционально: sentinel-ошибки домена (`ErrDefaultTariffTaken`)
+│           ├── context.go                  ← опционально: значение домена в `context.Context` (`admin.WithAdmin`/`FromContext`)
+│           ├── {действие}_command.go       ← опционально: сложное изменение (`go-sdk/domain.md`)
 │           └── {entity}_validator.go       ← опционально: доменные инварианты DTO (O-18)
 │
 ├── entrypoints/
 │   └── {context}/
+│       ├── http/middleware/                ← middleware контекста: `{назначение}.go`, функции `{Name}Middleware`
 │       ├── http/{domain}/{module}/
 │       │   ├── handler.go
 │       │   ├── routes.go
 │       │   ├── request.go
 │       │   ├── response.go
 │       │   └── mapper.go
-│       └── rabbit/{domain}/{module}/
-│           ├── consumer_registry.go
-│           └── {module}_consumer.go
+│       ├── rabbit/{domain}/{module}/
+│       │   ├── consumer_registry.go
+│       │   └── {module}_consumer.go
+│       └── console/{domain}/{module}/      ← только {context} = system
+│           └── {module}_command.go
+│
+├── console/                                ← сборка консольного приложения: `app.go` (ядра, `Close`), `migrate.go` (команда `migrate`)
+│
+├── migrations/
+│   ├── registry.go                         ← All()
+│   └── {YYYYMMDDHHMMSS}_{что_делает}.go
 │
 ├── infrastructure/
 │   ├── postgres/{domain}/{module}/
@@ -131,16 +136,20 @@ internal/
 │   │   └── repository.go
 │   ├── http/{provider}/{product}/            ← внешний провайдер (kaspi/autopay, webkassa)
 │   │   ├── model.go
-│   │   ├── repository.go
+│   │   ├── repository.go                     ← HTTPRepository (источник данных)
+│   │   ├── notifier.go                       ← HTTPNotifier (порт отправки; architecture/integrations.md)
 │   │   └── mapper.go
 │   ├── http/{service}/{module}/              ← наш другой микросервис
-│   └── {tech}/{domain}/{module}/             ← другая технология (jwt/identity/admin)
+│   ├── rabbit/{domain}/{module}/             ← публикатор: `publisher.go` (`RabbitPublisher`, `go-sdk/entrypoint/rabbit.md`), `publisher_definition.go`, `model.go`, `mapper.go`
+│   └── {tech}/{domain}/{module}/             ← другая технология: `jwt/identity/admin/verifier.go` (проверка токена — порт домена)
 │
 └── workflows/                                  ← опционально, отдельный слой (не внутри infrastructure)
     └── {domain}/
         └── {module}/
             ├── {конкретное_действие}_workflow.go
             ├── tx_manager.go                   ← если workflow пишет (O-8)
+            ├── repository.go                   ← опционально: порт внешней системы (данные), которого нет в домене
+            ├── system.go                       ← опционально: Clock, IDGenerator, порт отправки…
             └── dto.go
 ```
 
@@ -157,7 +166,9 @@ internal/
 | Workflow | `internal/workflows/{domain}/{module}/` или `internal/workflows/{module}/` |
 | Entrypoint HTTP | `internal/entrypoints/{context}/http/{domain}/{module}/` |
 | Entrypoint служебный (health, ready, metrics) | `internal/entrypoints/system/http/{name}/` (решение G-4) |
-| Entrypoint RabbitMQ | `internal/entrypoints/{context}/rabbit/{domain}/{module}/` |
+| Entrypoint RabbitMQ | `internal/entrypoints/{context}/rabbit/{domain}/{module}/` (`{context}` ≠ `internal`) |
+| Entrypoint консоль | `internal/entrypoints/system/console/{domain}/{module}/` |
+| Миграции | `internal/migrations/` |
 | Infrastructure Postgres | `internal/infrastructure/postgres/{domain}/{module}/` |
 | Infrastructure Redis | `internal/infrastructure/redis/{domain}/{module}/` |
 | Infrastructure HTTP (провайдер) | `internal/infrastructure/http/{provider}/{product}/` |
@@ -186,7 +197,11 @@ main()
         └── Ожидание SIGINT/SIGTERM → graceful shutdown всех Kernels
 ```
 
-**Порядок регистрации модулей важен**: модули не должны зависеть друг от друга.
+**Зависимости модулей bootstrap.** Модуль может взять у другого модуля только готовое и только одним из двух способов:
+- **объект через DI** — модуль-владелец в `Init` регистрирует сервис или настройки (`di.Register(a.Container, servicesFactory.AdminService)`), модуль-потребитель в своём `Init` берёт их `di.Resolve[*admin.Service](a.Container)` и передаёт в фабрики аргументами. Владелец стоит в `RegisterAndInitModules` в `app.go` **раньше** потребителя (`&healthcheck.Module{}, &auth.Module{}, &tariff.Module{}`), иначе `Resolve` падает при старте;
+- **значение настройки** — экспортированная `Load{Name}()` из `config.go` владельца (импорт пакета bootstrap владельца, только ради неё).
+
+Фабрики, конфиг-структуры и внутренности чужого модуля не импортируются, взаимных зависимостей (A берёт у B, B — у A) нет. Модуль, который только раздаёт сервисы (без маршрутов), — нормальная форма: `bootstrap/identity/auth/module.go` эталона. Эталон потребителя — `examples/tariff/internal/app/bootstrap/billing/tariff/module.go`.
 
 ---
 
@@ -199,7 +214,7 @@ main()
 | Операция охватывает 2+ доменов     | Workflow                           |
 | Бизнес-процесс из нескольких шагов | Workflow                           |
 
-Прямой зависимости домена от чужого домена нет (O-7, `architecture/cross-domain.md`): сценарий на 2+ домена — workflow, он берёт интерфейсы репозиториев/сервисов доменов напрямую (`go-sdk/domain.md`, «Cross-domain зависимость»).
+Прямой зависимости домена от чужого домена нет (O-7, `architecture/cross-domain.md`): сценарий на 2+ домена — workflow, он берёт репозитории доменов интерфейсами, сервисы — конкретным типом или своим интерфейсом (`go-sdk/workflow.md`; `go-sdk/domain.md`, «Cross-domain зависимость»).
 
 ---
 
@@ -238,6 +253,7 @@ main()
 - [ ] `internal/workflows/{domain}/{module}/{конкретное_действие}_workflow.go`
 - [ ] `internal/workflows/{domain}/{module}/dto.go`
 - [ ] `internal/workflows/{domain}/{module}/tx_manager.go` — если workflow пишет (O-8); реализация `dbtransaction.NewManager*` в `repositories_factory.go`
+- [ ] `internal/workflows/{domain}/{module}/repository.go`, `system.go` — если нужен порт внешней системы, которого нет в домене, или системные зависимости (`go-sdk/workflow.md`)
 - [ ] `app/bootstrap/{module}/workflows_factory.go` (не `services_factory.go`)
 - [ ] Зарегистрировать workflow через DI в `module.go`
 
@@ -252,7 +268,7 @@ main()
 | unit | рядом с кодом: `{file}_test.go` | `domains/billing/tariff/service_test.go` |
 | фикстуры | `testdata/` рядом с тестом | `infrastructure/jwt/identity/admin/testdata/` |
 | in-memory фейки репозиториев | рядом с тестом; общие для нескольких пакетов — `internal/testsupport/{domain}fakes/` | — |
-| хелпер преобразования формата (телефон, ИИН, номер карты, деньги, маска) — чистые функции над примитивами, без доменных типов и зависимостей | сначала SDK (`core/pkg/validation`: `NormalizePhoneNumber`, `CheckValidPhone`); нет в SDK — `pkg/{thing}/{thing}.go` (как `pkg/lpmsign`, `pkg/cryptenvelope`), `{thing}_test.go` рядом; вызов — из маппера хендлера/consumer'а и Response-маппера, не из сервиса и репозитория (`core/principles.md`, «Повторяющаяся обработка — один хелпер») | `duplicated-format-logic` |
+| хелпер преобразования формата (телефон, ИИН, номер карты, деньги, маска) — чистые функции над примитивами, без доменных типов и зависимостей | сначала SDK (`core/pkg/validation`: `NormalizePhoneNumber`, `CheckValidPhone`); нет в SDK — `pkg/{thing}/{thing}.go`, `{thing}_test.go` рядом; вызов — из маппера хендлера/consumer'а и Response-маппера, не из сервиса и репозитория (`core/principles.md`, «Повторяющаяся обработка — один хелпер»). Это про преобразование формата; транспортный хелпер `pkg/` (`pkg/requestid` — заголовок Request ID из `ctx`; `pkg/signature` — разбор и проверка HMAC-подписи заголовка `X-Signature`, `examples/tariff/pkg/signature/signature.go`) — чистые функции над байтами и заголовками, без доменных типов; вызывают middleware точек входа (`integration/http/middleware/signature_auth.go`) и адаптеры Infrastructure, не сервис | `duplicated-format-logic` |
 | тест границ `Common` | `internal/common/boundary_test.go`: разбирает файлы `internal/common/...` (`go/parser`, без новых зависимостей) и падает на импорте не из стандартной библиотеки и не из `internal/common/` (`approaches/process/testing.md`) | — |
 | интеграционные (живая БД/Redis) | рядом с кодом, с `//go:build integration` в первой строке | запуск: `go test -tags integration ./...` |
 | e2e (сервис целиком по HTTP) | `tests/<сценарий>/` в корне | `tests/kaspi/`, `tests/halyk/` |

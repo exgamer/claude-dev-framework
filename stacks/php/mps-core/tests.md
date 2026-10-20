@@ -100,12 +100,12 @@ class PositiveTest extends FeatureTestCase
 
 ## Mock-классы
 
-Mock — тестовая заглушка для **внешней интеграции** (Gateway внешней системы, платёжный шлюз). Интерфейс объявляет домен-потребитель (`Domains/{D}/Modules/{M}/Repositories/{System}{Purpose}GatewayInterface.php`), реализация и мок — в инфраструктуре по имени внешней системы (`../structure.md`, `../conventions.md`, «Модели и внешние системы»):
+Mock — тестовая заглушка для **внешней интеграции** (адаптер внешней системы, платёжный шлюз). Интерфейс объявляет потребитель и называет по роли, без имени системы (`architecture/integrations.md`): источник данных — `Domains/{D}/Modules/{M}/Repositories/{Entity}RepositoryInterface.php`, отправка — `…NotifierInterface` (у домена или в папке workflow), реализация и мок — в инфраструктуре по имени внешней системы (`../structure.md`, `../conventions.md`, «Модели и внешние системы»):
 
 ```
 Infrastructure/Http/{Provider}/{Product}/
-├── {Provider}{Purpose}Gateway.php        — реальная реализация
-└── Mocks/{Provider}{Purpose}GatewayMock.php
+├── {Provider}{Product}Repository.php     — реальная реализация (отправка — {Provider}{Product}Notifier.php)
+└── Mocks/{Provider}{Product}RepositoryMock.php
 ```
 
 **Не класть в `Domains/`** — домен не знает про инфраструктурные детали.
@@ -114,13 +114,13 @@ Infrastructure/Http/{Provider}/{Product}/
 ```php
 namespace App\ParkingApp\Infrastructure\Http\Lpm\Camera\Mocks;
 
-use App\ParkingApp\Domains\Catalog\Modules\Parkings\Repositories\LpmCameraGatewayInterface;
+use App\ParkingApp\Domains\Catalog\Modules\Parkings\Repositories\CameraRepositoryInterface;
 
-class LpmCameraGatewayMock implements LpmCameraGatewayInterface
+class LpmCameraRepositoryMock implements CameraRepositoryInterface
 {
-    public function holdOpen(int $cameraId): bool
+    public function findStatus(int $cameraId): ?string
     {
-        return true;
+        return 'online';
     }
 }
 ```
@@ -129,9 +129,9 @@ class LpmCameraGatewayMock implements LpmCameraGatewayInterface
 
 ```php
 [
-    'abstract' => LpmCameraGatewayInterface::class,
-    'concrete' => LpmCameraGateway::class,
-    'mock'     => LpmCameraGatewayMock::class,
+    'abstract' => CameraRepositoryInterface::class,
+    'concrete' => LpmCameraRepository::class,
+    'mock'     => LpmCameraRepositoryMock::class,
 ],
 ```
 

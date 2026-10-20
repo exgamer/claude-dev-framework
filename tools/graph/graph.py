@@ -89,6 +89,13 @@ def finish() -> None:
         new_n += d["nodes"]
         new_e += d["edges"]
         new_h += d.get("hyperedges", [])
+    # кэш пишется по source_file: узел агента со ссылкой на файл вне чанка затёр бы кэш того файла одним узлом
+    chunk_files = {str(Path(f).resolve()) for p in OUT.glob(".chunk_*.txt") for f in p.read_text().split() if f}
+    in_chunk = lambda x: str(Path(x.get("source_file") or "").resolve()) in chunk_files
+    foreign = sum(1 for x in new_n + new_e + new_h if x.get("source_file") and not in_chunk(x))
+    if foreign:
+        print(f"skipped {foreign} item(s) with source_file outside the chunks")
+    new_n, new_e, new_h = [x for x in new_n if in_chunk(x)], [x for x in new_e if in_chunk(x)], [x for x in new_h if in_chunk(x)]
     if new_n:
         save_semantic_cache(new_n, new_e, new_h)
     nodes, edges, hyper, missing = check_semantic_cache(files)

@@ -4,73 +4,76 @@
 
 ## Структура
 
-Консоль — контекст `Console` в точках входа: `Entrypoints/Console/{Domain}/{Module}/` (как `parking_app/Entrypoints/Console/Billing/WhitelistOutbox/`), провайдер — `Entrypoints/Console/{Domain}/ServiceProvider.php`.
+Консоль — контекст `Console` в точках входа (образец — `stacks/php/examples/parking_app/Entrypoints/Console/Billing/`):
+
+```
+Entrypoints/Console/{Domain}/
+├── ServiceProvider.php                      ← один на домен, extends MPS\Core\Modules\ModuleServiceProvider
+├── commands.php                             ← список команд домена
+└── {Module}/{Action}ConsoleCommand.php      ← команда модуля, без подкаталога Commands/
+```
+
+Провайдера на уровне модуля нет. Провайдер домена регистрируется в провайдере подпроекта (`../structure.md`).
 
 ## ServiceProvider
 
 ```php
-namespace App\ParkingApp\Entrypoints\Console\YourDomain\YourModule\Providers;
+namespace App\ParkingApp\Entrypoints\Console\YourDomain;
 
-use MPS\Core\Modules\ModuleServiceProvider;
+use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
-class ServiceProvider extends ModuleServiceProvider
+class ServiceProvider extends CoreServiceProvider
 {
-    public static function getName(): string
-    {
-        return 'console:your-domain:your-module';
-    }
 }
 ```
 
-Зарегистрировать в родительском `Entrypoints/Console/{Domain}/ServiceProvider.php`.
+Образец — `stacks/php/examples/parking_app/Entrypoints/Console/Billing/ServiceProvider.php`.
 
 ## commands.php
 
-Два варианта регистрации:
+`Entrypoints/Console/{Domain}/commands.php` возвращает классы команд всех модулей домена (образец — `stacks/php/examples/parking_app/Entrypoints/Console/Billing/commands.php`):
 
 ```php
-use App\ParkingApp\Entrypoints\Console\YourDomain\YourModule\Commands\YourConsoleCommand;
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands\YourDomainCommand;
-use Illuminate\Support\Facades\Artisan;
+use App\ParkingApp\Entrypoints\Console\YourDomain\YourModule\YourActionConsoleCommand;
 
-// Вариант 1 — класс команды (когда нужны опции, аргументы)
 return [
-    YourConsoleCommand::class,
+    YourActionConsoleCommand::class,
 ];
-
-// Вариант 2 — Artisan::command() для простых однострочников без опций
-Artisan::command('your-domain:action', function () {
-    app(YourDomainCommand::class)->execute();
-})->setDescription('Описание команды');
 ```
 
-Можно комбинировать оба варианта в одном файле.
+`Artisan::command('…', fn () => …)` для однострочника без опций допустим в том же файле, но эталон его не использует: класс команды проверяет аргументы и тестируется.
 
 ## Artisan-команда
 
-Тонкая оболочка: маппит CLI-опции в доменный Command и вызывает его. Бизнес-логики в `handle()` нет.
+Тонкая оболочка: проверяет и маппит аргументы CLI, вызывает доменный Command, возвращает код выхода. Бизнес-логики в `handle()` нет. Образец — `stacks/php/examples/parking_app/Entrypoints/Console/Billing/Tariffs/SetDefaultTariffConsoleCommand.php`.
 
 ```php
-namespace App\ParkingApp\Entrypoints\Console\YourDomain\YourModule\Commands;
+namespace App\ParkingApp\Entrypoints\Console\YourDomain\YourModule;
 
 use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands\YourDomainCommand;
 use Illuminate\Console\Command;
 
-class YourConsoleCommand extends Command
+class YourActionConsoleCommand extends Command
 {
-    protected $signature = 'your-domain:module:action
-        {--ids= : ID через запятую}
-        {--chunk-size= : Размер чанка}
+    protected $signature = 'your-domain:your-module:action
+        {id : ID записи}
     ';
 
     protected $description = 'Описание команды';
 
-    public function handle(YourDomainCommand $command): void
+    public function handle(YourDomainCommand $command): int
     {
-        $ids = $this->option('ids') ? array_map('intval', explode(',', (string) $this->option('ids'))) : [];
-        $chunkSize = (int) ($this->option('chunk-size') ?: 100);
+        $id = (string) $this->argument('id');
 
-        $command->execute(new YourActionParamsDto($ids, $chunkSize));
+        if (! ctype_digit($id) || (int) $id === 0) {
+            $this->error('ID — целое положительное число');
+
+            return self::INVALID;
+        }
+
+        $command->execute((int) $id, null);   // консоль без пользователя: скоуп null явно (architecture/layers.md, В-19)
+
+        return self::SUCCESS;
     }
 }
 ```

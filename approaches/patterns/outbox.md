@@ -9,17 +9,12 @@
 
 ## Форма (одинакова в обоих стеках)
 
-1. В той же транзакции, что и бизнес-запись, создаётся строка outbox: `status` (pending/sent/failed), `operation`, `payload`, `attempts`, идентификаторы для поиска (`parking_id`, …).
-2. Доставка — отдельный шаг: workflow берёт запись и шлёт наружу через репозиторий-клиент.
-3. Ошибки делятся на **временные** (сеть, 5xx — повтор через очередь/ретрай) и **постоянные** (нет конфигурации, битый payload — ручной разбор, без бесконечного повтора). Тип ошибки задаёт исключение и записан в `@throws`/доке метода.
-4. Повтор зависших — консольная команда / consumer по расписанию.
+1. **Запись события** — в транзакции сценария, который делает бизнес-запись (workflow или Command/сервис домена — кто пишет, тот и пишет событие): строка outbox — `status` (pending/published/failed/awaiting_retry), тип события (routing key), поля события колонками или `payload`, `attempts`, идентификаторы для поиска (`parking_id`, …). Отдельная таблица и модуль домена на поток событий (`outbox_{поток}_event`).
+2. **Доставка** — однодоменная операция модуля outbox, поэтому **Command домена** (`architecture/layers.md`, «Service, Command/Query, Workflow»), не workflow: одно событие → публикация через порт отправки (`system.go`/интерфейс публикатора) → отметка `published`; неудача → `attempts + 1`, `awaiting_retry` или `failed` по лимиту из конфига. Уже опубликованное и исчерпавшее попытки не отправляет — повтор безопасен. Первая попытка — сразу после коммита сценария; её сбой не отменяет сценарий (ошибка репортится, событие ждёт повтора).
+3. Ошибки делятся на **временные** (сеть, 5xx, брокер недоступен — повтор) и **постоянные** (нет конфигурации, битый payload — `failed`, ручной разбор, без бесконечного повтора). Тип ошибки задаёт исключение и записан в `@throws`/доке метода.
+4. **Повтор зависших** — второй Command домена, его вызывает консольная команда по расписанию: пачками, выборка с `FOR UPDATE SKIP LOCKED` (`concurrency.md`), сбой одного события — репорт и дальше, ошибка выборки — стоп.
 
-## Где реализовано (исходные проекты, для справки)
-
-Агент эти проекты не открывает: в проекте задачи — соседний outbox-модуль, если есть, иначе — по шагам выше.
-
-- Go: `domains/session/outbox_session_event/` (сущность, статус-enum, репозиторий), `workflows/session/outbox_session_event/sync_outbox_event_command.go` (по правилам — `sync_outbox_event_workflow.go`, G-1), consumer в `bootstrap/.../consumers_factory.go`.
-- PHP: `Domains/Billing/Modules/WhitelistOutbox/`, `Workflows/Billing/WhitelistOutbox/DeliverWhitelistCommand.php` (по правилам — `DeliverWhitelistWorkflow`, P-2), публикация `Infrastructure/RabbitMQ/Billing/WhitelistOutbox/`, повтор `Entrypoints/Console/Billing/WhitelistOutbox/RetryWhitelistOutboxCommand.php`.
+Эталон формы (Go): `stacks/go/examples/tariff/internal/domains/billing/outbox_tariff_event/` (`entity.go`, `status_enum.go`, `repository.go`, `system.go`, `publish_outbox_tariff_event_command.go`, `retry_outbox_tariff_events_command.go`); запись события — в транзакции `workflows/billing/tariff/create_tariff_workflow.go`; консоль — `entrypoints/system/console/billing/outbox_tariff_event/`; README эталона. Эталон формы (PHP): `stacks/php/examples/parking_app/Domains/Billing/Modules/OutboxTariffEvents/` (`Commands/{Publish,Retry}…Command.php`, `Enums/`, `Repositories/…PublisherInterface.php`), `Infrastructure/Postgres/Billing/OutboxTariffEvents/`, публикатор — `Infrastructure/RabbitMQ/Billing/OutboxTariffEvents/Publishers/OutboxTariffEventPublisher.php`, консоль — `Entrypoints/Console/Billing/OutboxTariffEvents/RetryOutboxTariffEventsConsoleCommand.php`; правила консоли и consumer — `stacks/php/mps-core/cli.md`, `stacks/php/mps-core/jobs.md`.
 
 ## Нельзя
 

@@ -15,10 +15,10 @@ builder.NewDeleteHttpRequestBuilder[E](ctx, url)
 ## Конфигурация
 
 ```go
-.SetRequestHeaders(map[string]string{"key": "value"})
+.SetRequestHeaders(map[string]string{"key": "value"}) // ЗАМЕНЯЕТ все заголовки — вызывать до SetJSONBody/SetXMLBody
 .SetQueryParams(map[string]string{"page": "1"})
 .SetRequestTimeout(5 * time.Second)  // default: 30s
-.SetJSONBody(payload)                // Content-Type: application/json
+.SetJSONBody(payload)                // добавляет Content-Type: application/json к уже заданным заголовкам
 .SetXMLBody(payload)                 // Content-Type: application/xml
 .SetThrowUnmarshalError(false)       // не возвращать ошибку если тело не JSON
 ```
@@ -44,18 +44,29 @@ resp.IsServerError()  // 5xx
 
 ## Поведение ошибок
 
-- **5xx** → `GetResult()` возвращает `error`
-- **4xx** → не ошибка, бизнес-логика; проверять через `resp.IsClientError()`
+- `GetResult()` / `Do()` возвращают `error` только при сбое транспорта (сеть, таймаут, отмена контекста) и — с `SetThrowUnmarshalError(true)` — при неразбираемом теле. **Статус ответа ошибкой не считается**: и 4xx, и 5xx приходят с `err == nil` (сверено по `gosdk-http-request-builder` v1.0.2).
+- Поэтому после `GetResult()` статус проверяется **всегда**: `!resp.IsSuccess()` → ошибка адаптера; 4xx (`resp.IsClientError()`) — ответ внешней системы, который сценарий может разобрать (не найдено, отказ), 5xx (`resp.IsServerError()`) — сбой внешней системы. Использовать `resp.Result` без проверки статуса — **[ОШИБКА]** `http-status-unchecked`.
 
 ## Проброс Request ID (обязателен) — отсутствие = ошибка ревью
 
+`gin.GetHttpInfoFromContext(ctx)` возвращает `nil` вне HTTP-запроса (consumer, консоль, тикер, `context.WithoutCancel` после ответа) — `httpInfo.RequestId` без проверки = паника. Заголовок собирается одним хелпером проекта (не-бизнесовая функциональность — один раз, `conventions.md` п. 22), а не проверкой в каждом адаптере:
+
 ```go
-httpInfo := gin.GetHttpInfoFromContext(ctx)
+// pkg/requestid/requestid.go
+// Header — заголовок Request ID для исходящего запроса; вне HTTP-запроса — пустой набор.
+func Header(ctx context.Context) map[string]string {
+    if info := gin.GetHttpInfoFromContext(ctx); info != nil && info.RequestId != "" {
+        return map[string]string{constants.RequestIdHeaderName: info.RequestId}
+    }
+
+    return map[string]string{}
+}
+
 builder.NewGetHttpRequestBuilder[ResponseType](ctx, url).
-    SetRequestHeaders(map[string]string{
-        constants.RequestIdHeaderName: httpInfo.RequestId,
-    })
+    SetRequestHeaders(requestid.Header(ctx))
 ```
+
+Своя проверка `httpInfo != nil` в двух и более адаптерах — **[ОШИБКА]** (инфраструктурный workaround, `stacks/go/conventions.md` п. 22).
 
 ## model.go
 
@@ -84,9 +95,7 @@ func modelToEntity(m *city) *domain.City {
 
 ```go
 resp, err := builder.NewGetHttpRequestBuilder[builder.Response[city]](ctx, url).
-    SetRequestHeaders(map[string]string{
-        constants.RequestIdHeaderName: httpInfo.RequestId,
-    }).
+    SetRequestHeaders(requestid.Header(ctx)).
     SetQueryParams(map[string]string{"page": "1"}).
     GetResult()
 ```
@@ -95,9 +104,7 @@ resp, err := builder.NewGetHttpRequestBuilder[builder.Response[city]](ctx, url).
 
 ```go
 resp, err := builder.NewPostHttpRequestBuilder[builder.Response[city]](ctx, url).
-    SetRequestHeaders(map[string]string{
-        constants.RequestIdHeaderName: httpInfo.RequestId,
-    }).
+    SetRequestHeaders(requestid.Header(ctx)). // до SetJSONBody — иначе Content-Type затрётся
     SetJSONBody(payload).
     GetResult()
 ```
@@ -106,30 +113,44 @@ PUT / PATCH — аналогично POST, только другой конст�
 
 ## repository.go
 
+Адаптер пакета `internal/infrastructure/http/{provider}/{product}/` называется по роли порта (`architecture/integrations.md`, В-18): источник данных — `HTTPRepository` в `repository.go`, порт отправки (уведомление, публикация без данных в ответ) — `HTTPNotifier` в `notifier.go` (не `Client`, не `HttpRepository`, не `Gateway`); реализует порт домена или workflow неявно. Эталон — `examples/tariff/internal/infrastructure/http/cityparking/pricelimits/repository.go` (порт данных), `.../partnerbilling/tariffs/notifier.go` (порт отправки). Ниже — источник данных; у `HTTPNotifier` та же форма (конструктор с адресом и таймаутом, `POST` с телом из `mapper.go`).
+
+**Клиент.** `gosdk-http-request-builder` создаёт `http.Client` сам на каждый запрос (сеттера клиента нет, сверено по v1.0.2), поэтому для него правило «клиент инжектируется» (`conventions.md` п. 15, `architecture/integrations.md`) означает: адрес и таймаут приходят через конструктор из конфига модуля (`app/bootstrap/{domain}/{module}/config.go`), а не литералом в репозитории; таймаут — `SetRequestTimeout` на каждый запрос.
+
+**Конфиг.** Адрес проверяется и нормализуется (абсолютный http(s), без хвостового `/`) при чтении конфига, не в конструкторе адаптера (`regulations/service-requirements.md`, «Конфиг»); таймаут в env — целые секунды, в `time.Duration` переводит bootstrap (`config.InitConfig` `time.Duration` из env не разбирает — сверено по `gosdk-core` v1.0.9). Эталон — `examples/tariff/internal/app/bootstrap/billing/tariff/config.go`.
+
 ```go
-// Адрес и таймаут — из конфига через конструктор (bootstrap), не литералом в репозитории
-// (`conventions.md` п. 15, `architecture/integrations.md`); клиент не создаётся внутри.
-func NewHttpRepository(baseURL string, timeout time.Duration) *HttpRepository {
-    return &HttpRepository{baseURL: strings.TrimSuffix(baseURL, "/"), timeout: timeout}
+func NewHTTPRepository(baseURL string, timeout time.Duration) *HTTPRepository {
+    return &HTTPRepository{
+        baseURL: baseURL,
+        timeout: timeout,
+    }
 }
 
-type HttpRepository struct {
+type HTTPRepository struct {
     baseURL string
     timeout time.Duration
 }
 
-func (r *HttpRepository) GetById(ctx context.Context, id uint) (*domain.City, error) {
-    httpInfo := gin.GetHttpInfoFromContext(ctx)
-
+func (r *HTTPRepository) GetByID(ctx context.Context, id uint) (*domain.City, error) {
     resp, err := builder.NewGetHttpRequestBuilder[builder.Response[city]](
         ctx,
-        r.baseURL+"/api/v1/cities/"+strconv.FormatUint(uint64(id), 10),
-    ).SetRequestTimeout(r.timeout).SetRequestHeaders(map[string]string{
-        constants.RequestIdHeaderName: httpInfo.RequestId,
-    }).GetResult()
-
+        fmt.Sprintf("%s/api/v1/cities/%d", r.baseURL, id),
+    ).
+        SetRequestHeaders(requestid.Header(ctx)).
+        SetRequestTimeout(r.timeout).
+        SetThrowUnmarshalError(false).
+        GetResult()
     if err != nil {
-        return nil, err
+        return nil, fmt.Errorf("get city failed (id=%d): %w", id, err)
+    }
+
+    if resp.StatusCode == http.StatusNotFound {
+        return nil, nil
+    }
+
+    if !resp.IsSuccess() {
+        return nil, fmt.Errorf("get city failed (id=%d): status %d", id, resp.StatusCode)
     }
 
     return modelToEntity(&resp.Result.Data), nil

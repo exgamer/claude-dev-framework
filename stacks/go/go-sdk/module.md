@@ -22,7 +22,7 @@ client (postgres DI)
 
 ## Правила
 
-- Модули не зависят друг от друга
+- Модули не зависят друг от друга, кроме двух форм: готовый объект через DI (владелец регистрирует, потребитель — `di.Resolve` в `Init`, владелец раньше в `app.go`) и `Load{Name}()` настройки владельца — `../structure.md`, «Зависимости модулей bootstrap»
 - `Name()` возвращает строку-идентификатор модуля (уникальная в рамках приложения)
 - Если нет Rabbit — блок с consumers не нужен
 - DI использовать только внутри `Init` — не передавать `a.Container` в фабрики и сервисы
@@ -37,7 +37,7 @@ package tariff
 import (
     tariffhttp "git.example.com/.../internal/entrypoints/client/http/billing/tariff"
     "github.com/exgamer/gosdk-core/pkg/app"
-    postgresDi "github.com/exgamer/gosdk-postgres-core/pkg/di"
+    postgresDI "github.com/exgamer/gosdk-postgres-core/pkg/di"
 )
 
 type Module struct{}
@@ -47,7 +47,7 @@ func (m *Module) Name() string {
 }
 
 func (m *Module) Init(a *app.App) error {
-    client, err := postgresDi.GetDefaultPostgresConnection(a.Container)
+    client, err := postgresDI.GetDefaultPostgresConnection(a.Container)
     if err != nil {
         return err
     }
@@ -64,7 +64,7 @@ func (m *Module) Init(a *app.App) error {
 
 ```go
 func (m *Module) Init(a *app.App) error {
-    client, err := postgresDi.GetDefaultPostgresConnection(a.Container)
+    client, err := postgresDI.GetDefaultPostgresConnection(a.Container)
     if err != nil {
         return err
     }
@@ -81,7 +81,7 @@ func (m *Module) Init(a *app.App) error {
     consumersFactory := newConsumersFactory()
     consumers := cityconsumer.GetConsumers(consumersFactory.CityConsumer)
 
-    reg, err := rabbitDi.GetRabbitConsumersRegistry(a.Container)
+    reg, err := rabbitDI.GetRabbitConsumersRegistry(a.Container)
     if err != nil {
         return err
     }

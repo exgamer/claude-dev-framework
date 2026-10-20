@@ -9,14 +9,21 @@ use Illuminate\Validation\Rule;
 use MPS\Core\Enums\CurrencyEnum;
 use OpenApi\Attributes as OA;
 
+/**
+ * Создание тарифа.
+ *
+ * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ */
 #[OA\Schema(
     schema: 'TariffCreateRequest',
-    required: ['parking_id', 'name'],
+    required: ['parking_id', 'name', 'price'],
     properties: [
         new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
         new OA\Property(property: 'name', description: 'Название тарифа', type: 'string', example: 'Стандарт'),
-        new OA\Property(property: 'currency', description: 'Валюта', type: 'string', example: 'KZT', nullable: true),
+        new OA\Property(property: 'currency', description: 'Валюта, по умолчанию KZT', type: 'string', example: 'KZT'),
+        new OA\Property(property: 'price', description: 'Цена часа в минимальных единицах валюты; не выше лимита реестра парковок', type: 'integer', example: 50000),
         new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
+        new OA\Property(property: 'scheduled_at', description: 'Дата активации, не в прошлом: задана — тариф создаётся запланированным и в эту дату становится тарифом по умолчанию', type: 'string', format: 'date-time', example: '2026-11-01 00:00:00', nullable: true),
     ],
     type: 'object'
 )]
@@ -32,8 +39,10 @@ class CreateRequest extends Request
         return [
             'parking_id' => ['required', 'integer', 'gt:0'],
             'name' => ['required', 'string', 'max:255'],
-            'currency' => ['nullable', 'string', Rule::enum(CurrencyEnum::class)],
+            'currency' => ['sometimes', 'string', Rule::enum(CurrencyEnum::class)],
+            'price' => ['required', 'integer', 'min:0', 'max:100000000'],
             'grace_minutes' => ['nullable', 'integer', 'min:0', 'max:1440'],
+            'scheduled_at' => ['nullable', 'date_format:Y-m-d H:i:s'],
         ];
     }
 }

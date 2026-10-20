@@ -3,6 +3,7 @@ package tariff
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/exception"
@@ -21,18 +22,23 @@ type Service struct {
 	cacheRepository CacheRepository
 }
 
-// GetByID Тариф по ID: сначала кеш, при промахе — БД с записью обратно в кеш
-func (s *Service) GetByID(ctx context.Context, id uint) (*Tariff, error) {
+// GetByID Тариф по ID в пределах парковок parkingIDs (nil — без ограничения): сначала кеш, при промахе — БД с записью обратно в кеш.
+// Кеш хранит тариф без скоупа — после чтения из кеша парковка сверяется со скоупом; чужой тариф — 404, как из БД
+func (s *Service) GetByID(ctx context.Context, id uint, parkingIDs []uint) (*Tariff, error) {
 	tariff, err := s.cacheRepository.GetByID(ctx, id)
 	if err != nil {
 		errorreporter.CaptureSoft(ctx, err, nil)
 	}
 
 	if tariff != nil {
+		if !inParkings(parkingIDs, tariff.ParkingID) {
+			return nil, exception.NewNotFoundException(errors.New("тариф не найден"), false)
+		}
+
 		return tariff, nil
 	}
 
-	tariff, err = s.repository.GetByID(ctx, id)
+	tariff, err = s.repository.GetByID(ctx, id, parkingIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -48,12 +54,14 @@ func (s *Service) GetByID(ctx context.Context, id uint) (*Tariff, error) {
 	return tariff, nil
 }
 
-func (s *Service) Paginated(ctx context.Context, search *Search) (*pagination.Paginated[Tariff], error) {
-	return s.repository.Paginated(ctx, search)
+// Paginated Список тарифов в пределах парковок parkingIDs (nil — без ограничения)
+func (s *Service) Paginated(ctx context.Context, search *Search, parkingIDs []uint) (*pagination.Paginated[Tariff], error) {
+	return s.repository.Paginated(ctx, search, parkingIDs)
 }
 
-func (s *Service) Update(ctx context.Context, id uint, patch *Patch) (*Tariff, error) {
-	if _, err := s.GetByID(ctx, id); err != nil {
+// Update Изменение тарифа в пределах парковок parkingIDs (nil — без ограничения); чужой — 404
+func (s *Service) Update(ctx context.Context, id uint, parkingIDs []uint, patch *Patch) (*Tariff, error) {
+	if _, err := s.GetByID(ctx, id, parkingIDs); err != nil {
 		return nil, err
 	}
 
@@ -65,5 +73,26 @@ func (s *Service) Update(ctx context.Context, id uint, patch *Patch) (*Tariff, e
 		errorreporter.CaptureSoft(ctx, err, nil)
 	}
 
-	return s.repository.GetByID(ctx, id)
+	return s.repository.GetByID(ctx, id, parkingIDs)
+}
+
+// DeactivateByParkingID Отключает тарифы отключённой парковки. Повтор безопасен: уже неактивные тарифы запрос не выбирает
+func (s *Service) DeactivateByParkingID(ctx context.Context, parkingID uint) error {
+	ids, err := s.repository.DeactivateByParkingID(ctx, parkingID)
+	if err != nil {
+		return err
+	}
+
+	for _, id := range ids {
+		if err := s.cacheRepository.Invalidate(ctx, id); err != nil {
+			errorreporter.CaptureSoft(ctx, err, map[string]string{"component": "tariff_cache"})
+		}
+	}
+
+	return nil
+}
+
+// inParkings Парковка входит в скоуп; nil — без ограничения
+func inParkings(parkingIDs []uint, parkingID uint) bool {
+	return parkingIDs == nil || slices.Contains(parkingIDs, parkingID)
 }

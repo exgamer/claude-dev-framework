@@ -34,10 +34,10 @@ import (
 - Прямой `return` без промежуточной переменной где возможно:
   ```go
   // хорошо
-  return repo.GetById(ctx, id)
+  return repo.GetByID(ctx, id)
 
   // лишнее
-  result, err := repo.GetById(ctx, id)
+  result, err := repo.GetByID(ctx, id)
   return result, err
   ```
 - Пустая строка между логическими блоками внутри функции

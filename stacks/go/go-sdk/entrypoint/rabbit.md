@@ -52,17 +52,19 @@ func (c *Consumer) Consume(ctx context.Context, msg *message.Message) error {
 
 ## consumer_registry.go
 
+Порядок аргументов — как в SDK: `NewConsumerTopicDurableConfig(consumerTag, routingKey, exchange, queue string, prefetchCnt int)` (`go-sdk/reference/{gitlab,github}/gosdk-rabbit-core.md`). Пресет не подходит, когда нужны `NoRequeueOnNack` и DLX-аргументы очереди, — тогда `config.NewConsumerByConfigs(...)`, как в эталоне `examples/tariff/internal/entrypoints/consumer/rabbit/billing/tariff/consumer_registry.go`.
+
 ```go
 func GetConsumers(consumer *Consumer) []config.HandlerRegister {
     return []config.HandlerRegister{
         {
             Handler: consumer.Consume,
             Config: config.NewConsumerTopicDurableConfig(
-                "catalog-product-consumer", // уникальное имя
-                "catalog-exchange",         // exchange
-                "catalog-product-queue",    // очередь
+                "catalog-product-consumer", // consumer tag, уникальное имя
                 "catalog.product.*",        // routing key, wildcards поддерживаются
-                10,                         // параллельных воркеров
+                "catalog-exchange",         // exchange издателя
+                "catalog-product-queue",    // своя очередь сервиса
+                10,                         // prefetch
             ),
         },
     }
@@ -72,7 +74,7 @@ func GetConsumers(consumer *Consumer) []config.HandlerRegister {
 ## Регистрация в module.go
 
 ```go
-reg, err := rabbitDi.GetRabbitConsumersRegistry(a.Container)
+reg, err := rabbitDI.GetRabbitConsumersRegistry(a.Container)
 if err != nil {
     return err
 }
@@ -83,11 +85,25 @@ reg.RegisterMultipleHandler(consumer.GetConsumers(consumersFactory.ProductConsum
 ## Publisher
 
 ```go
-publishersReg, err := rabbitDi.GetRabbitPublishersRegistry(a.Container)
-publisher := publishersReg.GetPublisher()
-msg := message.NewMessage(watermill.NewUUID(), payload)
-publisher.Publish("exchange-name", msg)
+// bootstrap модуля: издатель — по определению из infrastructure/rabbit/{domain}/{module}/publisher_definition.go
+publishersRegistry, err := rabbitDI.GetRabbitPublishersRegistry(a.Container)
+if err != nil {
+    return err
+}
+if err := publishersRegistry.Register(outboxrabbit.NewPublisherDefinition()); err != nil {   // config.NewPublisherDefinition(name, config.NewPublisherTopicDurableConfig(exchange)...)
+    return err
+}
+publisher, err := publishersRegistry.Get(outboxrabbit.PublisherName)   // *rabbitmq.Publisher
+if err != nil {
+    return err
+}
+rabbitPublisher := outboxrabbit.NewRabbitPublisher(publisher)          // адаптер, реализует порт домена
+
+// адаптер: первый аргумент — routing key (topic), payload — any (маршалер SDK)
+err = p.publisher.PublishWithMetaData(event.RoutingKey, metadata, entityToMessage(event))
 ```
+
+API — `go-sdk/reference/{gitlab,github}/gosdk-rabbit-core.md` (`PublisherRegistry.Register`/`Get`, `Publisher.Publish(topic string, payload any)`, `PublishWithMetaData`); `GetPublisher()` в SDK нет. Эталон — `examples/tariff/internal/infrastructure/rabbit/billing/outbox_tariff_event/{publisher,publisher_definition}.go`, регистрация — `examples/tariff/internal/app/bootstrap/billing/outbox_tariff_event/module.go`.
 
 - **Тип-обёртка над `*rabbitmq.Publisher` не называется `Publisher`** — если инфра-адаптер конкретного домена (`internal/infrastructure/rabbit/{domain}/{module}/publisher.go`) реализует доменный интерфейс `Publisher` через встроенный `*rabbitmq.Publisher`, называть сам адаптер тоже `Publisher` — **[ВНИМАНИЕ]**: получается три сущности с одним именем (доменный интерфейс `Publisher`, инфра-структура `Publisher`, SDK-тип `rabbitmq.Publisher` как поле) — путаница при переходе по определению/грепе. Называть адаптер иначе (`RabbitPublisher` или с префиксом домена)
 - **Обёртка ради обёртки** — если инфра-тип (`RetryScheduler`, `XxxPublisher` и т.п.) не добавляет никакой логики поверх `*rabbitmq.Publisher.Publish(...)`, кроме фиксированного routing key — это нормальный Adapter (домен не должен знать routing key). Но если поверх уже есть один такой адаптер и создаётся ещё один слой обёртки без новой логики — **[ВНИМАНИЕ]**, пересмотреть структуру
@@ -104,7 +120,7 @@ ch, err := conn.Channel()
 ...
 
 // хорошо — переиспользуем соединение kernel-а (gosdk-rabbit-core >= v1.0.5)
-conn, err := rabbitDi.GetRabbitConnection(a.Container)
+conn, err := rabbitDI.GetRabbitConnection(a.Container)
 if err != nil {
     return err
 }
