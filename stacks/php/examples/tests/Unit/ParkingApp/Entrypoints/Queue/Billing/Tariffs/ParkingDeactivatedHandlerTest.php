@@ -14,10 +14,7 @@ use ReflectionMethod;
 use Tests\TestCase;
 
 /**
- * Обработчик handbook.parking.deactivated: тарифы парковки — в архив через сервис; постоянная ошибка (нет parking_id) —
- * лог и выход без исключения, временная — исключение наверх, сообщение повторится.
- * process() — хук ядра (protected): вызывается через Reflection, как его вызывает UtilsJob::handle().
- * Tests\TestCase — ради фасада Log, которым пишет ядро.
+ * Обработчик handbook.parking.deactivated: архив тарифов, постоянная ошибка — лог, временная — наверх; Tests\TestCase — ради фасада Log.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -93,6 +90,7 @@ class ParkingDeactivatedHandlerTest extends TestCase
     {
         $handler = new ParkingDeactivatedHandler($this->tariffCrudService);
 
+        // process() — protected-хук ядра: так его вызывает UtilsJob::handle()
         (new ReflectionMethod($handler, 'process'))->invoke($handler, $payload);
     }
 }

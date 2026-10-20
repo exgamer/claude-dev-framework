@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
+	"example.com/parking-service/internal/common"
 	outboxdomain "example.com/parking-service/internal/domains/billing/outbox_tariff_event"
 	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 	parkingdomain "example.com/parking-service/internal/domains/handbook/parking"
@@ -47,14 +48,19 @@ func replaceBody(body string) gin.HandlerFunc {
 
 func newCreateHandler(tariffs *billingfakes.TariffRepository) *Handler {
 	parkings := handbookfakes.NewParkingRepository(
-		&parkingdomain.Parking{ID: 7, IsActive: true},
-		&parkingdomain.Parking{ID: 99, IsActive: true},
+		&parkingdomain.Parking{ID: 7, IsActive: true, Currency: common.CurrencyKZT},
+		&parkingdomain.Parking{ID: 99, IsActive: true, Currency: common.CurrencyKZT},
 	)
 	outbox := billingfakes.NewOutboxTariffEventRepository()
-	txManager := txfakes.NewManager3[parkingdomain.Repository, tariffdomain.Repository, outboxdomain.Repository](parkings, tariffs, outbox)
-	publishCommand := outboxdomain.NewPublishOutboxTariffEventCommand(outbox, &billingfakes.OutboxTariffEventPublisher{}, 3)
+	txManager := txfakes.NewManager2[tariffdomain.Repository, outboxdomain.Repository](tariffs, outbox)
+	publishCommand := outboxdomain.NewPublishOutboxTariffEventCommand(
+		outbox,
+		&billingfakes.OutboxTariffEventPublisher{},
+		txfakes.NewManager[outboxdomain.Repository](outbox),
+		3,
+	)
 
-	return NewHandler(nil, nil, tariffworkflow.NewCreateTariffWorkflow(txManager, noPriceLimits{}, noopNotifier{}, publishCommand))
+	return NewHandler(nil, nil, nil, tariffworkflow.NewCreateTariffWorkflow(txManager, parkings, noPriceLimits{}, noopNotifier{}, publishCommand))
 }
 
 // TestHandler_Create_ParkingScope Свой parking_id — 201; чужой — 403 и в middleware, и в хендлере, если тело подменено после проверки

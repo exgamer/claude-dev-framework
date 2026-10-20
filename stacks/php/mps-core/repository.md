@@ -30,19 +30,20 @@ class IndexRequest extends SearchRequest
 {
     protected array $sortAttributes = ['id', 'name'];
 
-    public function rules(): array
+    // фильтры — хук filterRules(); rules() собирает базовый SearchRequest подпроекта (parent::rules() + filterRules())
+    public function filterRules(): array
     {
-        return array_merge(parent::rules(), [
+        return [
             'id' => ['nullable', 'integer'],
             'name' => ['nullable', 'string'],
-        ]);
+        ];
     }
 }
 
 // контроллер: контекст из middleware — в params (../conventions.md п. 19a)
 $search = SearchDataObject::make()
     ->setParams([...$request->validated(), 'parking_ids' => RequestHelper::getParkingIds($request)])
-    ->setPerPage((int) $request->validated('per_page', 20))
+    ->setPerPage((int) $request->validated('per_page', 30))
     ->setPage($request->validated('page'));
 
 return response()->json(PaginateResource::make($this->service->search($search)));
@@ -125,7 +126,7 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
 
 **Репозиторий НЕ делает:**
 - Не применяет бизнес-правила (`if order.status == PAID then ...`)
-- Не трансформирует и не маппит данные в DTO или другие структуры
+- Не трансформирует данные под потребителя (`keyBy`, скидки, форматирование, сборка ответа); строка → модель/сущность — допустимо (`architecture/layers.md`, «Правила слоёв»)
 - Не вызывает другие сервисы или репозитории
 - Не бросает бизнес-исключения и «не найдено» — возвращает `null`, решает вызывающий
 

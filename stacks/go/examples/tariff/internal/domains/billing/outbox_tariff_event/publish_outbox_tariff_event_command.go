@@ -5,10 +5,16 @@ import (
 	"fmt"
 )
 
-func NewPublishOutboxTariffEventCommand(repository Repository, publisher EventPublisher, maxAttempts uint) *PublishOutboxTariffEventCommand {
+func NewPublishOutboxTariffEventCommand(
+	repository Repository,
+	publisher EventPublisher,
+	txManager FailedAttemptTxManager,
+	maxAttempts uint,
+) *PublishOutboxTariffEventCommand {
 	return &PublishOutboxTariffEventCommand{
 		repository:  repository,
 		publisher:   publisher,
+		txManager:   txManager,
 		maxAttempts: maxAttempts,
 	}
 }
@@ -17,6 +23,7 @@ func NewPublishOutboxTariffEventCommand(repository Repository, publisher EventPu
 type PublishOutboxTariffEventCommand struct {
 	repository  Repository
 	publisher   EventPublisher
+	txManager   FailedAttemptTxManager
 	maxAttempts uint
 }
 
@@ -37,22 +44,36 @@ func (c *PublishOutboxTariffEventCommand) Exec(ctx context.Context, outboxID uin
 		return c.repository.MarkPublished(ctx, outboxID)
 	}
 
-	attempts, err := c.repository.IncrementAttempts(ctx, outboxID)
+	attempts, err := c.recordFailedAttempt(ctx, outboxID)
 	if err != nil {
-		return fmt.Errorf("increment outbox tariff event attempts failed (outbox_id=%d): %w", outboxID, err)
-	}
-
-	if attempts >= c.maxAttempts {
-		if err := c.repository.MarkFailed(ctx, outboxID); err != nil {
-			return err
-		}
-
-		return fmt.Errorf("outbox tariff event failed after %d attempts (outbox_id=%d): %w", attempts, outboxID, publishErr)
-	}
-
-	if err := c.repository.MarkAwaitingRetry(ctx, outboxID); err != nil {
 		return err
 	}
 
+	if attempts >= c.maxAttempts {
+		return fmt.Errorf("outbox tariff event failed after %d attempts (outbox_id=%d): %w", attempts, outboxID, publishErr)
+	}
+
 	return fmt.Errorf("publish outbox tariff event failed, awaiting retry (outbox_id=%d, attempts=%d): %w", outboxID, attempts, publishErr)
+}
+
+// recordFailedAttempt Попытка и статус — вместе: счётчик без статуса дал бы StatusFailed по числу, но StatusAwaitingRetry в выборке повтора
+func (c *PublishOutboxTariffEventCommand) recordFailedAttempt(ctx context.Context, outboxID uint) (uint, error) {
+	var attempts uint
+
+	err := c.txManager.Exec(ctx, func(ctx context.Context, repository Repository) error {
+		incremented, incrementErr := repository.IncrementAttempts(ctx, outboxID)
+		if incrementErr != nil {
+			return fmt.Errorf("increment outbox tariff event attempts failed (outbox_id=%d): %w", outboxID, incrementErr)
+		}
+
+		attempts = incremented
+
+		if attempts >= c.maxAttempts {
+			return repository.MarkFailed(ctx, outboxID)
+		}
+
+		return repository.MarkAwaitingRetry(ctx, outboxID)
+	})
+
+	return attempts, err
 }

@@ -20,9 +20,7 @@ use MPS\Core\Exceptions\ValidationAppException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Запись тарифа через TariffCrudService: инварианты, статус при создании (с датой активации — запланированный),
- * отсутствующий тариф, отключение тарифов парковки; кеш по ID — сверка скоупа после чтения, сброс после записи,
- * недоступный кеш не роняет запрос.
+ * Запись тарифа через TariffCrudService: инварианты, статус при создании, 404, 422 при переносе тарифа по умолчанию, кеш по ID.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -240,10 +238,29 @@ class TariffCrudServiceTest extends TestCase
         $dto = $this->dto(name: 'Стандарт');
 
         $this->repository->shouldReceive('getByIdInParkings')->once()->andReturn($tariff);
-        $this->repository->shouldReceive('updateFromDto')->once()->with($tariff, $dto);
+        $this->repository->shouldReceive('updateFromDto')->once()->with($tariff, $dto)->andReturnTrue();
         $this->cacheRepository->shouldReceive('forget')->once()->with(self::TARIFF_ID);
 
         $this->assertSame($tariff, $this->service->update(self::TARIFF_ID, null, $dto));
+    }
+
+    public function test_moving_default_tariff_to_parking_with_default_is_validation_error(): void
+    {
+        $tariff = $this->tariff(parkingId: 15);
+        $dto = $this->dto(name: 'Стандарт');
+
+        $this->repository->shouldReceive('getByIdInParkings')->once()->andReturn($tariff);
+        // Уникальный индекс тарифа по умолчанию: репозиторий вернул false — 422, не 500
+        $this->repository->shouldReceive('updateFromDto')->once()->with($tariff, $dto)->andReturnFalse();
+        $this->cacheRepository->shouldNotReceive('forget');
+
+        try {
+            $this->service->update(self::TARIFF_ID, null, $dto);
+            $this->fail('Ожидалось ValidationAppException');
+        } catch (ValidationAppException $e) {
+            $this->assertSame(422, $e->getStatusCode());
+            $this->assertArrayHasKey('parking_id', $e->getDetails());
+        }
     }
 
     private function tariff(int $parkingId): Tariff

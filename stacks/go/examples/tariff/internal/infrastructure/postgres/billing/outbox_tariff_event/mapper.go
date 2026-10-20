@@ -1,6 +1,7 @@
 package outbox_tariff_event
 
 import (
+	"example.com/parking-service/internal/common"
 	outboxdomain "example.com/parking-service/internal/domains/billing/outbox_tariff_event"
 )
 
@@ -14,7 +15,7 @@ func modelToEntity(model *outboxTariffEvent) *outboxdomain.OutboxTariffEvent {
 		TariffID:     model.TariffID,
 		ParkingID:    model.ParkingID,
 		Name:         model.Name,
-		Currency:     model.Currency,
+		Currency:     common.Currency(model.Currency),
 		GraceMinutes: model.GraceMinutes,
 		Price:        model.Price,
 		RoutingKey:   model.RoutingKey,
@@ -34,7 +35,7 @@ func entityToModel(entity *outboxdomain.OutboxTariffEvent) *outboxTariffEvent {
 		TariffID:     entity.TariffID,
 		ParkingID:    entity.ParkingID,
 		Name:         entity.Name,
-		Currency:     entity.Currency,
+		Currency:     string(entity.Currency),
 		GraceMinutes: entity.GraceMinutes,
 		Price:        entity.Price,
 		RoutingKey:   entity.RoutingKey,

@@ -71,7 +71,7 @@ class YourActionConsoleCommand extends Command
             return self::INVALID;
         }
 
-        $command->execute((int) $id, null);   // консоль без пользователя: скоуп null явно (architecture/layers.md, В-19)
+        $command->execute((int) $id, null);   // консоль без пользователя: скоуп null явно (architecture/layers.md, «Принадлежность записи скоупу»)
 
         return self::SUCCESS;
     }
@@ -81,6 +81,6 @@ class YourActionConsoleCommand extends Command
 ## Соглашения
 
 - Signature: `{domain}:{module}:{action}` — через двоеточие
-- Доменный Command инжектируется через параметр `handle()` — Laravel резолвит из контейнера; точка входа у него `execute()` с DTO/типизированными аргументами, не fluent-сеттеры
+- Доменный Command инжектируется через параметр Laravel-метода `handle()` консольной команды — Laravel резолвит из контейнера; у самого Command точка входа — `execute(...)` с DTO/типизированными аргументами, без базового класса ядра и fluent-сеттеров (`commands.md`, «Форма Command и Query»)
 - Ошибки пробрасываются наверх — Laravel сам выводит их в консоль; fail команды/крона уходит в Sentry (`../checklist.md` п. 23)
 - Крон на нескольких инстансах — `withoutOverlapping()`/`onOneServer()` (`approaches/patterns/concurrency.md`)

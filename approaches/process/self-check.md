@@ -12,7 +12,7 @@
 - [ ] Прогнаны сборка, линтер, тесты стека — с выводом. Не запускал — так и написано.
   - Go-код с горутинами или общим состоянием — `go test -race ./...`.
   - Уязвимости зависимостей, если инструмент есть: Go — `govulncheck ./...`, PHP — `composer audit`.
-  - Go: `go build ./... && go vet ./... && go test ./... && gofmt -l internal pkg`
+  - Go: `go build ./... && go vet ./... && go test ./... && gofmt -l .` (с `vendor/` — `gofmt -l main.go cmd internal pkg`)
   - PHP: `composer csfix-validate`, `composer phpstan`, `composer test:run` (или их аналоги из `composer.json`)
 - [ ] Для проверки на живой инфраструктуре — использованы уже поднятые общие контейнеры (`docker ps`), одноразовые не поднимались; тестовые данные удалены.
 - [ ] Массовые операции, очистка, создание и изменение схемы БД (миграции) — не выполнялись без явного «да» на каждую (`core/principles.md`, «Действия с БД»).

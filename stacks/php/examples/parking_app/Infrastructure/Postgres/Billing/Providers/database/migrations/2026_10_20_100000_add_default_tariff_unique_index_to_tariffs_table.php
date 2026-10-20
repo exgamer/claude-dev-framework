@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use MPS\Core\Exceptions\OperationFailedAppException;
 
 /**
- * У парковки не больше одного тарифа по умолчанию (В-20): частичный уникальный индекс.
- * Дубли молча не исправляются: какой тариф оставить по умолчанию — решение владельца данных, снятый флаг откатом не вернуть.
- * Нашлись — миграция падает со списком парковок, данные правятся отдельной миграцией, затем эта применяется повторно.
+ * У парковки не больше одного тарифа по умолчанию (approaches/patterns/concurrency.md): частичный уникальный индекс.
  */
 return new class () extends Migration {
     private string $tableName = 'parking.tariffs';
 
     private string $indexName = 'tariffs_parking_id_default_unique';
 
+    /**
+     * Дубли молча не исправляются: какой тариф оставить по умолчанию — решение владельца данных, снятый флаг откатом не вернуть.
+     * Нашлись — миграция падает со списком парковок, данные правятся отдельной миграцией, затем эта применяется повторно.
+     *
+     * @throws OperationFailedAppException
+     */
     public function up(): void
     {
         $parkingIds = DB::table($this->tableName)
@@ -29,7 +34,7 @@ return new class () extends Migration {
             ->all();
 
         if ($parkingIds) {
-            throw new RuntimeException(sprintf(
+            throw new OperationFailedAppException(sprintf(
                 'У парковок больше одного тарифа по умолчанию, индекс не создан: исправить данные отдельной миграцией и повторить (parking_id=%s, первые 100)',
                 implode(', ', $parkingIds),
             ));

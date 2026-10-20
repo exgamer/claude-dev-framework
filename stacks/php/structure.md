@@ -31,8 +31,8 @@ parking_app/                                   ← корень подпроек
 │       ├── Repositories/{Entity}RepositoryInterface.php   ← только интерфейс
 │       ├── Services/{Entity}CrudService.php + {Entity}CrudServiceInterface.php
 │       ├── Services/{Context}{Entity}Service.php  ← только если логика для контекста отличается (P-13)
-│       ├── Commands/{Action}Command.php       ← большая операция изменения внутри домена, метод execute()
-│       ├── Queries/{Action}Query.php          ← большая операция чтения внутри домена, метод execute()
+│       ├── Commands/{Action}Command.php       ← большая операция изменения внутри домена, final без базового класса ядра, метод execute(...)
+│       ├── Queries/{Action}Query.php          ← большая операция чтения внутри домена, final без базового класса ядра, метод execute(...)
 │       ├── Validators/{Entity}DtoValidator.php            ← доменная валидация DTO
 │       ├── Jobs/{Action}Job.php               ← отложенные действия домена (Laravel ShouldQueue); обработчики RabbitMQ — Entrypoints/Queue (mps-core/jobs.md)
 │       └── Components/{Name}/                 ← изолированный алгоритм (калькулятор и т.п.) со своими DTO/Enums; тесты — в tests/ (O-3), преобразования формата — Core/Helpers
@@ -90,7 +90,7 @@ parking_app/                                   ← корень подпроек
 | Интерфейс репозитория | `Domains/{D}/Modules/{M}/Repositories/{E}RepositoryInterface.php` | `…\Modules\{M}\Repositories` |
 | Сервис | `Domains/{D}/Modules/{M}/Services/{E}CrudService.php` (+ `Interface`) | `…\Modules\{M}\Services` |
 | Валидатор DTO | `Domains/{D}/Modules/{M}/Validators/{E}DtoValidator.php` | `…\Modules\{M}\Validators` |
-| Command / Query | `Domains/{D}/Modules/{M}/Commands/{Action}Command.php` / `Queries/{Action}Query.php` | `…\Modules\{M}\Commands` / `…\Queries` |
+| Command / Query | `Domains/{D}/Modules/{M}/Commands/{Action}Command.php` / `Queries/{Action}Query.php`, метод `execute(...)` (`mps-core/commands.md`, «Форма Command и Query») | `…\Modules\{M}\Commands` / `…\Queries` |
 | Workflow | `Workflows/{D}/{M}/{Action}Workflow.php`, метод `execute()` | `App\ParkingApp\Workflows\{D}\{M}` |
 | Контроллер | `Entrypoints/{Ctx}/{D}/{M}/Http/Controllers/{E}Controller.php` | `App\ParkingApp\Entrypoints\{Ctx}\{D}\{M}\Http\Controllers` |
 | Request | `Entrypoints/{Ctx}/{D}/{M}/Http/Requests/{E}/CreateRequest.php` | `…\Http\Requests\{E}` |
@@ -139,7 +139,7 @@ parking_app/                                   ← корень подпроек
 | DTO | `dto.go` | `DTO/{E}Dto.php extends DataObject` |
 | Репозиторий | интерфейс в домене, `PostgresRepository` в infra | `{E}RepositoryInterface extends CRUDRepositoryInterface`, `{E}Repository extends CRUDRepository` |
 | Маппер | `mapper.go` на каждом слое | нет: запрос → DTO — `fromArray()`; DTO → колонки — явным списком внутри репозитория (`conventions.md` п. 11a); ответ — `JsonResource` |
-| Большая операция внутри домена | `domains/{d}/{m}/{action}_command.go` / `_query.go`, метод `Exec` | `Domains/{D}/Modules/{M}/Commands/{Action}Command.php` / `Queries/…Query.php`, метод `execute` |
+| Большая операция внутри домена | `domains/{d}/{m}/{action}_command.go` / `_query.go`, метод `Exec` | `Domains/{D}/Modules/{M}/Commands/{Action}Command.php` / `Queries/…Query.php`, метод `execute(...)`, без базового класса ядра |
 | Междоменная логика | `workflows/{d}/{m}/{action}_workflow.go`, метод `Exec` | `Workflows/{D}/{M}/{Action}Workflow.php`, метод `execute()` |
 | Ошибки | `exception.New*Exception` → `response.ErrorResponse` | `MPS\Core\Exceptions\*AppException` → `ApiResponseMiddleware` |
 | Транзакция | `dbtransaction.Manager*` | `TransactionManagerInterface::run()` |

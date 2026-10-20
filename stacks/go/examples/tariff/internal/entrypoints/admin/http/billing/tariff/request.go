@@ -12,12 +12,18 @@ type indexRequest struct {
 	PerPage   uint `form:"per_page" validate:"omitempty,lte=100"`
 }
 
+// defaultRequest Тариф по умолчанию парковки
+type defaultRequest struct {
+	validation.Request
+	ParkingID uint `form:"parking_id" binding:"required" validate:"required,gt=0"`
+}
+
 // createRequest Создание тарифа
 type createRequest struct {
 	validation.Request
 	ParkingID    uint   `json:"parking_id" binding:"required" validate:"required,gt=0"`
 	Name         string `json:"name" binding:"required" validate:"required,max=255"`
-	Currency     string `json:"currency" binding:"required" validate:"required,len=3"`
+	Currency     string `json:"currency" binding:"required" validate:"required,oneof=KZT RUB USD"`
 	GraceMinutes uint   `json:"grace_minutes" validate:"lte=1440"`
 	Price        uint   `json:"price" binding:"required" validate:"required,gt=0,lte=100000000"`
 }

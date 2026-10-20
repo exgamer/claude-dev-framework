@@ -14,6 +14,7 @@ import (
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/response"
 	"github.com/gin-gonic/gin"
 
+	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 	admindomain "example.com/parking-service/internal/domains/identity/admin"
 )
 
@@ -22,7 +23,7 @@ const (
 	maxBodyBytes   = 1 << 20
 )
 
-type parkingIDsContextKey struct{}
+type parkingScopeContextKey struct{}
 
 var (
 	errBodyNotJSON   = errors.New("тело запроса — только application/json")
@@ -30,7 +31,7 @@ var (
 	errBodyTooLarge  = errors.New("тело запроса больше 1 МБ")
 )
 
-// ResolveAdminParkingsMiddleware Кладёт в контекст парковки, доступные администратору (nil — super-admin, без ограничения),
+// ResolveAdminParkingsMiddleware Кладёт в контекст парковки, доступные администратору,
 // и отклоняет parking_id из query или JSON-тела, которого нет среди доступных, — 403.
 // Непустое тело не в JSON — 415; больше 1 МБ — 413; не ровно один JSON-объект или parking_id в нём повторён
 // (в любом регистре) — 400: иначе хендлер может забиндить не то значение, что проверено здесь.
@@ -45,7 +46,7 @@ func ResolveAdminParkingsMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		parkingIDs := accessibleParkingIDs(admin)
+		scope := accessibleParkingScope(admin)
 
 		requestedIDs, err := requestedParkingIDs(c)
 		if status, ok := bodyErrorStatus(err); ok {
@@ -61,38 +62,37 @@ func ResolveAdminParkingsMiddleware() gin.HandlerFunc {
 		}
 
 		for _, requestedID := range requestedIDs {
-			if parkingIDs != nil && !slices.Contains(parkingIDs, requestedID) {
+			if !scope.Allows(requestedID) {
 				response.ErrorResponseUntrackableSentry(c, http.StatusForbidden, errors.New("нет доступа к парковке"), nil)
 
 				return
 			}
 		}
 
-		ctx := context.WithValue(c.Request.Context(), parkingIDsContextKey{}, parkingIDs)
+		ctx := context.WithValue(c.Request.Context(), parkingScopeContextKey{}, scope)
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
 	}
 }
 
-// ParkingIDsFromContext Доступные парковки текущего администратора; nil — без ограничения.
-// Нет значения в контексте (маршрут без ResolveAdminParkingsMiddleware) — ошибка, а не «без ограничения»
-func ParkingIDsFromContext(ctx context.Context) ([]uint, error) {
-	parkingIDs, ok := ctx.Value(parkingIDsContextKey{}).([]uint)
+// ParkingScopeFromContext Скоуп парковок текущего администратора; нет значения в контексте — ошибка: маршрут собран без ResolveAdminParkingsMiddleware
+func ParkingScopeFromContext(ctx context.Context) (tariffdomain.ParkingScope, error) {
+	scope, ok := ctx.Value(parkingScopeContextKey{}).(tariffdomain.ParkingScope)
 	if !ok {
-		return nil, errors.New("parking ids: not in context, ResolveAdminParkingsMiddleware is missing on the route")
+		return tariffdomain.ParkingScope{}, errors.New("parking scope: not in context, ResolveAdminParkingsMiddleware is missing on the route")
 	}
 
-	return parkingIDs, nil
+	return scope, nil
 }
 
-// accessibleParkingIDs nil — у super-admin; у остальных — непустой или пустой, но не nil срез: администратор без парковок не видит ничего
-func accessibleParkingIDs(admin *admindomain.Admin) []uint {
+// accessibleParkingScope All: true — только у super-admin; у остальных — их парковки: администратор без парковок не видит ничего
+func accessibleParkingScope(admin *admindomain.Admin) tariffdomain.ParkingScope {
 	if slices.Contains(admin.SystemRoles, admindomain.SuperAdminRole) {
-		return nil
+		return tariffdomain.ParkingScope{All: true}
 	}
 
-	return append([]uint{}, admin.AllowedParkingIDs...)
+	return tariffdomain.ParkingScope{IDs: append([]uint{}, admin.AllowedParkingIDs...)}
 }
 
 // bodyErrorStatus Код ответа на ошибку тела, которую прислал клиент

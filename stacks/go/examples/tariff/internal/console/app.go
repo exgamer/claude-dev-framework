@@ -2,11 +2,13 @@ package console
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"time"
 
 	consoleapp "git.mpinnovations.kz/mps/go-packages/gosdk-console-core/pkg/app"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter"
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/logger"
 	postgresapp "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/app"
 	postgresDI "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/di"
 	rabbitapp "git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/app"
@@ -61,7 +63,8 @@ func NewApp() (*App, error) {
 		return nil, err
 	}
 
-	consoleKernel.AddCommand(newMigrateCommand(postgresapp.NewMigrator(postgresClient, migrations.All()...)))
+	migrator := postgresapp.NewMigrator(postgresClient, migrations.All()...)
+	consoleKernel.AddCommand(newMigrateCommand(migrator))
 
 	err = appInstance.RegisterAndInitModules(
 		&outbox_tariff_event.Module{Console: consoleKernel},
@@ -75,14 +78,18 @@ func NewApp() (*App, error) {
 	return appInstance, nil
 }
 
-// Close Закрывает соединения ядер в обратном порядке; ошибка закрытия — только в лог, итог команды не меняет
+// Close Закрывает соединения ядер в обратном порядке; ошибка закрытия — в трекер и лог, итог команды не меняет
 func (a *App) Close() {
 	ctx, cancel := context.WithTimeout(context.Background(), closeTimeout)
 	defer cancel()
 
 	for i := len(a.closers) - 1; i >= 0; i-- {
-		if err := a.closers[i].Stop(ctx); err != nil {
-			log.Printf("close %s: %v", a.closers[i].Name(), err)
+		closer := a.closers[i]
+
+		if err := closer.Stop(ctx); err != nil {
+			closeErr := fmt.Errorf("close %s kernel failed: %w", closer.Name(), err)
+			errorreporter.CaptureSoft(ctx, closeErr, map[string]string{"component": "console"})
+			logger.Error(ctx, closeErr.Error())
 		}
 	}
 }

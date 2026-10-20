@@ -59,9 +59,10 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
     public function paginateTariffs(TariffFilterDto $filter, Page $page): LengthAwarePaginator
     {
         $query = $this->getQuery();
+        $parkingIds = $filter->getParkingIds();
 
-        if ($filter->getParkingIds() !== null) {
-            $query->whereIn('parking_id', $filter->getParkingIds());
+        if ($parkingIds !== null) {
+            $query->whereIn('parking_id', $parkingIds);
         }
 
         if ($filter->getParkingId() !== null) {
@@ -132,10 +133,7 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
 
     public function allNotArchivedIdsByParkingId(int $parkingId): array
     {
-        $statuses = array_map(
-            static fn (TariffStatusEnum $status): string => $status->value,
-            TariffStatusEnum::notArchived(),
-        );
+        $statuses = TariffStatusEnum::notArchivedValues();
 
         /** @var list<int> */
         return $this->getQuery()
@@ -160,9 +158,19 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
         return $tariff;
     }
 
-    public function updateFromDto(Tariff $tariff, TariffDto $dto): void
+    public function updateFromDto(Tariff $tariff, TariffDto $dto): bool
     {
-        $tariff->fill($this->columns($dto))->save();
+        try {
+            $tariff->fill($this->columns($dto))->save();
+        } catch (QueryException $e) {
+            if ($this->isUniqueViolation($e, self::DEFAULT_TARIFF_UNIQUE_INDEX)) {
+                return false;
+            }
+
+            throw $e;
+        }
+
+        return true;
     }
 
     public function setDefault(int $id, bool $isDefault): bool
@@ -209,10 +217,7 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
 
     public function archiveNotArchivedByParkingId(int $parkingId): int
     {
-        $statuses = array_map(
-            static fn (TariffStatusEnum $status): string => $status->value,
-            TariffStatusEnum::notArchived(),
-        );
+        $statuses = TariffStatusEnum::notArchivedValues();
 
         return $this->getQuery()
             ->where('parking_id', $parkingId)

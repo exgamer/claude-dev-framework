@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Responses;
 
+use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use OpenApi\Attributes as OA;
 
 /**
  * Тариф в ответе админки.
+ *
+ * @property Tariff $resource
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -33,4 +37,23 @@ use OpenApi\Attributes as OA;
 )]
 class TariffResponse extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->resource->id,
+            'parking_id' => $this->resource->parking_id,
+            'name' => $this->resource->name,
+            'currency' => $this->resource->currency->value,
+            'price' => $this->resource->price,
+            'is_default' => $this->resource->is_default,
+            'status' => $this->resource->status->value,
+            'grace_minutes' => $this->resource->grace_minutes,
+            'scheduled_at' => $this->resource->scheduled_at?->toJSON(),
+            'created_at' => $this->resource->created_at->toJSON(),
+            'updated_at' => $this->resource->updated_at?->toJSON(),
+        ];
+    }
 }

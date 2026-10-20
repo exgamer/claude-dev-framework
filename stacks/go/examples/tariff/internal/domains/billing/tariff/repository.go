@@ -7,11 +7,10 @@ import (
 )
 
 type Repository interface {
-	// GetByID Тариф по ID в пределах парковок parkingIDs (nil — без ограничения); чужой — nil, nil
-	GetByID(ctx context.Context, id uint, parkingIDs []uint) (*Tariff, error)
+	// GetByID Чужой тариф — nil, nil. Скоуп парковок: GetByID — аргументом scope, Paginated — полем Search.Scope; All — все парковки, иначе — IDs, пустой IDs — ни одной; остальные методы работают по id/parkingID без скоупа
+	GetByID(ctx context.Context, id uint, scope ParkingScope) (*Tariff, error)
 	GetDefaultByParkingID(ctx context.Context, parkingID uint) (*Tariff, error)
-	// Paginated Список в пределах парковок parkingIDs (nil — без ограничения)
-	Paginated(ctx context.Context, search *Search, parkingIDs []uint) (*pagination.Paginated[Tariff], error)
+	Paginated(ctx context.Context, search *Search) (*pagination.Paginated[Tariff], error)
 	Create(ctx context.Context, tariff *Tariff) (*Tariff, error)
 	Update(ctx context.Context, id uint, patch *Patch) error
 	// SetDefault Пишет флаг; второй тариф по умолчанию у парковки (уникальный индекс, параллельная смена) — ErrDefaultTariffTaken
@@ -20,7 +19,7 @@ type Repository interface {
 	DeactivateByParkingID(ctx context.Context, parkingID uint) ([]uint, error)
 }
 
-// CacheRepository Кеш тарифов по ID без скоупа: принадлежность парковке сверяет сервис после чтения
+// CacheRepository Кеш тарифов по ID без скоупа парковок
 type CacheRepository interface {
 	GetByID(ctx context.Context, id uint) (*Tariff, error)
 	Set(ctx context.Context, tariff *Tariff) error

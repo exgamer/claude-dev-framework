@@ -18,6 +18,7 @@
 use App\Http\Controllers\Controller;
 use App\ParkingApp\Core\Http\RequestHelper;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use MPS\Core\Exceptions\NotFoundAppException;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,12 +35,14 @@ class TariffController extends Controller
     #[OA\Get(path: '/parking/admin/tariffs', summary: 'Список тарифов', tags: ['Admin Parking: Тарифы'], /* parameters, responses */)]
     public function index(IndexRequest $request): JsonResponse
     {
-        // Список в форме (2) — явный метод репозитория paginate…({E}FilterDto, Page) (форма — по «Список» design.md, P-19, п. 2a); контекст из middleware — полем DTO (п. 19a)
+        // Список в форме (2) — явный метод репозитория paginate…({E}FilterDto, Page) (форма — по «Список» design.md, P-19, п. 2a); контекст из middleware — полем DTO (п. 19a; не выставлен — исключение в геттере DTO, null — только явно)
         $filter = TariffFilterDto::make()
             ->fromArray($request->validated())
             ->setParkingIds(RequestHelper::getParkingIds($request));
 
-        return response()->json(new TariffPaginatedResponse($this->service->paginate($filter, Page::fromRequest($request))));
+        $tariffs = $this->service->paginate($filter, Page::fromRequest($request));
+
+        return response()->json(new TariffPaginatedResponse($tariffs));
     }
 
     #[OA\Get(path: '/parking/admin/tariffs/{id}', summary: 'Тариф по ID', tags: ['Admin Parking: Тарифы'], /* … */)]
@@ -58,7 +61,9 @@ class TariffController extends Controller
     {
         $dto = TariffDto::make()->fromArray($request->validated());   // DTO по всей цепочке (P-18, п. 11a)
 
-        return response()->json(new TariffResponse($this->createTariffWorkflow->execute($dto)), Response::HTTP_CREATED);
+        $tariff = $this->createTariffWorkflow->execute($dto);
+
+        return response()->json(new TariffResponse($tariff), Response::HTTP_CREATED);
     }
 
     #[OA\Put(path: '/parking/admin/tariffs/{id}', summary: 'Обновление тарифа', tags: ['Admin Parking: Тарифы'], /* … */)]
@@ -66,13 +71,15 @@ class TariffController extends Controller
     {
         $dto = TariffDto::make()->fromArray($request->validated());   // PUT — полные данные (O-10, п. 12)
 
-        return response()->json(new TariffResponse($this->service->update($id, $dto)));
+        $tariff = $this->service->update($id, RequestHelper::getParkingIds($request), $dto);   // скоуп — аргументом (п. 19a)
+
+        return response()->json(new TariffResponse($tariff));
     }
 
     #[OA\Delete(path: '/parking/admin/tariffs/{id}', summary: 'Удаление тарифа', tags: ['Admin Parking: Тарифы'], /* … */)]
-    public function delete(int $id): JsonResponse
+    public function delete(int $id, Request $request): JsonResponse
     {
-        $this->service->deleteById($id);
+        $this->service->deleteById($id, RequestHelper::getParkingIds($request));   // скоуп — аргументом (п. 19a)
 
         return response()->json(null, Response::HTTP_NO_CONTENT);
     }
@@ -95,7 +102,8 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(schema: 'TariffCreateRequest', required: ['parking_id', 'name'], properties: [
     new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
     new OA\Property(property: 'name', description: 'Название', type: 'string', example: 'Стандарт'),
-    new OA\Property(property: 'currency', description: 'Валюта', type: 'string', example: 'KZT', nullable: true),
+    new OA\Property(property: 'currency', description: 'Валюта, по умолчанию KZT', type: 'string', example: 'KZT'),
+    new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
 ], type: 'object')]
 class CreateRequest extends Request
 {
@@ -104,13 +112,15 @@ class CreateRequest extends Request
         return [
             'parking_id' => ['required', 'integer', 'gt:0'],
             'name' => ['required', 'string', 'max:255'],
-            'currency' => ['nullable', 'string', Rule::enum(CurrencyEnum::class)],
+            'currency' => ['sometimes', 'string', Rule::enum(CurrencyEnum::class)],   // не прислано — умолчание DTO; явный null — 422
+            'grace_minutes' => ['nullable', 'integer', 'min:0', 'max:' . TimeUnitEnum::DAY->minutes()],          // очищаемое
         ];
     }
 }
 
 // UpdateRequest (PUT): каждое поле required, очищаемое — present|nullable (п. 12)
-'currency' => ['present', 'nullable', 'string', Rule::enum(CurrencyEnum::class)],
+'currency' => ['required', 'string', Rule::enum(CurrencyEnum::class)],
+'grace_minutes' => ['present', 'nullable', 'integer', 'min:0', 'max:' . TimeUnitEnum::DAY->minutes()],
 
 // IndexRequest: каждое поле → поле {E}FilterDto → условие в paginate… (п. 12d); сортировка — enum (п. 12c)
 class IndexRequest extends Request
@@ -152,7 +162,7 @@ Route::middleware(['auth:admin-api', 'permission:parking.tariffs', 'api.response
     });
 ```
 
-Имена — `{ресурсы}.{index|view|create|update|delete}` (методы контроллера называются так же); URL — kebab-case, множественное число; действие вне CRUD — последний сегмент с `POST` (`regulations/rest-api.md`). Роль/право — middleware на маршруте, в контроллере проверок нет (п. 19a).
+Имена — `{ресурсы}.{index|view|create|update|delete}` (методы контроллера называются так же), действие над ресурсом — `{ресурсы}.{действие}` в kebab-case (`tariffs.set-default`); URL — kebab-case, множественное число; действие вне CRUD — последний сегмент с `POST` (`regulations/rest-api.md`). Роль/право — middleware на маршруте, в контроллере проверок нет (п. 19a).
 
 ## Responses
 

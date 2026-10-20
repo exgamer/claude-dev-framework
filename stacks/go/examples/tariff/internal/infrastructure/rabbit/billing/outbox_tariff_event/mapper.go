@@ -14,7 +14,7 @@ func entityToMessage(entity *outboxdomain.OutboxTariffEvent) *eventMessage {
 		TariffID:     entity.TariffID,
 		ParkingID:    entity.ParkingID,
 		Name:         entity.Name,
-		Currency:     entity.Currency,
+		Currency:     string(entity.Currency),
 		GraceMinutes: entity.GraceMinutes,
 		Price:        entity.Price,
 	}

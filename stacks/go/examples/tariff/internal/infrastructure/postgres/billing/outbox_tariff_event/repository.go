@@ -82,6 +82,7 @@ func (r *PostgresRepository) MarkFailed(ctx context.Context, id uint) error {
 	err := r.client.WithContext(ctx).
 		Model(&outboxTariffEvent{}).
 		Where("id = ?", id).
+		Where("status IN ?", []uint{uint(outboxdomain.StatusPending), uint(outboxdomain.StatusAwaitingRetry)}).
 		Update("status", uint(outboxdomain.StatusFailed)).
 		Error
 	if err != nil {
@@ -98,6 +99,7 @@ func (r *PostgresRepository) MarkAwaitingRetry(ctx context.Context, id uint) err
 	err := r.client.WithContext(ctx).
 		Model(&outboxTariffEvent{}).
 		Where("id = ?", id).
+		Where("status IN ?", []uint{uint(outboxdomain.StatusPending), uint(outboxdomain.StatusAwaitingRetry)}).
 		Update("status", uint(outboxdomain.StatusAwaitingRetry)).
 		Error
 	if err != nil {

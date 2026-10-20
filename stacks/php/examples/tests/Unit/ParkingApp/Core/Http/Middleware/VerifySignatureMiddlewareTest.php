@@ -8,6 +8,8 @@ use App\ParkingApp\Core\Enums\RequestHeaderEnum;
 use App\ParkingApp\Core\Helpers\SignatureHelper;
 use App\ParkingApp\Core\Http\Middleware\VerifySignatureMiddleware;
 use App\ParkingApp\Core\Http\Signature\SignatureNonceRepositoryInterface;
+use App\ParkingApp\Core\Http\Signature\SignedMessage;
+use App\ParkingApp\Core\Http\Signature\SignedRequest;
 use Carbon\Carbon;
 use Illuminate\Config\Repository as Config;
 use Illuminate\Http\Request;
@@ -19,8 +21,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Подпись машинного вызова: верная — запрос проходит и занимает nonce; битая, просроченная, повторная — 401,
- * и nonce при отказе по подписи не занимается; нет секрета в конфиге — ошибка конфигурации.
+ * Подпись машинного вызова: верная — проходит и занимает nonce, битая/просроченная/повторная — 401, нет секрета — ошибка конфигурации.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -67,7 +68,8 @@ class VerifySignatureMiddlewareTest extends TestCase
 
     public function test_signed_request_passes_and_takes_nonce(): void
     {
-        $request = $this->request(SignatureHelper::header(self::SECRET, self::NOW, self::NONCE, 'GET', self::TARGET, ''));
+        $header = $this->header(self::SECRET, self::NOW);
+        $request = $this->request($header);
 
         $response = $this->handle($request);
 
@@ -77,14 +79,15 @@ class VerifySignatureMiddlewareTest extends TestCase
 
     public function test_timestamp_inside_window_passes(): void
     {
-        $request = $this->request(SignatureHelper::header(self::SECRET, self::NOW - 299, self::NONCE, 'GET', self::TARGET, ''));
+        $header = $this->header(self::SECRET, self::NOW - 299);
+        $request = $this->request($header);
 
         $this->assertSame(Response::HTTP_OK, $this->handle($request)->getStatusCode());
     }
 
     public function test_replayed_nonce_is_unauthorized(): void
     {
-        $header = SignatureHelper::header(self::SECRET, self::NOW, self::NONCE, 'GET', self::TARGET, '');
+        $header = $this->header(self::SECRET, self::NOW);
         $this->handle($this->request($header));
 
         $this->expectException(UnAuthorizeAppException::class);
@@ -96,10 +99,10 @@ class VerifySignatureMiddlewareTest extends TestCase
     {
         $cases = [
             'нет заголовка' => null,
-            'чужой секрет' => SignatureHelper::header('other', self::NOW, self::NONCE, 'GET', self::TARGET, ''),
-            'другой путь' => SignatureHelper::header(self::SECRET, self::NOW, self::NONCE, 'GET', '/parking/integration/tariffs/43', ''),
-            'время вне окна' => SignatureHelper::header(self::SECRET, self::NOW - 301, self::NONCE, 'GET', self::TARGET, ''),
-            'время из будущего' => SignatureHelper::header(self::SECRET, self::NOW + 301, self::NONCE, 'GET', self::TARGET, ''),
+            'чужой секрет' => $this->header('other', self::NOW),
+            'другой путь' => $this->header(self::SECRET, self::NOW, '/parking/integration/tariffs/43'),
+            'время вне окна' => $this->header(self::SECRET, self::NOW - 301),
+            'время из будущего' => $this->header(self::SECRET, self::NOW + 301),
         ];
 
         foreach ($cases as $case => $header) {
@@ -119,6 +122,14 @@ class VerifySignatureMiddlewareTest extends TestCase
         new VerifySignatureMiddleware($this->nonceRepository, new Config([
             'parking-app' => ['integration_signature' => ['secret' => '', 'tolerance_seconds' => 300]],
         ]));
+    }
+
+    private function header(string $secret, int $timestamp, string $target = self::TARGET): string
+    {
+        $message = new SignedMessage('GET', $target, '');
+        $signed = new SignedRequest($timestamp, self::NONCE, $message);
+
+        return SignatureHelper::header($secret, $signed);
     }
 
     private function handle(Request $request): Response

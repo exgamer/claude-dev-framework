@@ -54,7 +54,13 @@ func (r *PostgresRepository) GetPermissionNames(ctx context.Context, adminID uin
 	defer cancel()
 
 	var names []string
-	err := r.permissionNames(ctx, adminID).Pluck("p.name", &names).Error
+	err := r.client.WithContext(ctx).
+		Table("public.admins_roles AS ar").
+		Joins("JOIN public.role_has_permissions rhp ON rhp.role_id = ar.role_id").
+		Joins("JOIN public.permissions p ON p.id = rhp.permission_id").
+		Where("ar.admin_id = ? AND p.guard_name = ?", adminID, r.guardName).
+		Distinct("p.name").
+		Pluck("p.name", &names).Error
 	if err != nil {
 		return nil, fmt.Errorf("get admin permissions failed (admin_id=%d): %w", adminID, err)
 	}
@@ -66,11 +72,18 @@ func (r *PostgresRepository) GetAllowedParkingIDs(ctx context.Context, adminID u
 	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
+	permissionNames := r.client.WithContext(ctx).
+		Table("public.admins_roles AS ar").
+		Joins("JOIN public.role_has_permissions rhp ON rhp.role_id = ar.role_id").
+		Joins("JOIN public.permissions p ON p.id = rhp.permission_id").
+		Where("ar.admin_id = ? AND p.guard_name = ?", adminID, r.guardName).
+		Select("p.name")
+
 	var ids []uint
 	err := r.client.WithContext(ctx).
 		Table("public.buildings AS b").
 		Where("b.parking_id IS NOT NULL").
-		Where("(? || b.key) IN (?)", buildingPermissionPrefix, r.permissionNames(ctx, adminID)).
+		Where("(? || b.key) IN (?)", buildingPermissionPrefix, permissionNames).
 		Distinct("b.parking_id").
 		Pluck("b.parking_id", &ids).Error
 	if err != nil {
@@ -78,14 +91,4 @@ func (r *PostgresRepository) GetAllowedParkingIDs(ctx context.Context, adminID u
 	}
 
 	return ids, nil
-}
-
-// permissionNames Права ролей администратора в guard'е сервиса
-func (r *PostgresRepository) permissionNames(ctx context.Context, adminID uint) *gorm.DB {
-	return r.client.WithContext(ctx).
-		Table("public.admins_roles AS ar").
-		Joins("JOIN public.role_has_permissions rhp ON rhp.role_id = ar.role_id").
-		Joins("JOIN public.permissions p ON p.id = rhp.permission_id").
-		Where("ar.admin_id = ? AND p.guard_name = ?", adminID, r.guardName).
-		Distinct("p.name")
 }

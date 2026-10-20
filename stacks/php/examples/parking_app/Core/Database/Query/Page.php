@@ -13,7 +13,9 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 final class Page
 {
-    private const DEFAULT_PER_PAGE = 30;
+    public const DEFAULT_PER_PAGE = 30;
+
+    public const MAX_PER_PAGE = 100;
 
     private function __construct(
         private readonly int $number,

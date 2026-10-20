@@ -9,6 +9,9 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use MPS\Core\Exceptions\InvalidConfigurationAppException;
+use MPS\Core\Exceptions\NotFoundAppException;
+use MPS\Core\Exceptions\ValidationAppException;
 
 /**
  * Интерфейс CRUD-сервиса тарифов.
@@ -25,10 +28,17 @@ interface TariffCrudServiceInterface
      */
     public function findById(int $id, ?array $parkingIds): ?Tariff;
 
+    /**
+     * Скоуп парковок — полем фильтра (TariffFilterDto::setParkingIds, выставляет контроллер); не выставлен — исключение.
+     *
+     * @throws InvalidConfigurationAppException
+     */
     public function paginate(TariffFilterDto $filter, Page $page): LengthAwarePaginator;
 
     /**
      * С датой активации тариф создаётся запланированным (SCHEDULED), без неё — действующим (ACTIVE); не по умолчанию.
+     *
+     * @throws ValidationAppException
      */
     public function create(TariffDto $dto): Tariff;
 
@@ -36,6 +46,9 @@ interface TariffCrudServiceInterface
      * Полная замена: DTO пишется целиком, null в необязательном поле очищает его. Тариф чужой парковки — 404.
      *
      * @param ?list<int> $parkingIds
+     *
+     * @throws NotFoundAppException
+     * @throws ValidationAppException
      */
     public function update(int $id, ?array $parkingIds, TariffDto $dto): Tariff;
 

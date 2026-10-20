@@ -3,7 +3,6 @@ package tariff
 import (
 	"errors"
 	"net/http"
-	"slices"
 
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/response"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/validators"
@@ -16,11 +15,13 @@ import (
 
 func NewHandler(
 	tariffService *tariffdomain.Service,
+	getDefaultTariffQuery *tariffdomain.GetDefaultTariffQuery,
 	setDefaultTariffCommand *tariffdomain.SetDefaultTariffCommand,
 	createTariffWorkflow *tariffworkflow.CreateTariffWorkflow,
 ) *Handler {
 	return &Handler{
 		tariffService:           tariffService,
+		getDefaultTariffQuery:   getDefaultTariffQuery,
 		setDefaultTariffCommand: setDefaultTariffCommand,
 		createTariffWorkflow:    createTariffWorkflow,
 	}
@@ -28,6 +29,7 @@ func NewHandler(
 
 type Handler struct {
 	tariffService           *tariffdomain.Service
+	getDefaultTariffQuery   *tariffdomain.GetDefaultTariffQuery
 	setDefaultTariffCommand *tariffdomain.SetDefaultTariffCommand
 	createTariffWorkflow    *tariffworkflow.CreateTariffWorkflow
 }
@@ -41,6 +43,7 @@ type Handler struct {
 // @Param			per_page	query	int	false	"Записей на странице (до 100)"
 // @Security		BearerAuth
 // @Success		200	{object}	tariffListResponse
+// @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
@@ -52,14 +55,14 @@ func (h *Handler) Index() gin.HandlerFunc {
 			return
 		}
 
-		parkingIDs, err := adminmiddleware.ParkingIDsFromContext(c.Request.Context())
+		scope, err := adminmiddleware.ParkingScopeFromContext(c.Request.Context())
 		if err != nil {
 			response.ErrorResponse(c, err)
 
 			return
 		}
 
-		result, err := h.tariffService.Paginated(c.Request.Context(), indexRequestToSearch(request), parkingIDs)
+		result, err := h.tariffService.Paginated(c.Request.Context(), indexRequestToSearch(request, scope))
 		if err != nil {
 			response.ErrorResponse(c, err)
 
@@ -78,6 +81,7 @@ func (h *Handler) Index() gin.HandlerFunc {
 // @Security		BearerAuth
 // @Success		200	{object}	tariffResponse
 // @Failure		400	{object}	structures.BadRequestErrorResponse
+// @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
@@ -91,14 +95,52 @@ func (h *Handler) View() gin.HandlerFunc {
 			return
 		}
 
-		parkingIDs, err := adminmiddleware.ParkingIDsFromContext(c.Request.Context())
+		scope, err := adminmiddleware.ParkingScopeFromContext(c.Request.Context())
 		if err != nil {
 			response.ErrorResponse(c, err)
 
 			return
 		}
 
-		tariff, err := h.tariffService.GetByID(c.Request.Context(), uint(id), parkingIDs)
+		tariff, err := h.tariffService.GetByID(c.Request.Context(), uint(id), scope)
+		if err != nil {
+			response.ErrorResponse(c, err)
+
+			return
+		}
+
+		response.Success(c, tariffToData(tariff))
+	}
+}
+
+// @Summary		Тариф по умолчанию парковки
+// @Description	Действующий тариф по умолчанию; нет или отключён — 404; parking_id недоступной парковки — 403
+// @Tags			admin-tariff
+// @Produce		json
+// @Param			parking_id	query	int	true	"ID парковки"
+// @Security		BearerAuth
+// @Success		200	{object}	tariffResponse
+// @Failure		401	{object}	structures.BadRequestErrorResponse
+// @Failure		403	{object}	structures.ForbiddenErrorResponse
+// @Failure		404	{object}	structures.NotFoundErrorResponse
+// @Failure		422	{object}	structures.ValidationErrorResponse
+// @Failure		500	{object}	structures.InternalServerResponse
+// @Router			/api/v1/admin/tariffs/default [get]
+func (h *Handler) Default() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		request := defaultRequest{}
+		if ok := validators.ValidateRequestQuery(c, &request); !ok {
+			return
+		}
+
+		scope, err := adminmiddleware.ParkingScopeFromContext(c.Request.Context())
+		if err != nil {
+			response.ErrorResponse(c, err)
+
+			return
+		}
+
+		tariff, err := h.getDefaultTariffQuery.Exec(c.Request.Context(), request.ParkingID, scope)
 		if err != nil {
 			response.ErrorResponse(c, err)
 
@@ -110,7 +152,7 @@ func (h *Handler) View() gin.HandlerFunc {
 }
 
 // @Summary		Создать тариф
-// @Description	Тариф создаётся не дефолтным; дефолт назначается отдельным запросом. Цена — не выше лимита парковки в реестре парковок, иначе 422; parking_id недоступной парковки — 403
+// @Description	Тариф создаётся не дефолтным; дефолт назначается отдельным запросом. Валюта — валюта парковки, цена — не выше лимита парковки в реестре парковок, иначе 422; parking_id недоступной парковки — 403
 // @Tags			admin-tariff
 // @Accept			json
 // @Produce		json
@@ -118,6 +160,7 @@ func (h *Handler) View() gin.HandlerFunc {
 // @Security		BearerAuth
 // @Success		201	{object}	tariffResponse
 // @Failure		400	{object}	structures.BadRequestErrorResponse
+// @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		413	{object}	structures.BadRequestErrorResponse
 // @Failure		415	{object}	structures.BadRequestErrorResponse
@@ -131,15 +174,14 @@ func (h *Handler) Create() gin.HandlerFunc {
 			return
 		}
 
-		parkingIDs, err := adminmiddleware.ParkingIDsFromContext(c.Request.Context())
+		scope, err := adminmiddleware.ParkingScopeFromContext(c.Request.Context())
 		if err != nil {
 			response.ErrorResponse(c, err)
 
 			return
 		}
 
-		// Повтор проверки ResolveAdminParkingsMiddleware по уже забинженному значению
-		if parkingIDs != nil && !slices.Contains(parkingIDs, request.ParkingID) {
+		if !scope.Allows(request.ParkingID) {
 			response.ErrorResponseUntrackableSentry(c, http.StatusForbidden, errors.New("нет доступа к парковке"), nil)
 
 			return
@@ -166,8 +208,11 @@ func (h *Handler) Create() gin.HandlerFunc {
 // @Security		BearerAuth
 // @Success		200	{object}	tariffResponse
 // @Failure		400	{object}	structures.BadRequestErrorResponse
+// @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
+// @Failure		413	{object}	structures.BadRequestErrorResponse
+// @Failure		415	{object}	structures.BadRequestErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
 // @Router			/api/v1/admin/tariffs/{id} [patch]
@@ -185,14 +230,14 @@ func (h *Handler) Update() gin.HandlerFunc {
 			return
 		}
 
-		parkingIDs, err := adminmiddleware.ParkingIDsFromContext(c.Request.Context())
+		scope, err := adminmiddleware.ParkingScopeFromContext(c.Request.Context())
 		if err != nil {
 			response.ErrorResponse(c, err)
 
 			return
 		}
 
-		tariff, err := h.tariffService.Update(c.Request.Context(), uint(id), parkingIDs, updateRequestToPatch(request))
+		tariff, err := h.tariffService.Update(c.Request.Context(), uint(id), scope, updateRequestToPatch(request))
 		if err != nil {
 			response.ErrorResponse(c, err)
 
@@ -211,6 +256,7 @@ func (h *Handler) Update() gin.HandlerFunc {
 // @Security		BearerAuth
 // @Success		204
 // @Failure		400	{object}	structures.BadRequestErrorResponse
+// @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
@@ -225,14 +271,14 @@ func (h *Handler) SetDefault() gin.HandlerFunc {
 			return
 		}
 
-		parkingIDs, err := adminmiddleware.ParkingIDsFromContext(c.Request.Context())
+		scope, err := adminmiddleware.ParkingScopeFromContext(c.Request.Context())
 		if err != nil {
 			response.ErrorResponse(c, err)
 
 			return
 		}
 
-		if err := h.setDefaultTariffCommand.Exec(c.Request.Context(), uint(id), parkingIDs); err != nil {
+		if err := h.setDefaultTariffCommand.Exec(c.Request.Context(), uint(id), scope); err != nil {
 			response.ErrorResponse(c, err)
 
 			return

@@ -57,9 +57,9 @@
 
 ### Workflow Layer *(опциональный)*
 - **Что**: оркестрирует несколько доменных сервисов для бизнес-процесса, не принадлежащего ни одному домену.
-- **Состав**: `{конкретное_действие}_workflow.go` (оркестратор), `dto.go` (Input/Result), `tx_manager.go` (интерфейс транзакции, если workflow пишет — O-8); по необходимости — `repository.go` / `system.go` (порт внешней системы, которого нет в домене, и системное — по критерию `conventions.md` п. 12, `go-sdk/workflow.md`).
+- **Состав**: `{конкретное_действие}_workflow.go` (оркестратор), `dto.go` (Input/Result), `tx_manager.go` (интерфейс транзакции, если workflow делает больше одного модифицирующего запроса — O-8); по необходимости — `repository.go` / `system.go` (порт внешней системы, которого нет в домене, и системное — по критерию `conventions.md` п. 12, `go-sdk/workflow.md`).
 - **Правила**: зависит только от Domain — берёт репозитории доменов интерфейсами, сервисы и Command доменов — конкретным типом или интерфейсом, который объявил сам workflow, когда он нужен (O-7, `go-sdk/workflow.md`); не знает про HTTP/Gin/очереди и инфраструктуру. Самостоятельность, логика агрегата, таблицы — домену — `architecture/layers.md`, «Зависимости»; свои интерфейсы workflow объявляет только для того, чего у доменов нет (`TxManager`, системное, порт внешней системы — `go-sdk/workflow.md`; `go-sdk/domain.md`, «Cross-domain зависимость»).
-- **Когда использовать**: операция охватывает 2+ доменов как равноправных участников; бизнес-процесс из нескольких шагов; нужно переиспользовать из разных точек входа (HTTP + Consumer).
+- **Когда использовать**: только когда операция охватывает 2+ доменов как равноправных участников. Однодоменная операция — даже многошаговая или вызываемая из нескольких точек входа (HTTP + Consumer) — Command/Query домена (`architecture/layers.md`, «Как выбирать»; G-1).
 
 ### Bootstrap / Application Layer
 - **Что**: собирает приложение: создаёт зависимости, регистрирует маршруты и consumers.
@@ -147,7 +147,7 @@ internal/
     └── {domain}/
         └── {module}/
             ├── {конкретное_действие}_workflow.go
-            ├── tx_manager.go                   ← если workflow пишет (O-8)
+            ├── tx_manager.go                   ← если workflow пишет больше чем одним запросом (O-8)
             ├── repository.go                   ← опционально: порт внешней системы (данные), которого нет в домене
             ├── system.go                       ← опционально: Clock, IDGenerator, порт отправки…
             └── dto.go
@@ -212,7 +212,7 @@ main()
 | Сервису A нужны данные из домена B | Workflow (берёт репозитории/сервисы B, передаёт данные сервису A) |
 | Валидация по данным другого домена | Workflow                           |
 | Операция охватывает 2+ доменов     | Workflow                           |
-| Бизнес-процесс из нескольких шагов | Workflow                           |
+| Бизнес-процесс из нескольких шагов | 2+ доменов — Workflow; один домен — Command/Query (G-1) |
 
 Прямой зависимости домена от чужого домена нет (O-7, `architecture/cross-domain.md`): сценарий на 2+ домена — workflow, он берёт репозитории доменов интерфейсами, сервисы — конкретным типом или своим интерфейсом (`go-sdk/workflow.md`; `go-sdk/domain.md`, «Cross-domain зависимость»).
 
@@ -252,7 +252,7 @@ main()
 **Cross-domain Workflow:**
 - [ ] `internal/workflows/{domain}/{module}/{конкретное_действие}_workflow.go`
 - [ ] `internal/workflows/{domain}/{module}/dto.go`
-- [ ] `internal/workflows/{domain}/{module}/tx_manager.go` — если workflow пишет (O-8); реализация `dbtransaction.NewManager*` в `repositories_factory.go`
+- [ ] `internal/workflows/{domain}/{module}/tx_manager.go` — если workflow делает больше одного модифицирующего запроса (O-8); реализация `dbtransaction.NewManager*` в `repositories_factory.go`
 - [ ] `internal/workflows/{domain}/{module}/repository.go`, `system.go` — если нужен порт внешней системы, которого нет в домене, или системные зависимости (`go-sdk/workflow.md`)
 - [ ] `app/bootstrap/{module}/workflows_factory.go` (не `services_factory.go`)
 - [ ] Зарегистрировать workflow через DI в `module.go`

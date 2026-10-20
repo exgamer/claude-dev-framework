@@ -19,6 +19,11 @@ interface OutboxTariffEventRepositoryInterface extends CRUDRepositoryInterface
     /**
      * Новое событие в статусе PENDING, попыток 0. Вызывается в транзакции сценария, который пишет тариф.
      */
+    /**
+     * Последнее событие тарифа по ID; событий нет — null.
+     */
+    public function getLatestByTariffId(int $tariffId): ?OutboxTariffEvent;
+
     public function createPending(OutboxTariffEventDto $dto, OutboxTariffEventRoutingKeyEnum $routingKey): OutboxTariffEvent;
 
     /**
@@ -26,8 +31,14 @@ interface OutboxTariffEventRepositoryInterface extends CRUDRepositoryInterface
      */
     public function markPublished(int $id): bool;
 
+    /**
+     * Только из PENDING/AWAITING_RETRY: опоздавшая неудача не затирает PUBLISHED.
+     */
     public function markFailed(int $id): void;
 
+    /**
+     * Только из PENDING/AWAITING_RETRY, как markFailed.
+     */
     public function markAwaitingRetry(int $id): void;
 
     /**

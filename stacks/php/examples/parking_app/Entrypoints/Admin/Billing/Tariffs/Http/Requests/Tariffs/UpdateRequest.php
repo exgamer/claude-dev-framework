@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs;
 
+use App\ParkingApp\Common\Enums\TimeUnitEnum;
 use App\ParkingApp\Core\Requests\Request;
 use Illuminate\Validation\Rule;
 use MPS\Core\Enums\CurrencyEnum;
@@ -41,7 +42,7 @@ class UpdateRequest extends Request
             'name' => ['required', 'string', 'max:255'],
             'currency' => ['required', 'string', Rule::enum(CurrencyEnum::class)],
             'price' => ['required', 'integer', 'min:0', 'max:100000000'],
-            'grace_minutes' => ['present', 'nullable', 'integer', 'min:0', 'max:1440'],
+            'grace_minutes' => ['present', 'nullable', 'integer', 'min:0', 'max:' . TimeUnitEnum::DAY->minutes()],
         ];
     }
 }

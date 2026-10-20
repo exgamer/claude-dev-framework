@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs;
 
+use App\ParkingApp\Core\Database\Query\Page;
 use App\ParkingApp\Core\Requests\Request;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffSortEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
@@ -29,7 +30,7 @@ use OpenApi\Attributes as OA;
     description: 'Записей на странице',
     in: 'query',
     required: false,
-    schema: new OA\Schema(type: 'integer', default: 30, maximum: 100, minimum: 1)
+    schema: new OA\Schema(type: 'integer', default: Page::DEFAULT_PER_PAGE, maximum: Page::MAX_PER_PAGE, minimum: 1)
 )]
 #[OA\Parameter(
     parameter: 'TariffsIndexRequestParkingId',
@@ -66,7 +67,7 @@ class IndexRequest extends Request
     {
         return [
             'page' => ['sometimes', 'integer', 'gt:0'],
-            'per_page' => ['sometimes', 'integer', 'between:1,100'],
+            'per_page' => ['sometimes', 'integer', 'between:1,' . Page::MAX_PER_PAGE],
             'parking_id' => ['nullable', 'integer', 'gt:0'],
             'status' => ['nullable', 'string', Rule::enum(TariffStatusEnum::class)],
             'sort' => ['sometimes', 'string', Rule::enum(TariffSortEnum::class)],

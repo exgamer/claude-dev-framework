@@ -75,8 +75,13 @@ final class SetDefaultTariffCommand
 
         $this->forgetCached($tariff->id);
 
-        /** @var Tariff */
-        return $this->repository->getByIdInParkings($id, $parkingIds);
+        $updated = $this->repository->getByIdInParkings($id, $parkingIds);
+
+        if (! $updated) {
+            throw new NotFoundAppException('Тариф не найден');
+        }
+
+        return $updated;
     }
 
     /**

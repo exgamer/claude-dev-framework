@@ -6,18 +6,16 @@ namespace App\ParkingApp\Core\Database\Query;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use InvalidArgumentException;
 use MPS\Core\Components\CRUD\DataObjects\SearchDataObject;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterface;
+use MPS\Core\Exceptions\BadRequestAppException;
 
 /**
- * Поиск формы (1) пагинации, P-19: search() CRUD-репозитория ядра → ['items', 'pagination', 'params']; эталон модуля — форма (2), Page + paginate() репозитория.
- * С id — один элемент; expanded строкой через запятую — массивом.
- * search() ядра принимает perPage только int, «без пагинации» в нём не выражается: perPage — целое ≥ 1, весь набор по id — searchByIds().
+ * Поиск формы (1) пагинации (P-19): search() CRUD-репозитория ядра → ['items', 'pagination', 'params'].
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
-class PaginatedQueryHelper
+final class PaginatedQueryHelper
 {
     private int $defaultPerPage = 30;
 
@@ -57,9 +55,12 @@ class PaginatedQueryHelper
     }
 
     /**
+     * С id — один элемент; expanded строкой через запятую — массивом.
+     * search() ядра принимает perPage только int, «без пагинации» в нём не выражается: весь набор по id — searchByIds().
+     *
      * @return array<int|string, mixed>
      *
-     * @throws InvalidArgumentException perPage не целое ≥ 1 (в том числе false)
+     * @throws BadRequestAppException perPage не целое ≥ 1 (в том числе false)
      */
     public function search(SearchDataObject $dto): array
     {
@@ -68,7 +69,7 @@ class PaginatedQueryHelper
         $perPage = $dto->getPerPage() ?? $this->defaultPerPage;
 
         if (! is_int($perPage) || $perPage < 1) {
-            throw new InvalidArgumentException('perPage — целое не меньше 1; весь набор по id — searchByIds()');
+            throw new BadRequestAppException('perPage — целое не меньше 1; весь набор по id — searchByIds()');
         }
 
         if (! empty($params['expanded']) && is_string($params['expanded'])) {
@@ -109,11 +110,13 @@ class PaginatedQueryHelper
     }
 
     /**
+     * Список без keyBy (у searchByIds() ядра он по умолчанию): карту по ключу собирает потребитель, не хелпер запросов.
+     *
      * @param array<int, int|string> $ids
      *
-     * @return array<int|string, mixed> при $keyBy — карта первичный ключ => элемент
+     * @return list<mixed>
      */
-    public function searchByIds(array $ids, bool $keyBy = true): array
+    public function searchByIds(array $ids): array
     {
         if ($ids === []) {
             return [];
@@ -126,13 +129,7 @@ class PaginatedQueryHelper
         );
         $result = $this->asArray ? $models->toArray() : $models->all();
 
-        if (! $keyBy) {
-            return $result;
-        }
-
-        $keyed = collect($result)->keyBy($primaryKey);
-
-        return $keyed->toArray();
+        return array_values($result);
     }
 
     /**

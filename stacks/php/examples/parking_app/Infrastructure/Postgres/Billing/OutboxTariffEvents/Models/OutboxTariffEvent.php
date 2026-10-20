@@ -13,19 +13,19 @@ use MPS\Core\Models\Model;
 /**
  * Событие о тарифе для отправки в RabbitMQ (outbox)
  *
- * @property int $id                                      PK; уходит в сообщение как event_id
- * @property int $tariff_id                               ID тарифа
- * @property int $parking_id                              ID парковки
+ * @property int $id                                      Уходит в сообщение как event_id
+ * @property int $tariff_id
+ * @property int $parking_id
  * @property string $name                                 Название тарифа на момент события
- * @property CurrencyEnum $currency                       Валюта
+ * @property CurrencyEnum $currency
  * @property int $price                                   Цена часа в минимальных единицах валюты
- * @property int|null $grace_minutes                      Льготный период (минуты)
+ * @property int|null $grace_minutes                      Льготный период, минуты
  * @property OutboxTariffEventRoutingKeyEnum $routing_key Routing key публикации, он же тип события
- * @property OutboxTariffEventStatusEnum $status          Статус доставки
+ * @property OutboxTariffEventStatusEnum $status
  * @property int $attempts                                Неудачных попыток отправки
  * @property Carbon|null $published_at                    Когда брокер принял событие
- * @property Carbon $created_at                           Дата создания
- * @property Carbon|null $updated_at                      Дата обновления
+ * @property Carbon $created_at
+ * @property Carbon|null $updated_at
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

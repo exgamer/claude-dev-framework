@@ -2,7 +2,7 @@
 
 Путь: `internal/workflows/{domain}/{module}/` или `internal/workflows/{module}/` — зависит от ситуации.
 
-Примеры: `internal/workflows/billing/tariff/`, `internal/workflows/billing/session/`, `workflows/tariff/`
+Примеры: `internal/workflows/billing/tariff/` (эталон `stacks/go/examples/tariff`); проект без доменов — `internal/workflows/tariff/`
 
 ## Правила
 
@@ -18,7 +18,7 @@
 - Инфраструктура — только через интерфейсы (репозитории, порты внешних систем, транзакции): конкретные реализации (`*PostgresRepository`, `*HTTPRepository`) не принимать. Сервисы и Command доменов можно принимать конкретным типом (`*tariff.Service`) — интерфейс объявляет потребитель, только когда он нужен (подмена в тесте, развязка): несколько реализаций бизнес-логики бывают редко, интерфейс «на всякий случай» не заводится, `conventions.md` п. 10–11
 - Бизнес-ошибки через `AppException` (см. `exceptions.md`)
 - Тест рядом с файлом: `{конкретное_действие}_workflow_test.go`
-- **Транзакционен по умолчанию** — `TxManager` в `tx_manager.go` рядом с workflow; правило — `approaches/patterns/transactions.md` (O-8), механика — `infra/postgres.md`, пример — `examples/tariff/internal/workflows/billing/tariff/`
+- **Транзакция — когда сценарий делает больше одного модифицирующего запроса**, один запрос — без неё (кроме транзакции ради блокировки `FOR UPDATE`/`FOR SHARE` — основание «Конкурентность» `design.md`); проверки до записи в транзакцию не переносятся, гонку закрывает `approaches/patterns/concurrency.md`. `TxManager` — в `tx_manager.go` рядом с workflow; правило — `approaches/patterns/transactions.md` (O-8), механика — `infra/postgres.md`, пример — `examples/tariff/internal/workflows/billing/tariff/`
 
 ## Именование файлов
 

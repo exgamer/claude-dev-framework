@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Validators;
 
+use App\ParkingApp\Common\Enums\TimeUnitEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 
 /**
@@ -24,7 +25,7 @@ final class TariffDtoValidator
             $errors['name'][] = 'Название обязательно';
         }
 
-        if ($dto->getGraceMinutes() !== null && $dto->getGraceMinutes() > 1440) {
+        if ($dto->getGraceMinutes() !== null && $dto->getGraceMinutes() > TimeUnitEnum::DAY->minutes()) {
             $errors['grace_minutes'][] = 'Льготный период не может превышать сутки';
         }
 

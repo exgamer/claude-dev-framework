@@ -8,11 +8,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use OpenApi\Attributes as OA;
 
 /**
- * Ответ списка формы (1) пагинации, P-19: результат PaginatedQueryHelper (items + pagination Laravel-пагинатора + params) как есть; эталон модуля — форма (2), PaginatedResource.
- * Схемы — Search*: имя PaginationMeta занято формой (2).
+ * Ответ списка формы (1) пагинации (P-19): результат PaginatedQueryHelper как есть.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
+// Схемы — Search*: имя PaginationMeta занято формой (2)
 #[OA\Schema(
     schema: 'SearchPaginationLink',
     properties: [

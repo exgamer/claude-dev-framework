@@ -7,6 +7,7 @@ namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffSortEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use MPS\Core\DataObjects\DataObject;
+use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
  * Фильтр списка тарифов.
@@ -17,8 +18,15 @@ class TariffFilterDto extends DataObject
 {
     private ?int $parkingId = null;
 
-    /** @var ?list<int> Парковки, в пределах которых список; null — без ограничения. Выставляет контроллер из контекста запроса */
+    /**
+     * @var ?list<int>
+     */
     private ?array $parkingIds = null;
+
+    /**
+     * Скоуп выставлен явно: null в $parkingIds без вызова setParkingIds — не «без ограничения» (scope-param-defaults-unrestricted).
+     */
+    private bool $parkingIdsSet = false;
 
     private ?TariffStatusEnum $status = null;
 
@@ -37,10 +45,19 @@ class TariffFilterDto extends DataObject
     }
 
     /**
+     * Парковки, доступные актору; null — без ограничения (super-admin), выставляется явно.
+     * Скоуп не выставлен — исключение: запрос собран без контекста middleware, а не «все парковки».
+     *
      * @return ?list<int>
+     *
+     * @throws InvalidConfigurationAppException
      */
     public function getParkingIds(): ?array
     {
+        if (! $this->parkingIdsSet) {
+            throw new InvalidConfigurationAppException('Скоуп парковок в TariffFilterDto не выставлен: нужен setParkingIds()');
+        }
+
         return $this->parkingIds;
     }
 
@@ -50,6 +67,7 @@ class TariffFilterDto extends DataObject
     public function setParkingIds(?array $value): self
     {
         $this->parkingIds = $value;
+        $this->parkingIdsSet = true;
 
         return $this;
     }

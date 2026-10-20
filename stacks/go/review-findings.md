@@ -66,8 +66,8 @@
 - Очереди/exchange объявляются при старте (`declareRetryQueue` и подобные), не лениво в consumer.
 - Новый consumer переживает недоступность rabbit на старте: ретрай подключения, не молчаливый пропуск регистрации.
 - **Своё `amqp.Dial` для декларации топологии без consumer-а** (MR!151, kulzhambekov.o: "пересмотреть полностью. реализация является антипаттерном. создается еще одно соединение внутри outboxrabbit.DeclareTopology") — лишнее соединение в обход kernel-а. С `gosdk-rabbit-core >= v1.0.5` — `rabbitDI.GetRabbitConnection` + `rabbitmq.DeclareTopology`; сама функция — bootstrap-код (kulzhambekov.o: "это bootstrap слой"), не infra. См. `go-sdk/entrypoint/rabbit.md`.
-- **Две независимые реализации одного и того же transport-фикса** (MR!151: `session_event/marshaler.go` vs `fiscalization/marshaler.go` — обработка `x-death`, "одно и тоже разными способами") — частный случай общего правила о недопустимости дублирования не-бизнесовой логики, см. `conventions.md` п. 22 и `go-sdk/entrypoint/rabbit.md`.
-- **`Publisher` оборачивает `Publisher`** (MR!151: `type Publisher struct { publisher *rabbitmq.Publisher }` в `fiscal_receipt/publisher.go`; "шедулер по сути просто паблишер, зачем обертка в обертке это нечитабельно") — доменный интерфейс, инфра-структура и SDK-тип с одним именем. Называть инфра-адаптер иначе (`RabbitPublisher`/с префиксом домена).
+- **Две независимые реализации одного и того же transport-фикса** (MR!151: два marshaler-а в разных consumer-ах — обработка `x-death`, "одно и тоже разными способами") — частный случай общего правила о недопустимости дублирования не-бизнесовой логики, см. `conventions.md` п. 22 и `go-sdk/entrypoint/rabbit.md`.
+- **`Publisher` оборачивает `Publisher`** (MR!151: `type Publisher struct { publisher *rabbitmq.Publisher }` в инфре; "шедулер по сути просто паблишер, зачем обертка в обертке это нечитабельно") — доменный интерфейс, инфра-структура и SDK-тип с одним именем. Называть инфра-адаптер иначе (`RabbitPublisher`/с префиксом домена).
 
 ## Структура и стиль (что ревьюеры пишут построчно)
 
@@ -76,7 +76,7 @@
 - **Mapper только маппит** — «это не маппер», «этому не место в маппере, лишняя обёртка» (!93). Условия, запросы, форматирование бизнес-смысла — в сервис/workflow.
 - **Доменный слой без HTTP-типов** (!99 «В доменном слое Http») — `gin`, `http.Request`, request/response-структуры entrypoint'а в `internal/domains` не импортируются.
 - **Workflow самодостаточен** — общие хелперы дублируются в каждый workflow, не шарятся между файлами workflow-слоя (!103, повторено дважды). Это осознанная позиция команды: workflow читается сверху вниз без прыжков. Касается шагов сценария; преобразования формата и инфраструктурные обходы — всё равно один хелпер/пакет (`core/style.md`, «Форма кода»; `conventions.md` п. 22).
-- **Транзакции на workflow** — «транзакция надо как будто» (!100, !103): workflow с записью без транзакции — ждать вопроса. Правило — `approaches/patterns/transactions.md` (O-8).
+- **Транзакции на workflow** — «транзакция надо как будто» (!100, !103): ждать вопроса, когда сценарий делает больше одного модифицирующего запроса без транзакции; транзакция вокруг одного запроса без блокировки — тоже вопрос («зачем»). Правило — `approaches/patterns/transactions.md` (O-8, пересмотр 2026-10-20).
 - **`gofmt` обязателен** — по отступам придираются построчно (!93).
 - **Имя не отражает поведение** (MR!151, серия комментариев подряд в одном файле: "почему функция называется положить в очередь а по факту создает запись в БД?", "почему менеджер называется положить в очередь а по факту транзакция?", "почему функция которая просто создает записи называется dispatch?") — `Enqueue`/`EnqueueTxManager`/`dispatch` присвоены синхронной записи в БД и прямому вызову без какой-либо очереди. См. `conventions.md`, п. 20.
 - **Название файла интерфейса слишком абстрактное** (MR!151: `ports.go` вместо `publisher.go`/`repository.go` — "что за название файла? название слишком абстрактное") — файл называется по объявляемому интерфейсу, не hexagonal-термином; в модуле домена и workflow — файлы групп `repository.go`/`tx_manager.go`/`modules.go`/`system.go` (G-6; у workflow без `modules.go`). См. `conventions.md`, п. 12.
@@ -95,7 +95,7 @@
 ## Известные споры (фиксировать как спор, не как свежую находку)
 
 - Сборка workflow в `services_factory` (!99 «Почему workflow собирается в services_factory?») — **[ВНИМАНИЕ]**, собирать в `workflows_factory.go` (решение 2026-10-07, `core/decisions-log.md`). Существующий код по-старому: в новом коде — по правилу, массово старое не переписывать без задачи.
-- Файл `*_command.go` / `*_query.go` в `internal/workflows/` — **[ВНИМАНИЕ]** (решение G-1): если сценарий междоменный — переименовать в `*_workflow.go`; если однодоменный — это Command/Query домена, перенести в модуль-владелец результата в `internal/domains/` (`fiscalize_receipt_command.go` → `domains/billing/fiscal_receipt/`, решение O-6; доставка outbox — Command домена outbox, `approaches/patterns/outbox.md`).
+- Файл `*_command.go` / `*_query.go` в `internal/workflows/` — **[ВНИМАНИЕ]** (решение G-1): если сценарий междоменный — переименовать в `*_workflow.go`; если однодоменный — это Command/Query домена, перенести в модуль-владелец результата в `internal/domains/` (`{действие}_command.go` → `internal/domains/{domain}/{модуль-владелец}/`, решение O-6; доставка outbox — Command домена outbox, `approaches/patterns/outbox.md`).
 - Инфра-адаптер внешней системы не по имени провайдера (`http/fiscalization/webkassa` → `http/webkassa`) или внешняя система под нашим доменом (`http/billing/payment` для Kaspi) — **[ВНИМАНИЕ]** (решение G-2, `go-sdk/infra.md`). По форме верно — `http/cityparking/pricelimits`, `http/partnerbilling/tariffs` эталона `examples/tariff`.
 - Расположение тестов (!103) — решено (O-3): unit рядом с кодом, e2e в `tests/`, см. `structure.md`, «Тесты».
 
@@ -103,6 +103,6 @@
 
 - **Разъезд `const`-блоков статусов**: новое значение → `grep` по `switch` и `map` по этому типу, по swagger `enums:` в DTO.
 - **Данные под миграцию поведения**: новый NOT NULL / новое значение enum — что лежит в колонке на stage/prod; локальной базы в репо может не быть — тогда явно поручать автору.
-- **CI без гейтов**: если pipeline — только containerize + deploy (ни lint, ни test stage), локальный `go build ./... && go vet ./... && go test ./... && gofmt -l internal pkg` — единственный гейт; его результат писать в отчёт явно.
+- **CI без гейтов**: если pipeline — только containerize + deploy (ни lint, ни test stage), локальный `go build ./... && go vet ./... && go test ./... && gofmt -l .` (с `vendor/` — `gofmt -l main.go cmd internal pkg`) — единственный гейт; его результат писать в отчёт явно.
 - **`go.sum` вместе с `go.mod`**, нет неиспользуемых импортов.
 - **Коммиты** по регламенту: `feat|perf|conf|fix|refactor: описание #номер`.

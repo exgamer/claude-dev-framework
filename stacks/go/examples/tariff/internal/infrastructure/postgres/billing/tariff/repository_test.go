@@ -1,6 +1,7 @@
 package tariff
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -44,4 +45,13 @@ func TestSetDefaultError_OtherFailuresStayInternal(t *testing.T) {
 
 func TestSetDefaultError_NilIsNil(t *testing.T) {
 	assert.NoError(t, setDefaultError(nil, 2))
+}
+
+func TestPostgresRepository_GetByID_ZeroScopeFindsNothingWithoutQuery(t *testing.T) {
+	repository := NewPostgresRepository(nil) // клиента нет: запрос к БД упал бы
+
+	tariff, err := repository.GetByID(context.Background(), 1, tariffdomain.ParkingScope{})
+
+	require.NoError(t, err)
+	assert.Nil(t, tariff)
 }

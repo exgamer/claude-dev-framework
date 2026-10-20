@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\ParkingApp\Core\Helpers;
 
 use App\ParkingApp\Core\Http\Signature\RequestSignature;
+use App\ParkingApp\Core\Http\Signature\SignedMessage;
+use App\ParkingApp\Core\Http\Signature\SignedRequest;
 
 /**
  * HMAC-подпись машинного вызова: заголовок t=<unix ts>,n=<nonce>,v1=<hex HMAC-SHA256(secret, "{t}\n{n}\n{METHOD}\n{path?query}\n{body}")>.
@@ -19,18 +21,11 @@ final class SignatureHelper
 
     private const SIGNATURE_PATTERN = '/^[0-9a-fA-F]{64}$/';
 
-    /**
-     * @param string $target путь с query, как на проводе
-     */
-    public static function sign(
-        #[\SensitiveParameter] string $secret,
-        int $timestamp,
-        string $nonce,
-        string $method,
-        string $target,
-        string $body,
-    ): string {
-        $canonical = $timestamp . "\n" . $nonce . "\n" . strtoupper($method) . "\n" . $target . "\n" . $body;
+    public static function sign(#[\SensitiveParameter] string $secret, SignedRequest $request): string
+    {
+        $message = $request->message;
+        $canonical = $request->timestamp . "\n" . $request->nonce . "\n" . strtoupper($message->method) . "\n"
+            . $message->target . "\n" . $message->body;
 
         return hash_hmac('sha256', $canonical, $secret);
     }
@@ -38,17 +33,11 @@ final class SignatureHelper
     /**
      * Значение заголовка для исходящего запроса и тестов.
      */
-    public static function header(
-        #[\SensitiveParameter] string $secret,
-        int $timestamp,
-        string $nonce,
-        string $method,
-        string $target,
-        string $body,
-    ): string {
-        $signature = self::sign($secret, $timestamp, $nonce, $method, $target, $body);
+    public static function header(#[\SensitiveParameter] string $secret, SignedRequest $request): string
+    {
+        $signature = self::sign($secret, $request);
 
-        return 't=' . $timestamp . ',n=' . $nonce . ',' . self::VERSION . '=' . $signature;
+        return 't=' . $request->timestamp . ',n=' . $request->nonce . ',' . self::VERSION . '=' . $signature;
     }
 
     /**
@@ -93,11 +82,10 @@ final class SignatureHelper
     public static function verify(
         #[\SensitiveParameter] string $secret,
         RequestSignature $signature,
-        string $method,
-        string $target,
-        string $body,
+        SignedMessage $message,
     ): bool {
-        $expected = self::sign($secret, $signature->timestamp, $signature->nonce, $method, $target, $body);
+        $request = new SignedRequest($signature->timestamp, $signature->nonce, $message);
+        $expected = self::sign($secret, $request);
 
         return hash_equals($expected, $signature->signature);
     }

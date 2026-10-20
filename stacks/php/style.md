@@ -104,11 +104,11 @@
       });
 
   // плохо: вызов в вызове и индекс по результату
-  return $this->buildSettingCardsWorkflow->handle([$this->settingService->getByKey($key)])[0];
+  return $this->buildSettingCardsWorkflow->execute([$this->settingService->getByKey($key)])[0];
 
   // хорошо: последовательно
   $setting = $this->settingService->getByKey($key);
-  $cards = $this->buildSettingCardsWorkflow->handle([$setting]);
+  $cards = $this->buildSettingCardsWorkflow->execute([$setting]);
 
   return $cards[0];
 
@@ -129,7 +129,7 @@
 
   ```php
   // допустимо: аргумент — один вызов маппера/хелпера от входных данных
-  $this->requestOtpWorkflow->handle(PhoneRequestMapper::toDto($request));
+  $this->requestOtpWorkflow->execute(PhoneRequestMapper::toDto($request));
   $paginator = ContractPagination::restore($items, Mapper::perPage($request), $request->page());
 
   // плохо: вызов в аргументе и индекс по результату
@@ -155,7 +155,7 @@
 | DTO | `{Entity}Dto` | `TariffDto` |
 | Сервис CRUD | `{Entity}CrudService` + `Interface` | `TariffCrudService` |
 | Сервис с логикой | `{Entity}Service` + `Interface` | `SessionService` |
-| Command / Query (в домене) | `{Action}Command` / `{Action}Query`, метод `execute()` | `ActivatePlannedTariffCommand` |
+| Command / Query (в домене) | `{Action}Command` / `{Action}Query`, `final` без базового класса ядра, метод `execute(...)` (`mps-core/commands.md`, «Форма Command и Query») | `ActivatePlannedTariffCommand` |
 | Workflow (междоменный) | `{Action}Workflow`, метод `execute()` | `CreateTariffWorkflow` |
 | Коллекция DTO | `{Entity}ItemsDto` (`DataObjectCollection`, `mps-core/data-objects.md`) | `PermissionItemsDto` |
 | Валидатор | `{Entity}DtoValidator` | `TariffDtoValidator` |

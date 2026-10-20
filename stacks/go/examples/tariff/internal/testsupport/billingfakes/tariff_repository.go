@@ -32,9 +32,9 @@ func NewTariffRepository(items ...*tariffdomain.Tariff) *TariffRepository {
 	return r
 }
 
-func (r *TariffRepository) GetByID(_ context.Context, id uint, parkingIDs []uint) (*tariffdomain.Tariff, error) {
+func (r *TariffRepository) GetByID(_ context.Context, id uint, scope tariffdomain.ParkingScope) (*tariffdomain.Tariff, error) {
 	item, ok := r.Items[id]
-	if !ok || !inParkings(parkingIDs, item.ParkingID) {
+	if !ok || !scope.Allows(item.ParkingID) {
 		return nil, nil
 	}
 
@@ -51,11 +51,11 @@ func (r *TariffRepository) GetDefaultByParkingID(_ context.Context, parkingID ui
 	return nil, nil
 }
 
-func (r *TariffRepository) Paginated(_ context.Context, search *tariffdomain.Search, parkingIDs []uint) (*pagination.Paginated[tariffdomain.Tariff], error) {
+func (r *TariffRepository) Paginated(_ context.Context, search *tariffdomain.Search) (*pagination.Paginated[tariffdomain.Tariff], error) {
 	items := make([]*tariffdomain.Tariff, 0, len(r.Items))
 
 	for _, item := range r.Items {
-		if !inParkings(parkingIDs, item.ParkingID) || (search.ParkingID != 0 && item.ParkingID != search.ParkingID) {
+		if !search.Scope.Allows(item.ParkingID) || (search.ParkingID != 0 && item.ParkingID != search.ParkingID) {
 			continue
 		}
 
@@ -116,11 +116,6 @@ func (r *TariffRepository) DeactivateByParkingID(_ context.Context, parkingID ui
 	}
 
 	return ids, nil
-}
-
-// inParkings Условие parking_id IN репозитория; nil — без ограничения
-func inParkings(parkingIDs []uint, parkingID uint) bool {
-	return parkingIDs == nil || slices.Contains(parkingIDs, parkingID)
 }
 
 // TariffCacheRepository In-memory tariffdomain.CacheRepository для unit-тестов

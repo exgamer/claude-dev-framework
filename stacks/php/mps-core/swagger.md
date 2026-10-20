@@ -36,14 +36,13 @@
             ])
         ),
         new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
-        new OA\Response(ref: '#/components/responses/NotFound404', response: 404),
         new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
     ]
 )]
 public function create(CreateRequest $request): JsonResponse { … }
 ```
 
-- У каждого метода — `404` (где есть id) и `500` (`../checklist.md` п. 24).
+- У каждого метода — `500`; `404` — только у эндпойнтов, ищущих запись по ID (`view`/`update`/`delete` и действия над записью), не у `index`/`create` (`../checklist.md` п. 24).
 - Обёртка `success`/`data` в ответе описывается: её даёт `ApiResponseMiddleware`, и это фактический формат (`../conventions.md` п. 19); сам код обёртку не собирает.
 
 ## Request — схема
@@ -93,4 +92,4 @@ enum TariffStatusEnum: string implements Enumerable { … }
 
 ## Генерация
 
-Изменились роуты, Request, Response — Swagger перегенерирован перед MR (`regulations/rest-api.md`, `review-checks.md` «Гигиена MR»); сгенерированный `storage/api-docs/*.json` в MR не уезжает посторонней правкой.
+Изменились роуты, Request, Response — Swagger перегенерирован перед MR (`regulations/rest-api.md`, `approaches/process/review.md`, п. 7 «Гигиена MR»); сгенерированный `storage/api-docs/*.json` в MR не уезжает посторонней правкой.

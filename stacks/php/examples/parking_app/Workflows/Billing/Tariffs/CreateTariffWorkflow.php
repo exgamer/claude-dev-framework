@@ -23,8 +23,7 @@ use MPS\Core\Exceptions\ValidationAppException;
 use Throwable;
 
 /**
- * Создание тарифа парковки: лимит цены реестра, существование парковки (Catalog), уведомление партнёрского биллинга,
- * событие tariff.created в брокер через outbox, отложенная активация запланированного тарифа.
+ * Создание тарифа парковки с уведомлением партнёрского биллинга и событием tariff.created через outbox.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -43,6 +42,9 @@ final class CreateTariffWorkflow
     }
 
     /**
+     * Лимит цены реестра, существование парковки и льготный период короче её наибольшей стоянки (Catalog) — до транзакции;
+     * в транзакции тариф и событие outbox; после коммита — уведомление, событие и отложенная активация запланированного тарифа.
+     *
      * @throws ValidationAppException
      * @throws OperationFailedAppException реестр лимитов недоступен
      * @throws Throwable
@@ -57,27 +59,29 @@ final class CreateTariffWorkflow
             ]);
         }
 
+        if (! $this->parkingRepository->oneById($dto->getParkingId())) {
+            throw new ValidationAppException('VALIDATION ERROR', [
+                'parking_id' => ['Парковка не найдена'],
+            ]);
+        }
+
+        $this->assertGraceShorterThanMaxStay($dto);
+
+        // Проверка парковки — до транзакции. Конкурентность: consumer handbook.parking.deactivated деактивирует тарифы при событии; событие обработано до коммита нового тарифа — тариф останется активным (решение «Конкурентность» эталона — принять риск; в задаче это вопрос пользователю, approaches/patterns/concurrency.md, «Принятие риска»; другой вариант — FOR SHARE на парковку в транзакции)
         /** @var array{Tariff, OutboxTariffEvent} $written */
         $written = $this->transactionManager->run(function () use ($dto): array {
-            if (! $this->parkingRepository->oneById($dto->getParkingId())) {
-                throw new ValidationAppException('VALIDATION ERROR', [
-                    'parking_id' => ['Парковка не найдена'],
-                ]);
-            }
-
             $tariff = $this->tariffCrudService->create($dto);
 
+            $eventDto = OutboxTariffEventDto::make()
+                ->setTariffId($tariff->id)
+                ->setParkingId($dto->getParkingId())
+                ->setName($dto->getName())
+                ->setCurrency($dto->getCurrency())
+                ->setPrice($dto->getPrice())
+                ->setGraceMinutes($dto->getGraceMinutes());
+
             // Событие — в той же транзакции, что и тариф: нет тарифа без события и события без тарифа
-            $event = $this->outboxRepository->createPending(
-                OutboxTariffEventDto::make()
-                    ->setTariffId($tariff->id)
-                    ->setParkingId($dto->getParkingId())
-                    ->setName($dto->getName())
-                    ->setCurrency($dto->getCurrency())
-                    ->setPrice($dto->getPrice())
-                    ->setGraceMinutes($dto->getGraceMinutes()),
-                OutboxTariffEventRoutingKeyEnum::TARIFF_CREATED,
-            );
+            $event = $this->outboxRepository->createPending($eventDto, OutboxTariffEventRoutingKeyEnum::TARIFF_CREATED);
 
             return [$tariff, $event];
         });
@@ -103,5 +107,34 @@ final class CreateTariffWorkflow
         }
 
         return $tariff;
+    }
+
+    /**
+     * Льготный период тарифа (Billing, минуты) сверяется с наибольшей стоянкой парковки (Catalog, единицы TimeUnitEnum):
+     * общий словарь — Common, ни один домен не импортирует другой.
+     *
+     * @throws ValidationAppException
+     */
+    private function assertGraceShorterThanMaxStay(TariffDto $dto): void
+    {
+        $graceMinutes = $dto->getGraceMinutes();
+
+        if ($graceMinutes === null) {
+            return;
+        }
+
+        $maxStay = $this->parkingRepository->getMaxStayById($dto->getParkingId());
+
+        if ($maxStay === null) {
+            return;
+        }
+
+        $maxStayMinutes = $maxStay->getAmount() * $maxStay->getUnit()->minutes();
+
+        if ($graceMinutes >= $maxStayMinutes) {
+            throw new ValidationAppException('VALIDATION ERROR', [
+                'grace_minutes' => ['Льготный период должен быть короче наибольшей стоянки парковки: ' . $maxStayMinutes . ' мин.'],
+            ]);
+        }
     }
 }

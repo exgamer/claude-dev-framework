@@ -27,7 +27,9 @@ type Handler struct {
 // @Security		PartnerAPIKey && PartnerSignature
 // @Success		200	{object}	tariffResponse
 // @Failure		400	{object}	structures.BadRequestErrorResponse
+// @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
+// @Failure		413	{object}	structures.BadRequestErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
 // @Router			/api/v1/integration/tariffs/{id} [get]
 func (h *Handler) View() gin.HandlerFunc {
@@ -39,8 +41,8 @@ func (h *Handler) View() gin.HandlerFunc {
 			return
 		}
 
-		// Машинный вызов без пользователя: скоупа нет, nil передаётся явно — без ограничения по парковкам
-		tariff, err := h.tariffService.GetByID(c.Request.Context(), uint(id), nil)
+		// Машинный вызов без пользователя: скоупа по парковкам нет
+		tariff, err := h.tariffService.GetByID(c.Request.Context(), uint(id), tariffdomain.ParkingScope{All: true})
 		if err != nil {
 			response.ErrorResponse(c, err)
 

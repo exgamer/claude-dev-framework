@@ -16,29 +16,45 @@ const (
 	vectorHex       = "aef0607db22c169c20df74d33bf170e8ff20b1cdc9238e35391e1a3dfcf9925e"
 )
 
+func vectorRequest(method string) Request {
+	return Request{
+		Timestamp: vectorTimestamp,
+		Nonce:     vectorNonce,
+		Message:   Message{Method: method, Path: vectorPath, Body: []byte(vectorBody)},
+	}
+}
+
 func TestSignMatchesVector(t *testing.T) {
-	got := Sign(vectorSecret, vectorTimestamp, vectorNonce, "post", vectorPath, []byte(vectorBody))
+	got := Sign(vectorSecret, vectorRequest("post"))
 	if got != vectorHex {
 		t.Fatalf("got %s, want %s", got, vectorHex)
 	}
 }
 
 func TestParseAndVerifyRoundTrip(t *testing.T) {
-	header := HeaderValue(vectorSecret, vectorTimestamp, vectorNonce, "POST", vectorPath, []byte(vectorBody))
+	header := HeaderValue(vectorSecret, vectorRequest("POST"))
 
 	parsed, err := Parse(header)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	now := time.Unix(vectorTimestamp+10, 0)
-	if err := Verify(vectorSecret, parsed, "POST", vectorPath, []byte(vectorBody), time.Minute, now); err != nil {
+	err = Verify(VerifyParams{
+		Secret:    vectorSecret,
+		Parsed:    parsed,
+		Message:   vectorRequest("POST").Message,
+		Tolerance: time.Minute,
+		Now:       time.Unix(vectorTimestamp+10, 0),
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestVerifyRejects(t *testing.T) {
-	parsed, err := Parse(HeaderValue(vectorSecret, vectorTimestamp, vectorNonce, "POST", vectorPath, []byte(vectorBody)))
+	header := HeaderValue(vectorSecret, vectorRequest("POST"))
+
+	parsed, err := Parse(header)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +75,13 @@ func TestVerifyRejects(t *testing.T) {
 	}
 
 	for name, tc := range cases {
-		err := Verify(tc.secret, parsed, tc.method, tc.path, []byte(tc.body), time.Minute, tc.now)
+		err := Verify(VerifyParams{
+			Secret:    tc.secret,
+			Parsed:    parsed,
+			Message:   Message{Method: tc.method, Path: tc.path, Body: []byte(tc.body)},
+			Tolerance: time.Minute,
+			Now:       tc.now,
+		})
 		if !errors.Is(err, tc.want) {
 			t.Fatalf("%s: got %v, want %v", name, err, tc.want)
 		}

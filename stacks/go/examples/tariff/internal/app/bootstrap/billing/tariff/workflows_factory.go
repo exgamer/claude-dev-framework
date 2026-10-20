@@ -8,6 +8,7 @@ func newWorkflowsFactory(repositoriesFactory *repositoriesFactory, servicesFacto
 	return &workflowsFactory{
 		CreateTariffWorkflow: tariffworkflow.NewCreateTariffWorkflow(
 			repositoriesFactory.CreateTariffTxManager,
+			repositoriesFactory.ParkingRepository,
 			repositoriesFactory.PriceLimitRepository,
 			repositoriesFactory.TariffNotifier,
 			servicesFactory.PublishOutboxTariffEventCommand,

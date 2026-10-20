@@ -1,13 +1,17 @@
 package outbox_tariff_event
 
-import "time"
+import (
+	"time"
+
+	"example.com/parking-service/internal/common"
+)
 
 // CreatedTariff Данные созданного тарифа для события tariff.created
 type CreatedTariff struct {
 	TariffID     uint
 	ParkingID    uint
 	Name         string
-	Currency     string
+	Currency     common.Currency
 	GraceMinutes uint
 	Price        uint
 }

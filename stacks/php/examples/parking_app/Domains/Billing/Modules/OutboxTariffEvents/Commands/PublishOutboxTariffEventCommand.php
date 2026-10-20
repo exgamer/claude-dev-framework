@@ -88,9 +88,11 @@ final class PublishOutboxTariffEventCommand
 
             if ($attempts >= $this->maxAttempts) {
                 $this->repository->markFailed($id);
-            } else {
-                $this->repository->markAwaitingRetry($id);
+
+                return $attempts;
             }
+
+            $this->repository->markAwaitingRetry($id);
 
             return $attempts;
         });

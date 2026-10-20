@@ -13,7 +13,7 @@ func tariffFromEntity(entity *tariffdomain.Tariff) *tariff {
 		ID:        entity.ID,
 		ParkingID: entity.ParkingID,
 		Name:      entity.Name,
-		Currency:  entity.Currency,
+		Currency:  string(entity.Currency),
 		Price:     entity.Price,
 	}
 }

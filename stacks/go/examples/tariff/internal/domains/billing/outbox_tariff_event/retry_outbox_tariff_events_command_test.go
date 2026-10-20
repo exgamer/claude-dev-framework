@@ -11,10 +11,11 @@ import (
 
 	outboxdomain "example.com/parking-service/internal/domains/billing/outbox_tariff_event"
 	"example.com/parking-service/internal/testsupport/billingfakes"
+	"example.com/parking-service/internal/testsupport/txfakes"
 )
 
 func newRetryCommand(repository *billingfakes.OutboxTariffEventRepository, publisher *billingfakes.OutboxTariffEventPublisher) *outboxdomain.RetryOutboxTariffEventsCommand {
-	publishCommand := outboxdomain.NewPublishOutboxTariffEventCommand(repository, publisher, 3)
+	publishCommand := outboxdomain.NewPublishOutboxTariffEventCommand(repository, publisher, txfakes.NewManager[outboxdomain.Repository](repository), 3)
 
 	return outboxdomain.NewRetryOutboxTariffEventsCommand(repository, publishCommand, outboxdomain.RetrySettings{BatchSize: 2, StaleAfter: time.Minute})
 }

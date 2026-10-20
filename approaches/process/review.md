@@ -35,7 +35,7 @@
 2. `glab mr view <id> --output text` → `Source Branch`, `Target Branch`.
 3. `git fetch origin`.
 4. `git diff origin/<target>...origin/<source> --name-only -- '*.<ext>'`.
-5. `glab` недоступен — сказать об этом, попросить ветку MR, `git diff origin/main...origin/<branch>`.
+5. `glab` недоступен — сказать об этом, попросить ветку MR и её целевую ветку (не названа — `stage`, `regulations/git.md`), `git diff origin/<target>...origin/<branch>`.
 6. **Локальный HEAD — не обязательно MR.** Сверить `git branch --show-current` с `Source Branch` и явно сказать, что проверяется.
 7. **База — `Target Branch` этого MR**, не дефолт: фичи идут в `stage`, есть `preprod`/`production`.
 8. **Открытые треды:** `glab api --paginate "projects/:fullpath/merge_requests/<id>/discussions?per_page=100"`, заметки без `system=true`; префикс замечания — по `regulations/code-review.md`. Уже написанное ревьюерами не дублировать; проверить, **закрыто ли замечание в текущем HEAD** — незакрытые отдельным блоком «Открытые замечания ревьюеров» (префикс, файл, суть). Разбирать чужие треды здесь не нужно — это `/dev-mr` (`mr-threads.md`).
@@ -56,7 +56,7 @@
 5. **Безопасность** — `security.md` стека, независимо от типа файла.
 6. Правила стека + `review-findings.md`; платёжные пути — каждый пункт `approaches/patterns/payments.md` явно, результат в отчёт даже без нарушений.
 6a. **Производительность** — по `approaches/patterns/performance.md`; **конкурентность** — по `approaches/patterns/concurrency.md` (теги оттуда).
-6b. **Транзакции** — по `approaches/patterns/transactions.md`: каждый workflow с записью — в одной транзакции вместе с проверками (или причина в `design.md`); Go — внутри `fn` только репозитории из аргументов; побочные эффекты — после коммита. Теги `workflow-without-transaction`, `multi-write-without-transaction`, `tx-bypassed-by-service`.
+6b. **Транзакции** — по `approaches/patterns/transactions.md`: больше одного модифицирующего запроса в сценарии (workflow, Command, Service) — в одной транзакции, один запрос — без неё (кроме транзакции ради блокировки `FOR UPDATE`/`FOR SHARE` — основание «Конкурентность» `design.md`); проверка перед записью защищена по `concurrency.md`, а не транзакцией; Go — внутри `fn` только репозитории из аргументов; побочные эффекты — после коммита. Теги `multi-write-without-transaction`, `needless-transaction`, `tx-bypassed-by-service`.
 7. Переизобретение и несуществующий API — по `capabilities.md` и `reference/` версии проекта (**[ОШИБКА]**).
 8. Проверки за пределами дифа (`review-checks.md`) — при ревью дифа/MR; при `--all` из них нужны только механические проверки — пункты, перечисленные для `--all` в начале раздела `review-checks.md` стека, — по всему проекту, остальные (разъезд списков, данные под миграцию, гигиена MR) без дифа смысла не имеют. **Связи:** по каждому изменённому символу/роуту/событию/таблице/enum — поиск использований; есть `design.md` — сверить с «Связи». Изменение, у которого не учтено использование, — **[ОШИБКА]** (тег `impact-unhandled-usage`).
 9. Блок **«Не покрыто правилами»** — что сделано в коде, но в регламенте/фреймворке этого нет; варианты + рекомендация, не ошибка автора.

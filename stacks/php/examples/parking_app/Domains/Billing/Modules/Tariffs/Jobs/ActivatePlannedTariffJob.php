@@ -11,8 +11,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 use Throwable;
 
 /**
- * Отложенная активация запланированного тарифа. Ставит CreateTariffWorkflow после коммита:
- * `ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->scheduled_at)`.
+ * Отложенная активация запланированного тарифа; ставит CreateTariffWorkflow после коммита с задержкой до scheduled_at.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

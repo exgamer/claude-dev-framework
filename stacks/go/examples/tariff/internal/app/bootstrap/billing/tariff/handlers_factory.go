@@ -9,6 +9,7 @@ func newHandlersFactory(servicesFactory *servicesFactory, workflowsFactory *work
 	return &handlersFactory{
 		TariffHandler: tariffhttp.NewHandler(
 			servicesFactory.TariffService,
+			servicesFactory.GetDefaultTariffQuery,
 			servicesFactory.SetDefaultTariffCommand,
 			workflowsFactory.CreateTariffWorkflow,
 		),

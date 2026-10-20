@@ -31,12 +31,12 @@
 15. **В** Доменные инварианты — `{E}DtoValidator::validate($dto)` → `ValidationAppException('VALIDATION ERROR', $errors)`. — `conventions.md` п. 10 (P-8)
 16. **О** Между слоями — DTO (`DataObject`, private-свойства, геттеры, fluent-сеттеры), не массив; enum-поле DTO — enum. — `conventions.md` п. 11
 17. **В** Ключи (атрибуты, заголовки, теги кэша) и значения домена (типы, статусы, провайдеры, действия) — enum, не константы; повтор значения существующего enum константой и константы в интерфейсах — **О**; подмножество значений enum — метод enum, не `const array` из кейсов в другом классе. — `conventions.md` п. 12b
-18. **В** Список — по форме из раздела «Список» `design.md` (P-19); раздела нет — вопрос пользователю, рекомендация (2). (2) `Page`: `paginate…({E}FilterDto, Page)` — один метод собирает один запрос, фильтры подряд `if (...) { $query->where(...); }`, явный `orderBy` в конце; каждое поле `IndexRequest` → поле FilterDto → условие. (1) `mps/core`: `search()` + `filterSearch()` + `SearchDataObject` + `SearchRequest` + `PaginateResource`; каждое поле `SearchRequest` → условие в `filterSearch()`. Существующий код на (1) — не нарушение. — `conventions.md` п. 2a, 12c, 12d
+18. **В** Список — по форме из раздела «Список» `design.md` (P-19); раздела нет — вопрос пользователю, рекомендация (2); вопрос — только для нового списка, правимый сохраняет свою форму. (2) `Page`: `paginate…({E}FilterDto, Page)` — один метод собирает один запрос, фильтры подряд `if (...) { $query->where(...); }`, явный `orderBy` в конце; каждое поле `IndexRequest` → поле FilterDto → условие. (1) `mps/core`: `search()` + `filterSearch()` + `SearchDataObject` + `SearchRequest` + `PaginateResource`; каждое поле `SearchRequest` → условие в `filterSearch()`. Существующий код на (1) — не нарушение. — `conventions.md` п. 2a, 12c, 12d
 
 ## Транзакции и побочные эффекты
 
-19. **О** Workflow с записью — проверки и все записи в одном `TransactionManagerInterface::run()`; без транзакции — только с причиной в `design.md`. — `approaches/patterns/transactions.md` (O-8)
-20. **О** Service/Command с 2+ связанными записями — `run()`; не `DB::transaction`, не `$repo->transaction`. — `conventions.md` п. 16
+19. **О** Workflow, Service, Command делает больше одного модифицирующего запроса (в разные таблицы или в одну) — в одном `TransactionManagerInterface::run()`, основание — «Границы транзакций» `design.md`. **В** Один модифицирующий запрос — без своей транзакции (тег `needless-transaction`), кроме транзакции ради блокировки `FOR UPDATE`/`FOR SHARE` — основание «Конкурентность» `design.md`. — `approaches/patterns/transactions.md` (O-8)
+20. **О** Транзакция — только `run()`; не `DB::transaction`, не `$repo->transaction`; проверка перед записью — до `run()` и защищена от гонки не тем, что лежит в транзакции, а по решению «Конкурентность» `design.md` (`approaches/patterns/concurrency.md`): уникальный индекс, условие в `UPDATE`, внешний ключ (существование); состояние связанной записи (активна, не удалена) — `FOR SHARE` в `run()` или принятый риск с ответом пользователя (O-8; теги `race-on-related-state`, `race-risk-accepted-silently` — `review-tags.md`). — `conventions.md` п. 16
 21. **О** Очередь, `Job::dispatch`, HTTP, файлы, сброс кэша — после записи и вне транзакции. — `conventions.md` п. 17
 21a. **О** Обработчик очереди — в `Entrypoints/Queue/`, тонкий, идемпотентный, payload через DTO; временная ошибка — повтор, постоянная — фиксация без повтора. — `approaches/patterns/async.md`, «Consumer», `mps-core/jobs.md`
 
@@ -47,15 +47,15 @@
 
 ## HTTP
 
-24. **О** OpenAPI-атрибуты на каждом эндпойнте, с `404`/`500`; тег `'{Context} {Подпроект}: {Сущность}'`. — `conventions.md` п. 18
+24. **О** OpenAPI-атрибуты на каждом эндпойнте, с `500`; `404` — только у эндпойнтов, ищущих запись по ID (`view`/`update`/`delete` и действия над записью), не у `index`/`create`; тег `'{Context} {Подпроект}: {Сущность}'`. — `conventions.md` п. 18
 25. **О** Ответ — `response()->json(new {E}Response(...), 200|201)`, удаление — `204`; обёртку `success/data` не собирать (её даёт `ApiResponseMiddleware`); макросы `Response::ok()` — нет. — `conventions.md` п. 19
-26. **В** Маршруты: префикс, имена `{ресурсы}.{index|view|create|update|delete}`, kebab-case, middleware — строковым алиасом. — `conventions.md` п. 20
+26. **В** Маршруты: префикс, имена `{ресурсы}.{index|view|create|update|delete}`, действие над ресурсом — `{ресурсы}.{действие}` в kebab-case (`tariffs.set-default`), URL в kebab-case, middleware — строковым алиасом. — `conventions.md` п. 20
 
 ## Конкурентность, производительность, безопасность
 
 27. **О** Конкурентные места из `design.md` закрыты: уникальный индекс, условная смена статуса, идемпотентность, блокировка крона; состояния в памяти процесса нет (Octane, 2+ инстанса). — `approaches/patterns/concurrency.md`
 28. **О** Без N+1, пагинация, индекс под фильтр/сортировку, большие выборки — `chunk()`/`cursor()`. — `approaches/patterns/performance.md`
-29. **О** Мульти-тенантный скоуп в каждом методе (`index`/`show`/`update`/`destroy` по отдельности): параметр владельца выводится сервером, не берётся из запроса как необязательный (id владельца из запроса — сверка в middleware, чужой → 403; по ID записи — фильтр в репозитории, чужая → 404; кэш по ID — сверка после чтения, `architecture/layers.md`); в сигнатуре сервиса/репозитория скоуп — без умолчания `= null`, `null` передаётся явно. — `security.md`, `review-findings.md`
+29. **О** Мульти-тенантный скоуп в каждом методе (`index`/`show`/`update`/`destroy` по отдельности): параметр владельца выводится сервером, не берётся из запроса как необязательный (id владельца из запроса — сверка в middleware, чужой → 403; по ID записи — фильтр в репозитории, чужая → 404; кэш по ID — сверка после чтения, `architecture/layers.md`); в сигнатуре сервиса/репозитория скоуп — без умолчания `= null`, `null` передаётся явно; поле скоупа `{E}FilterDto` — тоже без умолчания: не выставлено — исключение ядра, `null` — только явным `set…Ids(null)` (`conventions.md` п. 19a). — `security.md`, `review-findings.md`
 30. **О** Вебхук — проверка подписи до смены статуса; повтор события идемпотентен; платёжный путь — все пункты `payments.md`. — `security.md`, `approaches/patterns/payments.md`
 31. **О** Нет сырого SQL с подстановкой ввода, секретов в коде и логах, mass assignment без allowlist. — `security.md`
 32. **О** Меры из `threats.md` по своим файлам реализованы.
@@ -64,17 +64,18 @@
 
 33. **О** Используемые расширения PHP (`ext-zip`, `ext-intl`…) объявлены в `require` `composer.json` (AINA-2744). `declare(strict_types=1);` в каждом файле; форматирование — `composer csfix-validate`.
 34. **В** Docblock класса — одна строка по-русски + `@author`; описания, пересказывающие имя, и «ИИ-шные» комментарии не писать. Любой текст для людей (Swagger, ошибки клиенту, коммиты, ответы в MR) — по делу, без «ИИ-воды»; нигде нет Claude/ИИ как автора или соавтора (`Co-Authored-By: Claude`, «Generated with Claude Code»). — `style.md`, `core/style.md`, «Любой текст для людей»
-35. **В** `final` у Command/Query/workflow/валидаторов; promotion `private readonly`, trailing comma. — `style.md`
+35. **В** `final` у Command/Query/workflow/валидаторов; Command/Query — без базового класса ядра (`MPS\Core\Commands\Command`/`Queries\Query`, `prepare()`/`get()` не используются), метод `execute(...)` с типизированными аргументами (`command-query-form`, `mps-core/commands.md`); promotion `private readonly`, trailing comma. — `style.md`
 36. **В** Имена по таблице `style.md` (`{Entity}Dto`, `{Entity}CrudService`, `{Action}Workflow`, enum `UPPER_SNAKE` + `Enumerable`).
 37. **О** Модель: `@property` по-русски, `$table` со схемой (таблица в `public` — без префикса), `$fillable`, `$casts` (enum → enum). — `style.md`
-48. **В** Читается сверху вниз: замыкание не передаёт поведение в свой метод (`->when()` → `if`), вызов не вкладывается в вызов и не индексируется на месте (`handle([getByKey()])[0]` → три строки; один уровень с коротким аргументом — `handle(Mapper::toDto($request))` — допустим; цепочки `array_*` → `foreach`/именованные переменные), лямбда — одна строка только где требует библиотека, без затенения внешних переменных, глубина блоков ≤ 2. — `core/style.md`, «Форма кода»; `style.md`; тег `nested-call-chain`
+48. **В** Читается сверху вниз: замыкание не передаёт поведение в свой метод (`->when()` → `if`), вызов не вкладывается в вызов и не индексируется на месте (`execute([getByKey()])[0]` → три строки; один уровень с коротким аргументом — `execute(Mapper::toDto($request))` — допустим; цепочки `array_*` → `foreach`/именованные переменные), лямбда — одна строка только где требует библиотека, без затенения внешних переменных, глубина блоков ≤ 2. — `core/style.md`, «Форма кода»; `style.md`; тег `nested-call-chain`
 
 ## Тесты и проверка
 
 38. **О** Unit-тесты на правила R*, ветки ошибок и кейсы `qa.md` уровня unit — в `tests/Unit/…`, путь повторяет путь класса. — `structure.md`, «Тесты»
 39. **О** Прогнаны `composer csfix-validate`, `composer phpstan`, `composer test:run` (или аналоги проекта); вывод показан. Не запускал — так и написано.
 40. **О** Связи: по каждому изменённому классу/роуту/таблице/enum найдены использования (имя + строковый литерал); новое значение enum — в `in:`, swagger `enum:`, словарях фронта. — `approaches/process/impact-analysis.md`
-41. **О** Миграция обратно совместима (expand/contract), FK явно, порядок выкатки описан. — `approaches/patterns/migrations.md`
+40a. **О** Миграция — строго по «Схеме БД» `design.md` (согласована); расхождение — снова согласование, не правка по месту. — `regulations/technical-approval.md`, «Схема БД»
+41. **О** Миграция обратно совместима (expand/contract), FK явно, порядок выкатки и откат описаны. — `approaches/patterns/migrations.md`
 41a. **О** У нового статуса/значения есть потребитель (крон, consumer, переход), иначе тупик. — `approaches/process/impact-analysis.md`
 
 ## Действия агента

@@ -91,12 +91,12 @@ func (m *Module) Init(a *app.App) error {
 		return err
 	}
 
-	err = integrationtariffhttp.SetRoutes(
-		a,
-		handlersFactory.IntegrationTariffHandler,
-		integrationmiddleware.APIKeyMiddleware(partnerService),
-		integrationmiddleware.SignatureAuthMiddleware(partnerService, *signatureSettings),
-	)
+	integrationAuth := integrationtariffhttp.AuthMiddlewares{
+		APIKey:    integrationmiddleware.APIKeyMiddleware(partnerService),
+		Signature: integrationmiddleware.SignatureAuthMiddleware(partnerService, *signatureSettings),
+	}
+
+	err = integrationtariffhttp.SetRoutes(a, handlersFactory.IntegrationTariffHandler, integrationAuth)
 	if err != nil {
 		return err
 	}

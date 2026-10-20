@@ -22,8 +22,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Отправка outbox-события: опубликованное и исчерпавшее попытки не отправляется, сбой брокера — попытка и статус
- * AWAITING_RETRY, на лимите — FAILED; исключение уходит вызывающему.
+ * Отправка outbox-события: доставленное и исчерпавшее попытки не отправляется, сбой брокера — AWAITING_RETRY, на лимите — FAILED.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

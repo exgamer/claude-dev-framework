@@ -34,4 +34,18 @@ enum TariffStatusEnum: string implements Enumerable
     {
         return [self::ACTIVE, self::SCHEDULED];
     }
+
+    /**
+     * @return list<string>
+     */
+    public static function notArchivedValues(): array
+    {
+        $values = [];
+
+        foreach (self::notArchived() as $status) {
+            $values[] = $status->value;
+        }
+
+        return $values;
+    }
 }

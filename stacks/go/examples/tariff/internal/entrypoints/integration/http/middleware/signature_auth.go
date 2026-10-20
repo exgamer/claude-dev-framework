@@ -77,7 +77,17 @@ func verifySignature(c *gin.Context, body []byte, settings SignatureSettings) (s
 		return signature.Parsed{}, err
 	}
 
-	err = signature.Verify(settings.Secret, parsed, c.Request.Method, c.Request.URL.RequestURI(), body, settings.Tolerance, time.Now())
+	err = signature.Verify(signature.VerifyParams{
+		Secret: settings.Secret,
+		Parsed: parsed,
+		Message: signature.Message{
+			Method: c.Request.Method,
+			Path:   c.Request.URL.RequestURI(),
+			Body:   body,
+		},
+		Tolerance: settings.Tolerance,
+		Now:       time.Now(),
+	})
 	if err != nil {
 		return signature.Parsed{}, err
 	}

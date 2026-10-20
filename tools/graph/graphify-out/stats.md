@@ -1,14 +1,8 @@
 # Граф правил — сводка
 
-Узлов 1138, связей 4325, групп 11. Кандидаты ниже — подсказки, проверять по файлам.
+Узлов 1116, связей 4259, групп 13. Кандидаты ниже — подсказки, проверять по файлам.
 
 ## Сироты (на файл нет ссылок)
-- agents/df-analyst.md
-- agents/df-architect.md
-- agents/df-php.md
-- agents/df-qa.md
-- agents/df-review.md
-- agents/df-security.md
 - skills/dev-mr/SKILL.md
 - stacks/go/go-sdk/entrypoint.md
 - stacks/go/go-sdk/infra/redis.md
@@ -16,41 +10,41 @@
 - stacks/vanilla-js/README.md
 
 ## Темы в большем числе файлов
-- Транзакции — 23
-- Слои — 22
-- Репозиторий — 22
-- Возможности SDK — 21
-- Лог отклонений rules-log — 20
-- Внешние интеграции — 18
+- репозиторий — 28
+- Транзакции — 24
+- DI-контейнер — 22
+- Внешние интеграции — 20
+- Исключения и ошибки — 19
+- Конкурентность — 19
+- Лог отклонений rules-log — 19
+- RabbitMQ — 18
 - Подтверждение коммита и пуша — 18
-- Субагенты — 17
-- Безопасность — 17
-- Конкурентность — 17
-- Unit-тесты — 17
-- Анализ связей — 17
-- DI — 17
+- Unit-тесты — 18
+- Слои — 17
+- миграции БД — 17
 - Swagger — 17
-- RabbitMQ — 16
-- Workflow — 16
-- миграции БД — 16
+- возможности SDK — 17
+- Субагенты — 16
+- Ревью MR — 16
+- Сервисный слой — 16
 - Авторизация и права — 16
-- хелперы и переиспользование — 16
-- именование — 16
+- enum — 16
+- Хелперы и переиспользование — 16
 
 ## Кандидаты в противоречия (conflicts_with)
-C1. [agents/df-review.md § п.2] ««Круг N» — только закрытие находок + перечисленные файлы (правило «Повторный круг»)» VS [approaches/process/planning.md § Волны] «Ревью ⇄ исправления — до 3 кругов» (0.15)
-C2. [approaches/patterns/performance.md § База данных] «Каждый запрос — с таймаутом (Go context.WithTimeout, 10s по умолчанию; PHP — в конфиге)» VS [stacks/go/go-sdk/infra/http.md § Конфигурация; repository.go] «Таймаут builder по умолчанию 30s; таймаут — SetRequestTimeout на каждый запрос, адрес и таймаут — из конструктора» (0.15)
-C3. [stacks/go/checklist.md § п. 39] «п.39 Прогнаны go build/vet/test ./... и gofmt -l internal pkg (с горутинами -race); не запускал — так и написано» VS [stacks/go/examples/tariff/README.md § вступление] «Проверено 2026-10-20 против gosdk-core v1.0.9, rabbit-core v1.0.10, redis-core v1.0.7 и др. (Go 1.26+): go build/vet/test -race, gofmt -l .» (0.2)
-C4. [stacks/go/go-sdk/entrypoint/rabbit.md § «Правила»] «Работа с RabbitMQ только через gosdk-rabbit-core (пакет github.com/exgamer/gosdk-rabbit-core)» VS [stacks/go/examples/tariff/README.md § вступление] «Проверено 2026-10-20 против gosdk-core v1.0.9, rabbit-core v1.0.10, redis-core v1.0.7 и др. (Go 1.26+): go build/vet/test -race, gofmt -l .» (0.25)
-C5. [stacks/go/go-sdk/entrypoint/rabbit.md § «Правила»] «Путь consumer обязан содержать internal/entrypoints/{context}/rabbit/; иначе [ОШИБКА] (в т.ч. entrypoint/consumer/ без rabbit/)» VS [stacks/go/structure.md § «Entrypoint Layer»] «Каталог internal в контексте нельзя; consumer — контекст consumer, вебхуки — integration, служебные — system/http (G-4)» (0.15)
-C6. [stacks/go/go-sdk/entrypoint/rabbit.md § «Правила»] «Ошибка десериализации payload — постоянная: вернуть nil (ACK), не error» VS [stacks/go/examples/tariff/README.md § tariff_consumer.go] «Consumer: битый payload — CaptureError и ACK; временная — NACK в retry, после N попыток (x-death) — CaptureError и ACK; контекст consumer, не internal» (0.2)
-C7. [stacks/go/go-sdk/workflow.md § Правила] «Инфраструктура только через интерфейсы; сервисы доменов можно конкретным типом, интерфейс «на всякий случай» не заводится» VS [stacks/php/conventions.md § п.5] «RepositoryInterface и ServiceInterface — всегда; Command/Query — без интерфейса» (0.25)
-C8. [stacks/php/conventions.md § п.2a] «Форма (1): CRUDRepository::search(..., int $perPage = 30, ...)» VS [stacks/php/mps-core/repository.md § Форма (1)] «Форма (1): контроллер setPerPage(validated(per_page, 20))» (0.2)
-C9. [stacks/php/mps-core/migrations.md § «ALTER TABLE с заполнением»] «Data-миграция пишет через типизированный метод репозитория (один UPDATE … WHERE, P-20); зависимость — app(Interface::class)» VS [architecture/layers.md § «DI — только в сборке»] «DI только в сборке; резолв из контейнера (di.Resolve, app(), resolve()) в бизнес-коде — [ОШИБКА]; Go — сервисы конкретным типом, PHP — ServiceInterface всегда» (0.25)
-C10. [stacks/php/mps-core/migrations.md § «ALTER TABLE с заполнением»] «Новая обязательная колонка в таблице с данными — три миграции: nullable → данные → снять nullable» VS [stacks/go/examples/tariff/README.md § migrations/] «Миграция уникального индекса: до индекса проверка дублей, нашлись — падает со списком; данные не правятся молча; FK с RESTRICT» (0.15)
-C11. [stacks/php/mps-core/repository.md § Форма (1)] «Форма (1): контроллер setPerPage(validated(per_page, 20))» VS [stacks/php/mps-core/http.md § Requests] «IndexRequest: per_page between:1,100, page gt:0» (0.15)
-C12. [stacks/php/review-checks.md § 5.2] «Таблица 5.2: $cache->getOrCreate вместо SmartCache/getOrSet — [ОШИБКА] (поправка: по версии utils)» VS [stacks/php/conventions.md § п.22] «getOrCreate/getCacheKeyByParts устаревшие только с utils ≥ 2.6.4; при 2.6.x — не находка» (0.7)
-C13. [stacks/php/review-checks.md § 5.2] «Таблица 5.2: $cache->getOrCreate вместо SmartCache/getOrSet — [ОШИБКА] (поправка: по версии utils)» VS [stacks/php/mps-core/capabilities.md § Кеш и Redis] «utils ≥ 2.6.4 — getOrSet вместо getOrCreate (@deprecated); SmartCache — utils ≥ 2.8» (0.3)
-C14. [stacks/php/review-checks.md § 5.2] «Workflow с записью — всегда в транзакции, включая одиночный create (O-8) — workflow-without-transaction» VS [stacks/php/checklist.md § п.19] «Workflow с записью — в одном TransactionManagerInterface::run(); без транзакции — только с причиной в design.md» (0.3)
-C15. [stacks/php/review-checks.md § 5.2] «Workflow с записью — всегда в транзакции, включая одиночный create (O-8) — workflow-without-transaction» VS [stacks/php/review-tags.md § Таблица] «workflow-without-transaction: workflow пишет без run() и без причины в design.md (O-8)» (0.25)
-C16. [stacks/php/review-findings.md § Enums / Models] «Enums/Models: описание класса и свойств (docblock) обязательны» VS [stacks/php/style.md § Шапка класса] «@param/@return — только если добавляют информацию сверх сигнатуры» (0.15)
+C1. [approaches/process/security.md § Режим audit C] «Аудит: 4–8 параллельных агентов Explore без isolation, только чтение, запущенных одним сообщением» VS [approaches/process/security.md § финал] «Агентов-разработчиков не больше 3 (в рефакторе 5) по planning.md, против 4–8 у аудита» (0.2)
+C2. [architecture/layers.md § Принадлежность записи скоупу] «Внутренние точки входа читают без ограничения: скоуп передаётся явно — nil (Go) / null (PHP); null у super-admin» VS [stacks/go/conventions.md § п. 7a] «п. 7a: скоуп ParkingScope{All;IDs}: «без ограничения» — явный All: true (super-admin, consumer, консоль, integration); [ОШИБКА] scope-param-defaults-unrestricted» (0.75)
+C3. [regulations/git.md § Ветки] «Рабочая ветка от release; hotfix — от production; поток ветка → MR → stage → release → production» VS [approaches/process/review.md § --mr п. 7] «База ревью MR — Target Branch MR, не дефолт (фичи в stage)» (0.15)
+C4. [stacks/go/conventions.md § п. 6] «п. 6: вся бизнес-логика — только в сервисах и workflow» VS [stacks/go/checklist.md § п. 14] «п. 14: >1 модифицирующего запроса — один txManager.Exec; один — без транзакции (needless-transaction)» (0.2)
+C5. [stacks/go/go-sdk/infra/postgres.md § Правила] «Каждый DB-запрос — timeout 10s (кроме NewGormPaginatedHelper)» VS [stacks/go/go-sdk/infra/http.md § Конфигурация] «SetRequestTimeout на каждый запрос (default 30s)» (0.1)
+C6. [stacks/go/go-sdk/workflow.md § Именование файлов] «Собирается в internal/app/bootstrap/{module}/workflows_factory.go, не services_factory.go» VS [stacks/go/examples/tariff/README.md § шапка] «Проверено 2026-10-20 против gosdk-core v1.0.9, gosdk-db-core v1.0.10, http-request-builder v1.0.2 и др. (Go 1.26+)» (0.15)
+C7. [stacks/php/conventions.md § п. 11b] «Элемент внешнего массива (в т.ч. keyBy()-карта из репозитория) — только после проверки ключа ([ОШИБКА] array-key-unchecked)» VS [stacks/php/review-findings.md § Repository] «Репозиторий: нет keyBy/map/сборки структур — маппинг в Service» (0.3)
+C8. [stacks/php/mps-core/cli.md § Соглашения] «Signature: {domain}:{module}:{action} через двоеточие» VS [stacks/go/structure.md § Консоль] «Консольная команда: Use "{module-kebab}:{action}", тонкая — один вызов Command домена» (0.2)
+C9. [stacks/php/mps-core/migrations.md § «ALTER TABLE с заполнением»] «Data-миграция пишет через типизированный метод репозитория (один UPDATE … WHERE, P-20); зависимость — app(Interface::class)» VS [architecture/layers.md § Правила слоёв] «DI — только в Bootstrap; resolve в бизнес-коде — [ОШИБКА]; PHP ServiceInterface всегда, Go — по необходимости» (0.25)
+C10. [stacks/php/mps-core/transactions.md § По умолчанию] «CRUDService сам оборачивает create/update/delete в транзакцию через getRepository()->transaction()» VS [stacks/php/mps-core/transactions.md § Как использовать] «$this->repository->transaction() / $service->transaction() — антипаттерн на уровне Service/Command» (0.2)
+C11. [stacks/php/mps-core/transactions.md § Как использовать] «DB::transaction() — только в реализации менеджера транзакций (Infrastructure), при PostgreSQL-специфике» VS [stacks/php/checklist.md § п. 20] «Транзакция — только run(); не DB::transaction, не $repo->transaction» (0.15)
+C12. [stacks/php/review-checks.md § 5.2] «Бизнес-исключение в Repository, кроме NotFoundAppException, — [ОШИБКА]» VS [stacks/php/mps-core/repository.md § Контракт репозитория] «Репозиторий не бросает бизнес-исключения и «не найдено» — возвращает null; не делает keyBy» (0.7)
+C13. [stacks/php/review-checks.md § 5.2] «Бизнес-исключение в Repository, кроме NotFoundAppException, — [ОШИБКА]» VS [stacks/php/mps-core/repository.md § ЗАПРЕЩЕНО] «Своих *OrFail в репозитории нет; get…/oneBy… → ?Model, NotFoundAppException бросает вызывающий» (0.65)
+C14. [stacks/php/review-checks.md § 5.2] «$cache->getOrCreate(...) вместо SmartCache/getOrSet — [ОШИБКА] (с поправкой по версии utils)» VS [stacks/php/conventions.md § п. 22] «getOrCreate устаревший только с utils ≥ 2.6.4; при utils < 2.6.4 — не находка» (0.6)
+C15. [stacks/php/review-checks.md § 5.2] «$cache->getOrCreate(...) вместо SmartCache/getOrSet — [ОШИБКА] (с поправкой по версии utils)» VS [stacks/php/mps-core/capabilities.md § Кеш и Redis] «utils ≥ 2.6.4: getOrSet вместо deprecated getOrCreate; SmartCache — utils ≥ 2.8» (0.3)
+C16. [stacks/php/review-checks.md § 5.5 п. 3] «Тесты в проекте локально не запускаются (битый RefreshDatabase) — сказать об этом» VS [stacks/php/checklist.md § п. 39] «Прогнаны csfix-validate, phpstan, test:run; вывод показан; не запускал — так и написано» (0.25)

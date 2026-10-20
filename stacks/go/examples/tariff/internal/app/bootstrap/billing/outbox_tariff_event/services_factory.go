@@ -8,6 +8,7 @@ func newServicesFactory(repositoriesFactory *repositoriesFactory, retryConfig *r
 	publishCommand := outboxdomain.NewPublishOutboxTariffEventCommand(
 		repositoriesFactory.OutboxRepository,
 		repositoriesFactory.OutboxEventPublisher,
+		repositoriesFactory.FailedAttemptTxManager,
 		maxAttempts,
 	)
 

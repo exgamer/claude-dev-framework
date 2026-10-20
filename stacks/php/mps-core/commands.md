@@ -4,28 +4,31 @@
 
 > **Уточнение фреймворка:** Command/Query — это сервис, вынесенный в отдельный класс, когда операция слишком большая; работает **в пределах одного домена**. Агрегатная и междоменная логика (сценарий над несколькими доменами, координация их сервисов и побочных эффектов) — только workflow (`architecture/layers.md`, O-7), не Command.
 
-Command — **большая операция одного домена**. Живёт в `Domains/{Domain}/Modules/{Module}/Commands/`.
+Command — **большая операция одного домена** (изменение), Query — то же для чтения (`queries.md`).
+
+## Форма Command и Query
+
+Основное место правила формы для Command и Query (`queries.md` ссылается сюда). Решение пользователя 2026-10-20: «наследника Query реализовать prepare() — эти вещи для queries и command никогда не используем, делаем просто функцию handle с необходимым количеством аргументов», затем уточнение: метод — `execute(...)`, как у workflow. Почему: базовый класс ядра передаёт параметры через состояние объекта (`setQueryParams()`/сеттеры → `get()` → `prepare()`), сигнатура операции не видна и не типизируется.
+
+- **Класс** — простой `final` класс **без базового класса ядра**: `MPS\Core\Commands\Command`, `MPS\Core\Queries\Query` и подобные не наследуются; их `prepare()`, `get()`, `setQueryParams()`, fluent-сеттеры с массивами (`setData(array)`) не используются (описание в `official/core-v1.10.2/{commands,queries}.md` — факт API ядра, не образец).
+- **Точка входа** — публичный `execute(...)` с нужным количеством типизированных аргументов (DTO, id, скаляры; данные — DTO, п. 11a), результат — модель/DTO/значение или `void` (`../style.md`, «Имена»).
+- **Зависимости** — через конструктор (`private readonly`), интерфейс самого класса — только по `../conventions.md` п. 5.
+- **Логирование** — только если операции есть что логировать; `LoggerAwareInterface` + `LoggerAwareTrait` (`capabilities.md`) тогда подключаются, обязательными для Command/Query они не являются.
+- Workflow — тоже `execute()` (P-2), но это другой слой: 2+ доменов (`../structure.md`). Консольная команда Artisan (`*ConsoleCommand extends Illuminate\Console\Command`) и Job — Laravel-метод `handle()` со своей сигнатурой (`cli.md`, `jobs.md`); Command домена они получают параметром `handle()` и вызывают его `execute()`.
+
+**[ВНИМАНИЕ]** Command/Query с базовым классом ядра, `prepare()`/`get()` или точкой входа не `execute(...)` с типизированными аргументами — тег `command-query-form`.
 
 ## Command одного домена
 
-Одна операция одного домена, слишком большая для метода сервиса.
-
-### Форма
-
-Точка входа — `execute()` с типизированными аргументами (DTO, id), результат — модель/значение (`../style.md`, «Имена»). `Command::prepare()` ядра и fluent-сеттеры с массивами (`setData(array)`) в новом коде не используются: параметры команды — аргументы `execute()`, данные — DTO (п. 11a).
+Одна операция одного домена, слишком большая для метода сервиса. Живёт в `Domains/{Domain}/Modules/{Module}/Commands/`.
 
 ```php
 namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands;
 
-use MPS\Core\Commands\Command;
 use MPS\Core\Components\Database\Transaction\TransactionManagerInterface;
-use MPS\Utils\Components\Logger\Interfaces\LoggerAwareInterface;
-use MPS\Utils\Components\Logger\Traits\LoggerAwareTrait;
 
-final class SaveYourEntityCommand extends Command implements LoggerAwareInterface
+final class SaveYourEntityCommand
 {
-    use LoggerAwareTrait;
-
     public function __construct(
         private readonly TransactionManagerInterface $transactionManager,
         private readonly YourRepositoryInterface $repository,
@@ -35,8 +38,6 @@ final class SaveYourEntityCommand extends Command implements LoggerAwareInterfac
 
     public function execute(YourDto $dto): YourModel
     {
-        $this->getLogger()->for($this);
-
         $model = $this->transactionManager->run(function () use ($dto) {
             $existing = $this->repository->getByExternalId($dto->getExternalId());
             if ($existing) {
@@ -55,9 +56,11 @@ final class SaveYourEntityCommand extends Command implements LoggerAwareInterfac
 }
 ```
 
+Эталоны — `../examples/parking_app/Domains/Billing/Modules/Tariffs/Commands/SetDefaultTariffCommand.php`, `ActivatePlannedTariffCommand.php`, `.../OutboxTariffEvents/Commands/{Publish,Retry}OutboxTariffEvent*Command.php`.
+
 ## Сценарий над несколькими доменами — Workflow, не Command
 
-«Оркестрирующего Command» нет: координация сервисов разных доменов (заказ + корзина + бонусы + уведомление) — `Workflows/{D}/{M}/{Action}Workflow::execute()`, транзакционен по умолчанию (O-8). Workflow берёт репозитории и сервисы любых доменов напрямую (O-7), Command/Query/Service домена чужой домен не берут — **[ОШИБКА]**, тег `domain-cross-domain-access`. Эталон — `../examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php`.
+«Оркестрирующего Command» нет: координация сервисов разных доменов (заказ + корзина + бонусы + уведомление) — `Workflows/{D}/{M}/{Action}Workflow::execute()`; транзакция — если больше одного модифицирующего запроса (O-8, `approaches/patterns/transactions.md`). Workflow берёт репозитории и сервисы любых доменов напрямую (O-7), Command/Query/Service домена чужой домен не берут — **[ОШИБКА]**, тег `domain-cross-domain-access`. Эталон — `../examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php`.
 
 ```php
 final class CreateOrderWorkflow

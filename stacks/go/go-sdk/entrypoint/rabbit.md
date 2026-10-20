@@ -1,8 +1,6 @@
 # RabbitMQ Entrypoint
 
-Путь (две допустимые формы):
-- двухуровневый: `internal/entrypoints/{context}/rabbit/{domain}/{module}/`
-- одноуровневый: `internal/entrypoints/{context}/rabbit/{module}/`
+Путь: `internal/entrypoints/consumer/rabbit/{domain}/{module}/` — контекст `consumer` для событий брокера (`stacks/go/structure.md`, «Entrypoint Layer»; эталон — `examples/tariff/internal/entrypoints/consumer/rabbit/billing/tariff/`).
 
 Пакет: `github.com/exgamer/gosdk-rabbit-core`
 
@@ -12,7 +10,6 @@
   - неверный корень (например `entrypoint/consumer/` вместо `internal/entrypoints/{context}/rabbit/`)
   - отсутствие сегмента `rabbit/` в пути
   - плоская структура `consumer/{module}/` без `rabbit/` и `{context}/`
-- Если путь корректен — отметить **[ИНФО]** какая форма используется: одноуровневая (`rabbit/{module}/`) или двухуровневая (`rabbit/{domain}/{module}/`); это не нарушение, просто фиксация выбранной структуры
 - Общие правила consumer (тонкий, идемпотентный, payload через DTO, временная ошибка — повтор, постоянная — фиксация, топология при старте) — `approaches/patterns/async.md`, «Consumer». Ниже — как это выглядит в Go SDK
 - Работа с RabbitMQ только через `gosdk-rabbit-core`; прямое использование клиента запрещено
 - Каждый consumer — отдельная структура со своим файлом `{module}_consumer.go`; файл с именем просто `consumer.go` (без префикса модуля) — **[ОШИБКА]**
@@ -26,9 +23,8 @@
 `nil` = ACK, `error` = NACK (повтор). Явные `msg.Ack()` / `msg.Nack()` не использовать.
 
 ```go
-type productMessage struct {
-    ID   uint   `json:"id"`
-    Name string `json:"name"`
+type parkingDeactivatedMessage struct {
+    ParkingID uint `json:"parking_id"`
 }
 
 type Consumer struct {
@@ -40,13 +36,13 @@ func NewConsumer(service *domain.Service) *Consumer {
 }
 
 func (c *Consumer) Consume(ctx context.Context, msg *message.Message) error {
-    var payload productMessage
+    var payload parkingDeactivatedMessage
     if err := json.Unmarshal(msg.Payload, &payload); err != nil {
         // невалидный payload — ACK чтобы не повторять бесконечно
         return nil
     }
 
-    return c.service.Handle(ctx, payload.ID)
+    return c.service.DeactivateByParkingID(ctx, payload.ParkingID)
 }
 ```
 

@@ -120,7 +120,12 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
 
-        $this->repository->updateFromDto($tariff, $dto);
+        if (! $this->repository->updateFromDto($tariff, $dto)) {
+            throw new ValidationAppException('VALIDATION ERROR', [
+                'parking_id' => ['У этой парковки уже есть тариф по умолчанию — сначала назначьте его другому тарифу'],
+            ]);
+        }
+
         $this->forgetCached($tariff->id);
 
         return $tariff;

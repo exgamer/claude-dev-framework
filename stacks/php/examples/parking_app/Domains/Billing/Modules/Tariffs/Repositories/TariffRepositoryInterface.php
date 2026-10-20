@@ -12,6 +12,7 @@ use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterface;
+use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
  * Интерфейс репозитория тарифов.
@@ -27,6 +28,11 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
      */
     public function getByIdInParkings(int $id, ?array $parkingIds): ?Tariff;
 
+    /**
+     * Скоуп парковок — полем фильтра (setParkingIds); не выставлен — исключение, а не «все парковки».
+     *
+     * @throws InvalidConfigurationAppException
+     */
     public function paginateTariffs(TariffFilterDto $filter, Page $page): LengthAwarePaginator;
 
     public function getDefaultByParkingId(int $parkingId): ?Tariff;
@@ -47,7 +53,11 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
 
     public function createFromDto(TariffDto $dto, TariffStatusEnum $status, bool $isDefault): Tariff;
 
-    public function updateFromDto(Tariff $tariff, TariffDto $dto): void;
+    /**
+     * Пишет колонки из DTO. false — тариф по умолчанию переносится на парковку, где тариф по умолчанию уже есть
+     * (уникальный индекс): запись не сделана, вызывающий только бросает исключение.
+     */
+    public function updateFromDto(Tariff $tariff, TariffDto $dto): bool;
 
     /**
      * Пишет флаг. false — у парковки уже есть другой тариф по умолчанию (уникальный индекс, параллельная смена):

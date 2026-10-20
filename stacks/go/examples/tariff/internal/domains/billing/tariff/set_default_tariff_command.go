@@ -21,13 +21,13 @@ type SetDefaultTariffCommand struct {
 	txManager       DefaultTariffTxManager
 }
 
-// Exec Тариф ищется в пределах парковок parkingIDs (nil — без ограничения); чужой — 404.
+// Exec Чужой тариф — 404.
 // Поиск прежнего и снятие его флага — для обычного случая; от параллельной смены защищает уникальный индекс: ErrDefaultTariffTaken → 422, транзакция откатывается
-func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, parkingIDs []uint) error {
+func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope ParkingScope) error {
 	var changedIDs []uint
 
 	err := c.txManager.Exec(ctx, func(ctx context.Context, repository Repository) error {
-		tariff, err := repository.GetByID(ctx, id, parkingIDs)
+		tariff, err := repository.GetByID(ctx, id, scope)
 		if err != nil {
 			return err
 		}

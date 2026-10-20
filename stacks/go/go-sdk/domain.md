@@ -2,7 +2,7 @@
 
 Путь: `internal/domains/{domain}/{module}/`
 
-Примеры: `internal/domains/billing/tariff/`, `internal/domains/billing/session/`
+Примеры: `internal/domains/billing/tariff/`, `internal/domains/billing/outbox_tariff_event/` (эталон `stacks/go/examples/tariff`)
 
 ## Правила
 
@@ -193,7 +193,7 @@ Command/Query берёт только репозитории **своего** д
 
 Нужны несколько модулей своего домена — Command/Query лежит в модуле-владельце результата, остальные модули получает через интерфейсы, объявленные в этом модуле (решение O-6).
 
-Если `Command` выполняет несколько операций записи, которые должны выполниться атомарно — оборачивать в транзакцию (см. `../conventions.md`, правило 17, и `infra/postgres.md`, раздел "Транзакции").
+Если `Command` делает больше одного модифицирующего запроса (в разные таблицы или в одну) — оборачивать в транзакцию; один запрос — без неё, кроме транзакции ради блокировки `FOR UPDATE`/`FOR SHARE` — основание «Конкурентность» `design.md` (см. `../conventions.md`, правило 17, и `infra/postgres.md`, раздел "Транзакции").
 
 ## Cross-domain зависимость
 

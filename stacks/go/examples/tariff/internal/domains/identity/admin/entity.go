@@ -4,7 +4,6 @@ import "time"
 
 // Admin Администратор с правами на момент загрузки из БД
 type Admin struct {
-	// ID
 	ID uint
 	// SystemRoles Системные роли (super-admin)
 	SystemRoles []string

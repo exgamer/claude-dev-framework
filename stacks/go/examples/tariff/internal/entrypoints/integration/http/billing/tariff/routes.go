@@ -7,9 +7,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetRoutes Машинный вызов партнёра: сначала ключ API (дешёвый отказ до чтения тела и Redis), затем подпись.
+// AuthMiddlewares Проверки машинного вызова партнёра; порядок в группе — ключ API, затем подпись
+type AuthMiddlewares struct {
+	// APIKey Дешёвый отказ до чтения тела и Redis
+	APIKey    gin.HandlerFunc
+	Signature gin.HandlerFunc
+}
+
+// SetRoutes Машинный вызов партнёра: сначала ключ API, затем подпись.
 // LoggerMiddleware в группе нет: на DEBUG он пишет заголовки, а маскирует только Authorization и Cookie — Api-Key попал бы в лог
-func SetRoutes(a *app.App, handler *Handler, apiKeyAuth gin.HandlerFunc, signatureAuth gin.HandlerFunc) error {
+func SetRoutes(a *app.App, handler *Handler, auth AuthMiddlewares) error {
 	router, err := di.GetRouter(a.Container)
 	if err != nil {
 		return err
@@ -25,8 +32,8 @@ func SetRoutes(a *app.App, handler *Handler, apiKeyAuth gin.HandlerFunc, signatu
 		{
 			v1.Use(middleware.FormattedResponseMiddleware())
 			v1.Use(middleware.MetricsMiddleware(a))
-			v1.Use(apiKeyAuth)
-			v1.Use(signatureAuth)
+			v1.Use(auth.APIKey)
+			v1.Use(auth.Signature)
 
 			v1.GET("/tariffs/:id", handler.View())
 		}

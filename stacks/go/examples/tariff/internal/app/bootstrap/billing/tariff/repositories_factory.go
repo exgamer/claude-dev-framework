@@ -43,9 +43,12 @@ func newRepositoriesFactory(
 			postgresClient,
 			func(tx *gorm.DB) tariffdomain.Repository { return tariffpostgres.NewPostgresRepository(tx) },
 		),
-		CreateTariffTxManager: dbtransaction.NewManager3[parkingdomain.Repository, tariffdomain.Repository, outboxdomain.Repository](
+		FailedAttemptTxManager: dbtransaction.NewManager[outboxdomain.Repository](
 			postgresClient,
-			func(tx *gorm.DB) parkingdomain.Repository { return parkingpostgres.NewPostgresRepository(tx) },
+			func(tx *gorm.DB) outboxdomain.Repository { return outboxpostgres.NewPostgresRepository(tx) },
+		),
+		CreateTariffTxManager: dbtransaction.NewManager2[tariffdomain.Repository, outboxdomain.Repository](
+			postgresClient,
 			func(tx *gorm.DB) tariffdomain.Repository { return tariffpostgres.NewPostgresRepository(tx) },
 			func(tx *gorm.DB) outboxdomain.Repository { return outboxpostgres.NewPostgresRepository(tx) },
 		),
@@ -61,5 +64,6 @@ type repositoriesFactory struct {
 	PriceLimitRepository   tariffdomain.PriceLimitRepository
 	TariffNotifier         tariffworkflow.TariffNotifier
 	DefaultTariffTxManager tariffdomain.DefaultTariffTxManager
+	FailedAttemptTxManager outboxdomain.FailedAttemptTxManager
 	CreateTariffTxManager  tariffworkflow.CreateTariffTxManager
 }

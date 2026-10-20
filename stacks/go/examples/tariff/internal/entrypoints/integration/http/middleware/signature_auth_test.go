@@ -34,6 +34,24 @@ func signedRouter(storageFails bool) (*gin.Engine, *string) {
 	return r, received
 }
 
+// signing Подпись POST-запроса на signedPath
+type signing struct {
+	secret    string
+	timestamp int64
+	nonce     string
+	body      string
+}
+
+func (s signing) header() string {
+	request := signature.Request{
+		Timestamp: s.timestamp,
+		Nonce:     s.nonce,
+		Message:   signature.Message{Method: http.MethodPost, Path: signedPath, Body: []byte(s.body)},
+	}
+
+	return signature.HeaderValue(s.secret, request)
+}
+
 func signedRequest(header, path, body string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	if header != "" {
@@ -53,28 +71,36 @@ func serve(r *gin.Engine, req *http.Request) int {
 func TestSignatureAuthMiddleware_ValidSignatureKeepsBody(t *testing.T) {
 	r, received := signedRouter(false)
 	body := `{"event":"ping"}`
-	header := signature.HeaderValue(testSecret, time.Now().Unix(), "nonce-0001", http.MethodPost, signedPath, []byte(body))
+	header := signing{testSecret, time.Now().Unix(), "nonce-0001", body}.header()
 
-	require.Equal(t, http.StatusOK, serve(r, signedRequest(header, signedPath, body)))
+	request := signedRequest(header, signedPath, body)
+
+	require.Equal(t, http.StatusOK, serve(r, request))
 	assert.Equal(t, body, *received, "хендлер получает тело целиком")
 }
 
 func TestSignatureAuthMiddleware_RejectsReplay(t *testing.T) {
 	r, _ := signedRouter(false)
-	header := signature.HeaderValue(testSecret, time.Now().Unix(), "nonce-0002", http.MethodPost, signedPath, nil)
+	header := signing{secret: testSecret, timestamp: time.Now().Unix(), nonce: "nonce-0002"}.header()
 
-	require.Equal(t, http.StatusOK, serve(r, signedRequest(header, signedPath, "")))
-	assert.Equal(t, http.StatusUnauthorized, serve(r, signedRequest(header, signedPath, "")))
+	first := signedRequest(header, signedPath, "")
+	replay := signedRequest(header, signedPath, "")
+
+	require.Equal(t, http.StatusOK, serve(r, first))
+	assert.Equal(t, http.StatusUnauthorized, serve(r, replay))
 }
 
 func TestSignatureAuthMiddleware_RejectedSignatureKeepsNonceFree(t *testing.T) {
 	r, _ := signedRouter(false)
 	now := time.Now().Unix()
-	forged := signature.HeaderValue("other", now, "nonce-0011", http.MethodPost, signedPath, nil)
-	valid := signature.HeaderValue(testSecret, now, "nonce-0011", http.MethodPost, signedPath, nil)
+	forged := signing{secret: "other", timestamp: now, nonce: "nonce-0011"}.header()
+	valid := signing{secret: testSecret, timestamp: now, nonce: "nonce-0011"}.header()
 
-	require.Equal(t, http.StatusUnauthorized, serve(r, signedRequest(forged, signedPath, "")))
-	assert.Equal(t, http.StatusOK, serve(r, signedRequest(valid, signedPath, "")), "неподписанный запрос не занимает чужой nonce")
+	forgedRequest := signedRequest(forged, signedPath, "")
+	validRequest := signedRequest(valid, signedPath, "")
+
+	require.Equal(t, http.StatusUnauthorized, serve(r, forgedRequest))
+	assert.Equal(t, http.StatusOK, serve(r, validRequest), "неподписанный запрос не занимает чужой nonce")
 }
 
 func TestSignatureAuthMiddleware_Rejects(t *testing.T) {
@@ -82,25 +108,35 @@ func TestSignatureAuthMiddleware_Rejects(t *testing.T) {
 	body := `{"event":"ping"}`
 
 	cases := []struct {
-		name, header, path, body string
-		storageFails             bool
-		want                     int
+		name string
+		// sign Пустой secret — заголовок берётся из header как есть
+		sign               signing
+		header, path, body string
+		storageFails       bool
+		want               int
 	}{
-		{"no header", "", signedPath, body, false, http.StatusUnauthorized},
-		{"other secret", signature.HeaderValue("other", now, "nonce-0003", http.MethodPost, signedPath, []byte(body)), signedPath, body, false, http.StatusUnauthorized},
-		{"body changed", signature.HeaderValue(testSecret, now, "nonce-0004", http.MethodPost, signedPath, []byte(body)), signedPath, `{"event":"pong"}`, false, http.StatusUnauthorized},
-		{"query changed", signature.HeaderValue(testSecret, now, "nonce-0005", http.MethodPost, signedPath, []byte(body)), "/tariffs/1?expand=all", body, false, http.StatusUnauthorized},
-		{"expired", signature.HeaderValue(testSecret, now-600, "nonce-0006", http.MethodPost, signedPath, []byte(body)), signedPath, body, false, http.StatusUnauthorized},
-		{"from the future", signature.HeaderValue(testSecret, now+120, "nonce-0009", http.MethodPost, signedPath, []byte(body)), signedPath, body, false, http.StatusUnauthorized},
-		{"malformed header", "t=abc,n=nonce-0010,v1=00", signedPath, body, false, http.StatusUnauthorized},
-		{"body too large", signature.HeaderValue(testSecret, now, "nonce-0007", http.MethodPost, signedPath, nil), signedPath, strings.Repeat("x", maxSignedBodyBytes+1), false, http.StatusRequestEntityTooLarge},
-		{"nonce storage error", signature.HeaderValue(testSecret, now, "nonce-0008", http.MethodPost, signedPath, []byte(body)), signedPath, body, true, http.StatusInternalServerError},
+		{name: "no header", path: signedPath, body: body, want: http.StatusUnauthorized},
+		{name: "other secret", sign: signing{"other", now, "nonce-0003", body}, path: signedPath, body: body, want: http.StatusUnauthorized},
+		{name: "body changed", sign: signing{testSecret, now, "nonce-0004", body}, path: signedPath, body: `{"event":"pong"}`, want: http.StatusUnauthorized},
+		{name: "query changed", sign: signing{testSecret, now, "nonce-0005", body}, path: "/tariffs/1?expand=all", body: body, want: http.StatusUnauthorized},
+		{name: "expired", sign: signing{testSecret, now - 600, "nonce-0006", body}, path: signedPath, body: body, want: http.StatusUnauthorized},
+		{name: "from the future", sign: signing{testSecret, now + 120, "nonce-0009", body}, path: signedPath, body: body, want: http.StatusUnauthorized},
+		{name: "malformed header", header: "t=abc,n=nonce-0010,v1=00", path: signedPath, body: body, want: http.StatusUnauthorized},
+		{name: "body too large", sign: signing{secret: testSecret, timestamp: now, nonce: "nonce-0007"}, path: signedPath, body: strings.Repeat("x", maxSignedBodyBytes+1), want: http.StatusRequestEntityTooLarge},
+		{name: "nonce storage error", sign: signing{testSecret, now, "nonce-0008", body}, path: signedPath, body: body, storageFails: true, want: http.StatusInternalServerError},
 	}
 
 	for _, tc := range cases {
 		r, _ := signedRouter(tc.storageFails)
+		header := tc.header
 
-		if got := serve(r, signedRequest(tc.header, tc.path, tc.body)); got != tc.want {
+		if tc.sign.secret != "" {
+			header = tc.sign.header()
+		}
+
+		request := signedRequest(header, tc.path, tc.body)
+
+		if got := serve(r, request); got != tc.want {
 			t.Fatalf("%s: got %d, want %d", tc.name, got, tc.want)
 		}
 	}

@@ -1,27 +1,28 @@
 package outbox_tariff_event
 
-import "time"
+import (
+	"time"
+
+	"example.com/parking-service/internal/common"
+)
 
 // OutboxTariffEvent Событие о тарифе для отправки в RabbitMQ (outbox)
 type OutboxTariffEvent struct {
 	// ID ID записи; уходит в сообщение как event_id — по нему получатель отсекает повторную доставку
-	ID uint
-	// TariffID
-	TariffID uint
-	// ParkingID
+	ID        uint
+	TariffID  uint
 	ParkingID uint
 	// Name Название тарифа на момент события
 	Name string
 	// Currency Валюта (ISO 4217)
-	Currency string
+	Currency common.Currency
 	// GraceMinutes Доп. время на выезд после оплаты (минуты)
 	GraceMinutes uint
 	// Price Цена часа в минимальных единицах валюты
 	Price uint
 	// RoutingKey Routing key публикации, он же тип события
 	RoutingKey string
-	// Status
-	Status Status
+	Status     Status
 	// Attempts Неудачных попыток отправки
 	Attempts uint
 	// PublishedAt Когда брокер подтвердил публикацию

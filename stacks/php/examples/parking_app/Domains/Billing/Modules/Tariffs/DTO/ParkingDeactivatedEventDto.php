@@ -7,13 +7,13 @@ namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO;
 use MPS\Core\DataObjects\DataObject;
 
 /**
- * Событие справочника handbook.parking.deactivated: парковку отключили. Поля nullable — payload внешний,
- * обязательность проверяет обработчик.
+ * Событие справочника handbook.parking.deactivated: парковку отключили.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
 class ParkingDeactivatedEventDto extends DataObject
 {
+    /** Nullable: payload внешний, обязательность проверяет обработчик */
     private ?int $parkingId = null;
 
     public function getParkingId(): ?int

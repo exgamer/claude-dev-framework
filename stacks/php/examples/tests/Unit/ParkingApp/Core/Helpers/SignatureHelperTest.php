@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit\ParkingApp\Core\Helpers;
 
 use App\ParkingApp\Core\Helpers\SignatureHelper;
+use App\ParkingApp\Core\Http\Signature\SignedMessage;
+use App\ParkingApp\Core\Http\Signature\SignedRequest;
 use PHPUnit\Framework\TestCase;
 
 /**
- * HMAC-подпись машинного вызова: вектор совпадает с Go-эталоном, разбор заголовка отвергает битый формат,
- * подпись не сходится при смене секрета, метода, пути или тела.
+ * HMAC-подпись машинного вызова: вектор Go-эталона, отказ на битый формат и на смену секрета, метода, пути или тела.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -30,21 +31,24 @@ class SignatureHelperTest extends TestCase
 
     public function test_signature_matches_independent_vector(): void
     {
-        $signature = SignatureHelper::sign(self::SECRET, self::TIMESTAMP, self::NONCE, 'post', self::TARGET, self::BODY);
+        $request = new SignedRequest(self::TIMESTAMP, self::NONCE, $this->message('post'));
+        $signature = SignatureHelper::sign(self::SECRET, $request);
 
         $this->assertSame(self::VECTOR, $signature);
     }
 
     public function test_header_is_parsed_back_and_verified(): void
     {
-        $header = SignatureHelper::header(self::SECRET, self::TIMESTAMP, self::NONCE, 'POST', self::TARGET, self::BODY);
+        $request = new SignedRequest(self::TIMESTAMP, self::NONCE, $this->message());
+        $header = SignatureHelper::header(self::SECRET, $request);
 
         $parsed = SignatureHelper::parse($header);
 
         $this->assertNotNull($parsed);
         $this->assertSame(self::TIMESTAMP, $parsed->timestamp);
         $this->assertSame(self::NONCE, $parsed->nonce);
-        $this->assertTrue(SignatureHelper::verify(self::SECRET, $parsed, 'POST', self::TARGET, self::BODY));
+        $message = $this->message();
+        $this->assertTrue(SignatureHelper::verify(self::SECRET, $parsed, $message));
     }
 
     public function test_upper_case_hex_is_accepted(): void
@@ -52,7 +56,8 @@ class SignatureHelperTest extends TestCase
         $parsed = SignatureHelper::parse('t=' . self::TIMESTAMP . ',n=' . self::NONCE . ',v1=' . strtoupper(self::VECTOR));
 
         $this->assertNotNull($parsed);
-        $this->assertTrue(SignatureHelper::verify(self::SECRET, $parsed, 'POST', self::TARGET, self::BODY));
+        $message = $this->message();
+        $this->assertTrue(SignatureHelper::verify(self::SECRET, $parsed, $message));
     }
 
     public function test_malformed_headers_are_rejected(): void
@@ -81,9 +86,20 @@ class SignatureHelperTest extends TestCase
         $parsed = SignatureHelper::parse('t=' . self::TIMESTAMP . ',n=' . self::NONCE . ',v1=' . self::VECTOR);
         $this->assertNotNull($parsed);
 
-        $this->assertFalse(SignatureHelper::verify('other', $parsed, 'POST', self::TARGET, self::BODY));
-        $this->assertFalse(SignatureHelper::verify(self::SECRET, $parsed, 'GET', self::TARGET, self::BODY));
-        $this->assertFalse(SignatureHelper::verify(self::SECRET, $parsed, 'POST', '/api/v1/integration/tariffs/43', self::BODY));
-        $this->assertFalse(SignatureHelper::verify(self::SECRET, $parsed, 'POST', self::TARGET, '{"a":2}'));
+        $cases = [
+            'чужой секрет' => ['other', $this->message()],
+            'другой метод' => [self::SECRET, $this->message(method: 'GET')],
+            'другой путь' => [self::SECRET, $this->message(target: '/api/v1/integration/tariffs/43')],
+            'другое тело' => [self::SECRET, $this->message(body: '{"a":2}')],
+        ];
+
+        foreach ($cases as $case => [$secret, $message]) {
+            $this->assertFalse(SignatureHelper::verify($secret, $parsed, $message), $case);
+        }
+    }
+
+    private function message(string $method = 'POST', string $target = self::TARGET, string $body = self::BODY): SignedMessage
+    {
+        return new SignedMessage($method, $target, $body);
     }
 }

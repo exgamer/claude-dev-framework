@@ -12,15 +12,15 @@ use MPS\Core\Exceptions\UnAuthorizeAppException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Парковки администратора в контекст запроса (алиас resolve.admin.parkings, после auth:admin-api и parking.permission).
- * super-admin — null (без ограничения); parking_id из query или тела, которого нет среди доступных, — 403.
- * Сервис и репозиторий получают список фильтром и про администратора не знают.
+ * Парковки администратора в контекст запроса (алиас resolve.admin.parkings, после auth:admin-api).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
 final class ResolveAdminParkings
 {
     /**
+     * super-admin — null; parking_id из query или тела, которого нет среди доступных, — 403.
+     *
      * @param Closure(Request): Response $next
      *
      * @throws UnAuthorizeAppException
@@ -34,7 +34,7 @@ final class ResolveAdminParkings
             throw new UnAuthorizeAppException('Требуется авторизация');
         }
 
-        $parkingIds = $admin->isSuperAdmin() ? null : array_values(array_map(intval(...), $admin->getParkingIds()));
+        $parkingIds = $admin->isSuperAdmin() ? null : $this->adminParkingIds($admin->getParkingIds());
 
         $requestedParkingId = filter_var($request->input('parking_id'), FILTER_VALIDATE_INT);
 
@@ -45,5 +45,21 @@ final class ResolveAdminParkings
         $request->attributes->set(RequestAttributeEnum::PARKING_IDS->value, $parkingIds);
 
         return $next($request);
+    }
+
+    /**
+     * @param array<int|string> $rawIds
+     *
+     * @return list<int>
+     */
+    private function adminParkingIds(array $rawIds): array
+    {
+        $parkingIds = [];
+
+        foreach ($rawIds as $rawId) {
+            $parkingIds[] = (int) $rawId;
+        }
+
+        return $parkingIds;
     }
 }

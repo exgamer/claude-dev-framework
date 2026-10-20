@@ -8,6 +8,8 @@ type parking struct {
 	// LPMHost Хост ЛПМ для доставки изменений; NULL — у парковки нет ЛПМ
 	LPMHost  *string `gorm:"column:lpm_host"`
 	IsActive bool    `gorm:"column:is_active"`
+	// Currency Валюта расчётов (ISO 4217)
+	Currency string `gorm:"column:currency"`
 	// DeletedAt Мягкое удаление; удалённая парковка не читается
 	DeletedAt *time.Time `gorm:"column:deleted_at"`
 }

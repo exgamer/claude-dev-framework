@@ -38,6 +38,20 @@ enum OutboxTariffEventStatusEnum: string implements Enumerable
         return [self::PENDING, self::AWAITING_RETRY];
     }
 
+    /**
+     * @return list<string>
+     */
+    public static function deliverableValues(): array
+    {
+        $values = [];
+
+        foreach (self::deliverable() as $status) {
+            $values[] = $status->value;
+        }
+
+        return $values;
+    }
+
     public function isDeliverable(): bool
     {
         return in_array($this, self::deliverable(), true);

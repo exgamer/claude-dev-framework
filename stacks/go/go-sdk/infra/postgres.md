@@ -93,7 +93,7 @@ func (r *PostgresRepository) Create(ctx context.Context, e *domain.Product) (*do
 
 ## Транзакции
 
-Workflow — всегда, если пишет (O-8); Command/Service — когда несколько операций записи обязаны выполниться атомарно (см. `../../conventions.md`, правило 17, `approaches/patterns/transactions.md`). Менеджер транзакций SDK `gosdk-db-core/pkg/transaction` (`Manager`, `Manager2` … `Manager5` — по числу репозиториев в одной транзакции).
+Workflow, Command, Service — одинаково: когда сценарий делает больше одного модифицирующего запроса (в разные таблицы или в одну); один модифицирующий запрос — без транзакции, кроме транзакции ради блокировки `FOR UPDATE`/`FOR SHARE` — основание «Конкурентность» `design.md` (O-8, `approaches/patterns/transactions.md`, `../../conventions.md` п. 17). Менеджер транзакций SDK `gosdk-db-core/pkg/transaction` (`Manager`, `Manager2` … `Manager5` — по числу репозиториев в одной транзакции).
 
 Как это устроено:
 - **Домен/workflow** объявляет узкий интерфейс `TxManager` в отдельном файле `tx_manager.go` — только сигнатура `Exec`, без gorm.
@@ -101,57 +101,80 @@ Workflow — всегда, если пишет (O-8); Command/Service — ког
 - Репозитории менять не нужно: тот же `NewPostgresRepository(db)` получает `tx` вместо пула.
 - Таймаут транзакции по умолчанию 10s, переопределяется `.WithTimeout(...)`.
 
+Эталон — `../../examples/tariff/`.
+
 ```go
-// internal/domains/billing/payment_transactions/tx_manager.go
-// TxManager — атомарная операция над Repository внутри одной Postgres-транзакции.
-type TxManager interface {
-    Exec(ctx context.Context, fn func(ctx context.Context, repo Repository) error) error
+// internal/domains/billing/tariff/tx_manager.go — один репозиторий, два UPDATE
+// DefaultTariffTxManager Смена тарифа по умолчанию: снять флаг со старого и поставить новому — атомарно
+type DefaultTariffTxManager interface {
+    Exec(ctx context.Context, fn func(ctx context.Context, repository Repository) error) error
 }
 ```
 
 ```go
-// internal/workflows/session/manage_event/tx_manager.go — две сущности атомарно
-// SessionEntryTxManager атомарно создаёт Session + SessionEvent при въезде.
-type SessionEntryTxManager interface {
-    Exec(ctx context.Context, fn func(ctx context.Context, sessionRepo sessiondomain.Repository, sessionEventRepo sessioneventdomain.Repository) error) error
+// internal/workflows/billing/tariff/tx_manager.go — две сущности атомарно (тариф + outbox)
+// CreateTariffTxManager Создание тарифа и событие tariff.created в outbox — в одной транзакции (два модифицирующих запроса)
+type CreateTariffTxManager interface {
+    Exec(ctx context.Context, fn func(
+        ctx context.Context,
+        tariffRepository tariffdomain.Repository,
+        outboxRepository outboxdomain.Repository,
+    ) error) error
 }
 ```
 
 ```go
-// internal/app/bootstrap/{module}/repositories_factory.go
+// internal/app/bootstrap/billing/tariff/repositories_factory.go
 import dbtransaction "git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/transaction"
 
-PaymentTxManager: dbtransaction.NewManager[paymenttxdomain.Repository](
+DefaultTariffTxManager: dbtransaction.NewManager[tariffdomain.Repository](
     postgresClient,
-    func(tx *gorm.DB) paymenttxdomain.Repository { return paymenttxinfrapostgre.NewPostgresRepository(tx) },
-).WithTimeout(20 * time.Second),
-
-PaymentEventTxManager: dbtransaction.NewManager2[sessioneventdomain.Repository, outboxdomain.Repository](
+    func(tx *gorm.DB) tariffdomain.Repository { return tariffpostgres.NewPostgresRepository(tx) },
+),
+CreateTariffTxManager: dbtransaction.NewManager2[tariffdomain.Repository, outboxdomain.Repository](
     postgresClient,
-    func(tx *gorm.DB) sessioneventdomain.Repository { return sessioneventinfrapostgre.NewPostgresRepository(tx) },
-    func(tx *gorm.DB) outboxdomain.Repository { return outboxinfrapostgre.NewPostgresRepository(tx) },
+    func(tx *gorm.DB) tariffdomain.Repository { return tariffpostgres.NewPostgresRepository(tx) },
+    func(tx *gorm.DB) outboxdomain.Repository { return outboxpostgres.NewPostgresRepository(tx) },
 ),
 ```
 
 ```go
-// использование в сервисе/workflow
-err := w.txManager.Exec(ctx, func(ctx context.Context, sessionRepo sessiondomain.Repository, eventRepo sessioneventdomain.Repository) error {
-    session, err := sessionRepo.Create(ctx, entity)
+// использование — SetDefaultTariffCommand.Exec (internal/domains/billing/tariff/set_default_tariff_command.go, сокращено)
+err := c.txManager.Exec(ctx, func(ctx context.Context, repository Repository) error {
+    tariff, err := repository.GetByID(ctx, id, scope)
     if err != nil {
         return err
     }
 
-    return eventRepo.Create(ctx, event(session.ID))
+    if tariff == nil {
+        return exception.NewNotFoundException(errors.New("тариф не найден"), false)
+    }
+
+    previous, err := repository.GetDefaultByParkingID(ctx, tariff.ParkingID)
+    if err != nil {
+        return err
+    }
+
+    if previous != nil {
+        if err := repository.SetDefault(ctx, previous.ID, false); err != nil {
+            return err
+        }
+    }
+
+    return repository.SetDefault(ctx, tariff.ID, true)
 })
+if errors.Is(err, ErrDefaultTariffTaken) { // параллельную смену закрывает уникальный индекс — 422
+    ...
+}
 ```
 
 Правила:
-- Workflow с записью без транзакции (и без причины в `design.md`) или Command/Service с несколькими взаимосвязанными записями без транзакции — **[ОШИБКА]**.
+- Сценарий (workflow, Command, Service) делает больше одного модифицирующего запроса без транзакции — **[ОШИБКА]** (`multi-write-without-transaction`); транзакция на один модифицирующий запрос без блокировки — **[ВНИМАНИЕ]** (`needless-transaction`).
 - Внутри `fn` — только репозитории, полученные аргументами (на `tx`). Репозиторий из поля структуры, **сервис или Command домена** внутри `fn` пишут мимо транзакции (менеджер пересобирает только репозитории) — **[ОШИБКА]**, тег `tx-bypassed-by-service`. Workflow пишет через репозитории (O-7).
-- Проверки, от которых зависит запись, читаются внутри `fn`, через репозитории из аргументов.
+- Чтение внутри `fn` допустимо (как `GetByID`/`GetDefaultByParkingID` в `SetDefaultTariffCommand`) — через репозитории из аргументов. Гонку «проверил — записал» закрывает не сама транзакция, а `approaches/patterns/concurrency.md`: уникальный индекс, условие в `UPDATE` или блокировка (`FOR UPDATE`/`FOR SHARE`) до коммита; проверки перед записью ради этого в `fn` не переносятся.
 - Тесты: фейк менеджера вызывает `fn` с in-memory репозиториями — `examples/tariff/internal/testsupport/txfakes`.
 - Внутри `fn` — никаких HTTP-вызовов, публикаций в очередь и `time.Sleep`: транзакция держит блокировки. Побочные эффекты — через outbox (см. `approaches/patterns/outbox.md`).
-- Имя интерфейса отражает операцию (`SessionEntryTxManager`), а не придуманную механику (`EnqueueTxManager` без очереди — **[ОШИБКА]**, см. `../../conventions.md`, п. 20).
+- Имя интерфейса отражает операцию (`DefaultTariffTxManager`, `CreateTariffTxManager`), а не придуманную механику (`EnqueueTxManager` без очереди — **[ОШИБКА]**, см. `../../conventions.md`, п. 20).
 - Ручной `client.Transaction(func(tx *gorm.DB) error {...})` в репозитории не используется: метод репозитория выполняет один запрос (`../../conventions.md`, п. 15b), а несколько запросов в одной транзакции — это сервис, Command или workflow через `txManager.Exec`.
 
 ## Пагинация
@@ -163,6 +186,11 @@ func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain
         SetPerPage(search.PerPage).
         Paginated(search.Page, func(db *gorm.DB) *gorm.DB {
             query := db.Model(&tariff{}).Where("deleted_at IS NULL")
+
+            // скоуп — поле фильтра типа ParkingScope: без All — только свои, пустой IDs — ничего (../../conventions.md п. 7a)
+            if !search.Scope.All {
+                query = query.Where("parking_id IN ?", search.Scope.IDs)
+            }
 
             if search.ParkingID != 0 {
                 query = query.Where("parking_id = ?", search.ParkingID)

@@ -22,7 +22,8 @@ func NewRetryCommand(retryCommand *outboxdomain.RetryOutboxTariffEventsCommand) 
 				return err
 			}
 
-			logger.Info(cmd.Context(), fmt.Sprintf("outbox tariff events: published=%d failed=%d", result.Published, result.Failed))
+			message := fmt.Sprintf("outbox tariff events: published=%d failed=%d", result.Published, result.Failed)
+			logger.Info(cmd.Context(), message)
 
 			return nil
 		},

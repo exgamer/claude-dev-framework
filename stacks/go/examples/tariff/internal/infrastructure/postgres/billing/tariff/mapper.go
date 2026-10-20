@@ -1,6 +1,7 @@
 package tariff
 
 import (
+	"example.com/parking-service/internal/common"
 	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 )
 
@@ -13,7 +14,7 @@ func tariffToEntity(model *tariff) *tariffdomain.Tariff {
 		ID:           model.ID,
 		ParkingID:    model.ParkingID,
 		Name:         model.Name,
-		Currency:     model.Currency,
+		Currency:     common.Currency(model.Currency),
 		IsDefault:    model.IsDefault,
 		IsActive:     model.IsActive,
 		GraceMinutes: model.GraceMinutes,
@@ -30,7 +31,7 @@ func tariffFromEntity(entity *tariffdomain.Tariff) *tariff {
 		ID:           entity.ID,
 		ParkingID:    entity.ParkingID,
 		Name:         entity.Name,
-		Currency:     entity.Currency,
+		Currency:     string(entity.Currency),
 		IsDefault:    entity.IsDefault,
 		IsActive:     entity.IsActive,
 		GraceMinutes: entity.GraceMinutes,

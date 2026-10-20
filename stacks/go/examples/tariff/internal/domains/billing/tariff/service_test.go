@@ -67,22 +67,22 @@ func requireNotFound(t *testing.T, err error) {
 func TestService_GetByID_Scope(t *testing.T) {
 	service, _, _ := newScopedService()
 
-	own, err := service.GetByID(context.Background(), 1, []uint{7})
+	own, err := service.GetByID(context.Background(), 1, tariffdomain.ParkingScope{IDs: []uint{7}})
 	require.NoError(t, err)
 	assert.Equal(t, uint(1), own.ID)
 
-	_, err = service.GetByID(context.Background(), 2, []uint{7})
+	_, err = service.GetByID(context.Background(), 2, tariffdomain.ParkingScope{IDs: []uint{7}})
 	requireNotFound(t, err)
 
-	_, err = service.GetByID(context.Background(), 1, []uint{})
+	_, err = service.GetByID(context.Background(), 1, tariffdomain.ParkingScope{})
 	requireNotFound(t, err)
 }
 
-func TestService_GetByID_UnrestrictedSeesAll(t *testing.T) {
+func TestService_GetByID_AllSeesAll(t *testing.T) {
 	service, _, _ := newScopedService()
 
 	for _, id := range []uint{1, 2} {
-		tariff, err := service.GetByID(context.Background(), id, nil)
+		tariff, err := service.GetByID(context.Background(), id, tariffdomain.ParkingScope{All: true})
 		require.NoError(t, err)
 		assert.Equal(t, id, tariff.ID)
 	}
@@ -92,7 +92,7 @@ func TestService_GetByID_CachedOtherParkingIsNotFound(t *testing.T) {
 	service, tariffs, cache := newScopedService()
 	cache.Items[2] = *tariffs.Items[2]
 
-	_, err := service.GetByID(context.Background(), 2, []uint{7})
+	_, err := service.GetByID(context.Background(), 2, tariffdomain.ParkingScope{IDs: []uint{7}})
 
 	requireNotFound(t, err)
 }
@@ -101,7 +101,7 @@ func TestService_Update_OtherParkingIsNotFound(t *testing.T) {
 	service, tariffs, _ := newScopedService()
 	name := "переименован"
 
-	_, err := service.Update(context.Background(), 2, []uint{7}, &tariffdomain.Patch{Name: &name})
+	_, err := service.Update(context.Background(), 2, tariffdomain.ParkingScope{IDs: []uint{7}}, &tariffdomain.Patch{Name: &name})
 
 	requireNotFound(t, err)
 	assert.Equal(t, "чужой", tariffs.Items[2].Name, "чужой тариф не изменён")
@@ -110,12 +110,29 @@ func TestService_Update_OtherParkingIsNotFound(t *testing.T) {
 func TestService_Paginated_Scope(t *testing.T) {
 	service, _, _ := newScopedService()
 
-	scoped, err := service.Paginated(context.Background(), &tariffdomain.Search{}, []uint{7})
+	scoped, err := service.Paginated(context.Background(), &tariffdomain.Search{Scope: tariffdomain.ParkingScope{IDs: []uint{7}}})
 	require.NoError(t, err)
 	require.Len(t, scoped.Items, 1)
 	assert.Equal(t, uint(1), scoped.Items[0].ID)
 
-	all, err := service.Paginated(context.Background(), &tariffdomain.Search{}, nil)
+	all, err := service.Paginated(context.Background(), &tariffdomain.Search{Scope: tariffdomain.ParkingScope{All: true}})
 	require.NoError(t, err)
 	assert.Len(t, all.Items, 2)
+
+	none, err := service.Paginated(context.Background(), &tariffdomain.Search{})
+	require.NoError(t, err)
+	assert.Empty(t, none.Items)
+}
+
+func TestService_Update_InvalidPatchIs422(t *testing.T) {
+	service, tariffs, _ := newScopedService()
+	blank := "  "
+
+	_, err := service.Update(context.Background(), 1, tariffdomain.ParkingScope{All: true}, &tariffdomain.Patch{Name: &blank})
+
+	var appException *exception.AppException
+	require.ErrorAs(t, err, &appException)
+	assert.Equal(t, exception.ErrorKindValidation, appException.Kind)
+	assert.Contains(t, appException.Context, "name")
+	assert.Equal(t, "свой", tariffs.Items[1].Name, "тариф не изменён")
 }

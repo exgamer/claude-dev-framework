@@ -96,7 +96,7 @@
 
 | Задача | Что взять |
 |---|---|
-| get/set/forget (utils 2.6.x) | `MPS\Utils\Components\Cache\CacheManagerInterface`: `get`, `set`, `forget`, `getOrCreate(key, closure, ttl)`, ключ — `getCacheKeyByParts()` |
+| get/set/forget (utils < 2.6.4) | `MPS\Utils\Components\Cache\CacheManagerInterface`: `get`, `set`, `forget`, `getOrCreate(key, closure, ttl)`, ключ — `getCacheKeyByParts()` |
 | то же (utils ≥ 2.6.4) | `Cache\Interfaces\CacheManagerInterface`: **`getOrSet`** (вместо `getOrCreate` — `@deprecated`), `getMultiple`, `setMultiple`; ключ — `Redis\Helpers\KeyHelper::generate()` (вместо `getCacheKeyByParts` — `@deprecated`) |
 | Кеш с тегами и автообновлением (utils ≥ 2.8) | `Cache\Interfaces\SmartCacheInterface`: `getOrSet(key, CallbackOptions, CacheOptions::make()->ttl()->tags())`, `invalidate(tag)`, `getByTag` |
 | Множества / sorted set в Redis (utils ≥ 2.8) | `MPS\Utils\Components\Redis\Structures\{Set, SortedSet}`, теги — `Redis\Tag\TagManager` |
@@ -150,6 +150,7 @@
 - `Page` (номер и размер страницы) и базовый `PaginatedResource` для списка в форме (2) — `Core/Database/Query/Page`, `Core/Resources/PaginatedResource` подпроекта (P-22, тестовый вариант); образец — `../examples/parking_app/Core/`.
 - Форма (1) списка (P-19) — три класса подпроекта: `Core/Requests/SearchRequest`, `Core/Resources/PaginateResource`, `Core/Database/Query/PaginatedQueryHelper`; образец — `../examples/parking_app/Core/Requests/SearchRequest.php`, `../examples/parking_app/Core/Resources/PaginateResource.php`, `../examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`.
 - Менеджер транзакций при `mps/core` < 1.10 — `Core/Database/Managers/TransactionManagerInterface` + `Infrastructure/Postgres/Database/Managers/DatabaseTransactionManager` (+ `NoopTransactionManager` как mock). С **core ≥ 1.10.0** — в ядре: `MPS\Core\Components\Database\Transaction\{TransactionManagerInterface, TransactionManager, NoopTransactionManager}` (`run`, `afterCommit`, `begin/commit/rollBack`, `onConnection`), биндинг регистрирует ядро.
+- Базовые `MPS\Core\Commands\Command` и `MPS\Core\Queries\Query` (`prepare()`, `get()`, `setQueryParams()`, `official/core-v1.10.2/{commands,queries}.md`) в ядре есть, но **не используются**: Command/Query — простой `final` класс с `execute(...)` (`commands.md`, «Форма Command и Query»).
 - `Repository::transaction()` в ядре есть, но в сервисах/workflow его не использовать — только `TransactionManagerInterface` (`../conventions.md`).
 - Базовый `Request` подпроекта — `Core/Requests/Request` (образец — `../examples/parking_app/Core/Requests/Request.php`).
 

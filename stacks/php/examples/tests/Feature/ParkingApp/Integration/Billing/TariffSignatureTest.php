@@ -6,6 +6,8 @@ namespace Tests\Feature\ParkingApp\Integration\Billing;
 
 use App\ParkingApp\Core\Enums\RequestHeaderEnum;
 use App\ParkingApp\Core\Helpers\SignatureHelper;
+use App\ParkingApp\Core\Http\Signature\SignedMessage;
+use App\ParkingApp\Core\Http\Signature\SignedRequest;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
@@ -17,8 +19,7 @@ use MPS\Core\Enums\CurrencyEnum;
 use Tests\TestCase;
 
 /**
- * GET /parking/integration/tariffs/{id} — только с HMAC-подписью: верная — тариф без скоупа парковок,
- * без заголовка, с подписью другого пути или повтором nonce — 401 и сервис не вызывается.
+ * GET /parking/integration/tariffs/{id}: верная HMAC-подпись — тариф без скоупа, иначе — 401 без вызова сервиса.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -67,7 +68,8 @@ class TariffSignatureTest extends TestCase
     public function test_signature_of_other_tariff_is_unauthorized(): void
     {
         $this->service->shouldNotReceive('findById');
-        $header = SignatureHelper::header(self::SECRET, Carbon::now()->getTimestamp(), (string) Str::uuid(), 'GET', '/parking/integration/tariffs/43', '');
+        $nonce = (string) Str::uuid();
+        $header = $this->header('/parking/integration/tariffs/43', $nonce);
 
         $this->getJson(self::TARGET, [RequestHeaderEnum::SIGNATURE->value => $header])->assertUnauthorized();
     }
@@ -83,9 +85,18 @@ class TariffSignatureTest extends TestCase
 
     private function getSigned(string $target, string $nonce): TestResponse
     {
-        $header = SignatureHelper::header(self::SECRET, Carbon::now()->getTimestamp(), $nonce, 'GET', $target, '');
+        $header = $this->header($target, $nonce);
 
         return $this->getJson($target, [RequestHeaderEnum::SIGNATURE->value => $header]);
+    }
+
+    private function header(string $target, string $nonce): string
+    {
+        $message = new SignedMessage('GET', $target, '');
+        $now = Carbon::now()->getTimestamp();
+        $request = new SignedRequest($now, $nonce, $message);
+
+        return SignatureHelper::header(self::SECRET, $request);
     }
 
     private function tariff(): Tariff

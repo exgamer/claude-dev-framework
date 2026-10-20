@@ -18,7 +18,7 @@
 | Infra Repository (HTTP) | `repository.go`, импортирует `gosdk-http-request-builder` | `internal/infrastructure/http/{provider}/{product}/` — внешний провайдер; `internal/infrastructure/http/{service}/{module}/` — наш сервис (G-2) |
 | Infra Model | `model.go`, struct с `gorm:` тегами | `internal/infrastructure/postgres/{domain}/{module}/` |
 | HTTP Handler | `handler.go`, методы принимают `*gin.Context` | `internal/entrypoints/{context}/http/{domain}/{module}/` |
-| RabbitMQ Consumer | `{module}_consumer.go`, метод `Consume(ctx, *message.Message)` | `internal/entrypoints/{context}/rabbit/{domain}/{module}/` или `internal/entrypoints/{context}/rabbit/{module}/` |
+| RabbitMQ Consumer | `{module}_consumer.go`, метод `Consume(ctx, *message.Message)` | `internal/entrypoints/consumer/rabbit/{domain}/{module}/` (`structure.md`) |
 | Workflow | любой `.go` с оркестрацией нескольких доменных сервисов | `internal/workflows/{domain}/{module}/` или `internal/workflows/{module}/` |
 | Bootstrap Module | `module.go` + `repositories_factory.go` / `services_factory.go` / `handlers_factory.go` | `internal/app/bootstrap/{module}/` или `internal/app/bootstrap/{domain}/{module}/` |
 
@@ -66,9 +66,9 @@
    # импорты доменов из доменов — сверить {domain} в пути импорта с папкой файла
    grep -rnE '"[^"]+/internal/domains/[^"/]+' internal/domains --include='*.go' | grep -v '_test\.go'
    # зависимости Common
-   grep -rnE '"[^"]+/internal/(domains|infrastructure|workflows|entrypoints|app)/|"context"|"net/http"|"database/sql"|gorm' internal/common --include='*.go'
+   grep -rnE '"[^"]+/internal/(domains|infrastructure|workflows|entrypoints|app)/|"context"|"net/http"|"database/sql"|gorm' internal/common --include='*.go' | grep -v '_test\.go:'
    ```
    Пара enum, где один файл — в дифе, и это то же понятие — **[ОШИБКА]** `duplicated-enum` (в находке — перенос в `internal/common/` и откуда импортировать); совпадение случайных значений разных понятий — не находка. Импорт другого `{domain}` из `internal/domains/{domain}/` — **[ОШИБКА]**: enum или value-объект — `duplicated-enum` с переносом в `internal/common/`, сервис или репозиторий — сценарий двух доменов, его место — workflow (O-7). Строка третьей команды — **[ОШИБКА]** `common-with-logic`.
 1. **Разъезд списков, новый статус без потребителя, данные под миграцию, гигиена MR** — правила общие, `approaches/process/review.md`, «За пределами дифа»; здесь только что искать в Go: `switch`/`map` по типу статуса, `enums:` в swagger-аннотациях DTO, строковые литералы значений; `go.sum` вместе с `go.mod`; локальной базы в репозитории может не быть — тогда проверку колонок явно поручать автору.
-2. **Инструменты.** `go build ./... && go vet ./... && go test ./... && gofmt -l internal pkg`; с горутинами — `go test -race`. CI проекта часто только containerize + deploy — локальный прогон единственный гейт, результат в отчёт явно. Падение e2e из `tests/*` без `APP_URL` («unsupported protocol scheme») — не сигнал; локальный гейт — юнит-тесты пакетов. Swagger: `swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1`.
+2. **Инструменты.** `go build ./... && go vet ./... && go test ./... && gofmt -l .` (с `vendor/` — `gofmt -l main.go cmd internal pkg`); с горутинами — `go test -race`. CI проекта часто только containerize + deploy — локальный прогон единственный гейт, результат в отчёт явно. Падение e2e из `tests/*` без `APP_URL` («unsupported protocol scheme») — не сигнал; локальный гейт — юнит-тесты пакетов. Swagger: `swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1`.
 3. **Платёжные пути** — `approaches/patterns/payments.md`, каждый пункт явно; новый платёжный сценарий без теста в `tests/<шлюз>/` — законное замечание.

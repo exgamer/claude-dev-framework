@@ -8,24 +8,18 @@ Query — большая операция **чтения** одного доме
 
 ```
 Domains/{Domain}/Modules/{Module}/Queries/
-└── {Action}Query.php            — final, метод execute(); интерфейс — только если Query подменяется в тестах или инжектируется через границу (../conventions.md п. 5)
+└── {Action}Query.php            — final без базового класса ядра, метод execute(...); интерфейс — только если Query подменяется в тестах или инжектируется через границу (../conventions.md п. 5)
 ```
 
 ## Implementation
 
-Параметры — типизированный DTO фильтра, не `array`; данные других модулей своего домена — через их интерфейсы (O-6), пачкой по id (`approaches/patterns/performance.md`).
+Форма — одна для Command и Query: `commands.md`, «Форма Command и Query» (основное место): `final` класс без `MPS\Core\Queries\Query` ядра (`prepare()`, `get()`, `setQueryParams()` не используются), публичный `execute(...)` с нужными типизированными аргументами, зависимости — конструктором, логгер — только если нужен. Параметры — типизированный DTO фильтра или скаляры, не `array`; данные других модулей своего домена — через их интерфейсы (O-6), пачкой по id (`approaches/patterns/performance.md`).
 
 ```php
 namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Queries;
 
-use MPS\Core\Queries\Query;
-use MPS\Utils\Components\Logger\Interfaces\LoggerAwareInterface;
-use MPS\Utils\Components\Logger\Traits\LoggerAwareTrait;
-
-final class ListYourItemsWithRelatedQuery extends Query implements LoggerAwareInterface
+final class ListYourItemsWithRelatedQuery
 {
-    use LoggerAwareTrait;
-
     public function __construct(
         private readonly YourRepositoryInterface $repository,
         private readonly RelatedRepositoryInterface $relatedRepository,   // другой модуль своего домена
@@ -37,8 +31,6 @@ final class ListYourItemsWithRelatedQuery extends Query implements LoggerAwareIn
      */
     public function execute(YourItemsFilterDto $filter): array
     {
-        $this->getLogger()->for($this);
-
         $items = $this->repository->listByFilter($filter);
         $relatedByItemId = $this->relatedRepository->allByItemIds(array_column($items, 'id'));
 
@@ -51,6 +43,8 @@ final class ListYourItemsWithRelatedQuery extends Query implements LoggerAwareIn
     }
 }
 ```
+
+Эталон — `../examples/parking_app/Domains/Billing/Modules/Tariffs/Queries/GetParkingDefaultTariffQuery.php`.
 
 ## Использование
 

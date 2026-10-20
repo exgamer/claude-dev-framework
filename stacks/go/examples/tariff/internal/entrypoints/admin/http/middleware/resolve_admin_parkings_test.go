@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 	admindomain "example.com/parking-service/internal/domains/identity/admin"
 )
 
@@ -23,13 +24,13 @@ var (
 
 // scopeRecorder Запоминает скоуп из контекста и тело, которое дошло до хендлера
 type scopeRecorder struct {
-	parkingIDs []uint
-	body       string
-	called     bool
+	scope  tariffdomain.ParkingScope
+	body   string
+	called bool
 }
 
 func (s *scopeRecorder) handler(c *gin.Context) {
-	parkingIDs, err := ParkingIDsFromContext(c.Request.Context())
+	scope, err := ParkingScopeFromContext(c.Request.Context())
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 
@@ -37,7 +38,7 @@ func (s *scopeRecorder) handler(c *gin.Context) {
 	}
 
 	body, _ := io.ReadAll(c.Request.Body)
-	s.parkingIDs, s.body, s.called = parkingIDs, string(body), true
+	s.scope, s.body, s.called = scope, string(body), true
 	c.Status(http.StatusOK)
 }
 
@@ -69,22 +70,22 @@ func TestResolveAdminParkingsMiddleware_PutsScopeIntoContext(t *testing.T) {
 	w, recorder := serveResolve(parkingAdmin, http.MethodGet, "/tariffs", "")
 
 	require.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, []uint{7}, recorder.parkingIDs)
+	assert.Equal(t, tariffdomain.ParkingScope{IDs: []uint{7}}, recorder.scope)
 }
 
 func TestResolveAdminParkingsMiddleware_SuperAdminIsUnrestricted(t *testing.T) {
 	w, recorder := serveResolve(superAdmin, http.MethodGet, "/tariffs?parking_id=99", "")
 
 	require.Equal(t, http.StatusOK, w.Code)
-	assert.Nil(t, recorder.parkingIDs)
+	assert.Equal(t, tariffdomain.ParkingScope{All: true}, recorder.scope)
 }
 
 func TestResolveAdminParkingsMiddleware_AdminWithoutParkingsSeesNothing(t *testing.T) {
 	w, recorder := serveResolve(noParkings, http.MethodGet, "/tariffs", "")
 
 	require.Equal(t, http.StatusOK, w.Code)
-	assert.NotNil(t, recorder.parkingIDs, "пустой скоуп — не «без ограничения»")
-	assert.Empty(t, recorder.parkingIDs)
+	assert.False(t, recorder.scope.All, "пустой скоуп — не «без ограничения»")
+	assert.Empty(t, recorder.scope.IDs)
 }
 
 func TestResolveAdminParkingsMiddleware_ForbidsOtherParkingInQuery(t *testing.T) {

@@ -10,14 +10,14 @@
 | Проверка существования/валидность по данным домена B | **workflow** (как `CreateTariffWorkflow`: парковка проверяется до создания тарифа) |
 | Операция пишет в 2+ домена | **workflow** |
 | Многошаговый процесс (запись → событие → запись в другом домене) | workflow + outbox (см. `approaches/patterns/outbox.md`) |
-| Одна и та же операция вызывается из HTTP и consumer | workflow |
+| Одна и та же операция вызывается из HTTP и consumer | 2+ доменов — workflow; один домен — Command/Query домена (вызывается из любой точки входа) |
 
 ## Правила
 
 - Домен (Service, Command/Query) не зависит от чужого домена ни через репозиторий, ни через сервис, ни через «свой» интерфейс на чужой сервис — **[ОШИБКА]** (O-7). Из интерфейсов на то, что вне своего домена, у потребителя остаётся только адаптер внешней системы или легаси вне доменов (`integrations.md`): домен объявляет порт, Infrastructure его реализует. Интерфейсы своих репозиториев, соседних модулей своего домена (O-6), транзакций и системных зависимостей — не в счёт (Go — `stacks/go/conventions.md` п. 11–12).
 - Циклов между доменами нет. Если A нужен B и B нужен A — общая часть уходит в workflow.
 - Workflow получает репозитории и сервисы доменов через конструктор — **напрямую, без посредничества сервисов** (это агрегат, O-7). К БД и кэшу — только через репозитории доменов; к внешней системе — через порт домена, если его нет — свой интерфейс-порт workflow (`layers.md`, «Зависимости»); без `gorm`/`DB::`/конкретных клиентов в самом workflow. Workflow не вызывает другие workflow (`layers.md`, «Зависимости»).
-- Workflow транзакционен по умолчанию — `approaches/patterns/transactions.md` (O-8).
+- Транзакция в workflow — по тому же правилу, что в сервисе: при больше чем одном модифицирующем запросе — `approaches/patterns/transactions.md` (O-8).
 - Домен не импортирует чужие DTO/сущности для записи — workflow собирает данные и передаёт каждому домену его DTO.
 - **Read-only подзапрос к таблице чужого домена** (`EXISTS`/`JOIN` для фильтра или выборки) в своём репозитории допустим — с комментарием, чья таблица: это условие выборки своего домена на уровне SQL; поля чужой таблицы в результат не отдаются, модели и репозитории чужого домена не берутся. Нужны сами данные домена B, запись в его таблицы или его бизнес-правило (существование как правило, статусы) — workflow через репозитории/сервисы B (AINA-2978).
   ```
@@ -32,5 +32,5 @@
 
 Создание тарифа требует существующей парковки (Catalog) — Billing о Catalog не знает:
 
-- Go: `stacks/go/examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go` → `Exec(ctx, params)`: в одном `txManager.Exec` — `parkingRepository.GetByID` → `tariffRepository.Create`.
-- PHP: `stacks/php/examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php` → `execute(TariffDto)`: в одном `transactionManager->run()` — `parkingRepository->oneById` → `tariffCrudService->create` (в существующем коде такой класс бывает назван `CreateTariffCommand` — старый нейминг, P-2).
+- Go: `stacks/go/examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go` → `Exec(ctx, params)`: проверка `parkingRepository.GetByID` → в одном `txManager.Exec` `tariffRepository.Create` и строка outbox (два модифицирующих запроса — O-8); существование парковки при записи держит внешний ключ.
+- PHP: `stacks/php/examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php` → `execute(TariffDto)`: проверка `parkingRepository->oneById` → в одном `transactionManager->run()` `tariffCrudService->create` и строка outbox (в существующем коде такой класс бывает назван `CreateTariffCommand` — старый нейминг, P-2).

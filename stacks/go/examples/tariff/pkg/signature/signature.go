@@ -32,30 +32,28 @@ var (
 	signaturePattern = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
 )
 
-// Parsed Разобранный заголовок подписи
-type Parsed struct {
-	Timestamp int64
-	Nonce     string
-	// Signature hex в нижнем регистре
-	Signature string
-}
-
 // Canonical Строка, которую подписывает отправитель
-func Canonical(timestamp int64, nonce, method, path string, body []byte) string {
-	return fmt.Sprintf("%d\n%s\n%s\n%s\n%s", timestamp, nonce, strings.ToUpper(method), path, body)
+func Canonical(request Request) string {
+	message := request.Message
+	method := strings.ToUpper(message.Method)
+
+	return fmt.Sprintf("%d\n%s\n%s\n%s\n%s", request.Timestamp, request.Nonce, method, message.Path, message.Body)
 }
 
 // Sign hex HMAC-SHA256 канонической строки
-func Sign(secret string, timestamp int64, nonce, method, path string, body []byte) string {
+func Sign(secret string, request Request) string {
+	canonical := Canonical(request)
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(Canonical(timestamp, nonce, method, path, body)))
+	mac.Write([]byte(canonical))
 
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
 // HeaderValue Значение заголовка для заданных времени и nonce
-func HeaderValue(secret string, timestamp int64, nonce, method, path string, body []byte) string {
-	return fmt.Sprintf("t=%d,n=%s,%s=%s", timestamp, nonce, Version, Sign(secret, timestamp, nonce, method, path, body))
+func HeaderValue(secret string, request Request) string {
+	sum := Sign(secret, request)
+
+	return fmt.Sprintf("t=%d,n=%s,%s=%s", request.Timestamp, request.Nonce, Version, sum)
 }
 
 // Parse Разбор заголовка; повтор ключа, лишний ключ, пустое значение или чужой алфавит поля — ErrMalformed
@@ -87,14 +85,21 @@ func Parse(header string) (Parsed, error) {
 	return Parsed{Timestamp: timestamp, Nonce: parts["n"], Signature: strings.ToLower(parts[Version])}, nil
 }
 
-// Verify Время подписи в окне tolerance от now и подпись совпадает; сравнение — за постоянное время
-func Verify(secret string, parsed Parsed, method, path string, body []byte, tolerance time.Duration, now time.Time) error {
-	if now.Sub(time.Unix(parsed.Timestamp, 0)).Abs() > tolerance {
+// Verify Время подписи в окне Tolerance от Now и подпись совпадает; сравнение — за постоянное время
+func Verify(params VerifyParams) error {
+	signedAt := time.Unix(params.Parsed.Timestamp, 0)
+	age := params.Now.Sub(signedAt)
+
+	if age.Abs() > params.Tolerance {
 		return ErrExpired
 	}
 
-	expected := Sign(secret, parsed.Timestamp, parsed.Nonce, method, path, body)
-	if !hmac.Equal([]byte(parsed.Signature), []byte(expected)) {
+	expected := Sign(params.Secret, Request{
+		Timestamp: params.Parsed.Timestamp,
+		Nonce:     params.Parsed.Nonce,
+		Message:   params.Message,
+	})
+	if !hmac.Equal([]byte(params.Parsed.Signature), []byte(expected)) {
 		return ErrMismatch
 	}
 

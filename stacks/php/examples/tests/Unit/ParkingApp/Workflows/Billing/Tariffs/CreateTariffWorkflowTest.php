@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Workflows\Billing\Tariffs;
 
+use App\ParkingApp\Common\Enums\TimeUnitEnum;
 use App\ParkingApp\Core\Database\Managers\TransactionManagerInterface;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Commands\PublishOutboxTariffEventCommand;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEventDto;
@@ -16,6 +17,7 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Jobs\ActivatePlannedTariffJob;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\PriceLimitRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
+use App\ParkingApp\Domains\Catalog\Modules\Parkings\DTO\ParkingMaxStayDto;
 use App\ParkingApp\Domains\Catalog\Modules\Parkings\Repositories\ParkingRepositoryInterface;
 use App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Models\OutboxTariffEvent;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
@@ -35,9 +37,7 @@ use MPS\Core\Models\Model;
 use Tests\TestCase;
 
 /**
- * Сценарий создания тарифа: лимит реестра, парковка, тариф и событие outbox в одной транзакции, после коммита —
- * отправка партнёру, публикация события и отложенная активация запланированного тарифа.
- * Tests\TestCase — ради Queue::fake(): Job ставится статическим dispatch().
+ * Сценарий создания тарифа: проверки до транзакции, тариф и outbox в ней, после коммита — отправка, публикация, активация; Tests\TestCase — ради Queue::fake().
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -49,7 +49,7 @@ class CreateTariffWorkflowTest extends TestCase
 
     private const OUTBOX_ID = 77;
 
-    /** Шаги сценария в порядке выполнения: границы транзакции, записи, отправки после коммита */
+    /** Шаги сценария в порядке выполнения: проверка парковки, границы транзакции, записи, отправки после коммита */
     private ArrayObject $steps;
 
     private ParkingRepositoryInterface&MockInterface $parkingRepository;
@@ -82,6 +82,7 @@ class CreateTariffWorkflowTest extends TestCase
     public function test_price_above_registry_limit_is_rejected_without_write(): void
     {
         $this->parkingRepository->shouldNotReceive('oneById');
+        $this->parkingRepository->shouldNotReceive('getMaxStayById');
         $this->tariffCrudService->shouldNotReceive('create');
         $this->outboxRepository->shouldNotReceive('createPending');
 
@@ -103,7 +104,12 @@ class CreateTariffWorkflowTest extends TestCase
             ->shouldReceive('oneById')
             ->once()
             ->with(self::PARKING_ID)
-            ->andReturn(null);
+            ->andReturnUsing(function (): ?Model {
+                $this->steps[] = 'parking';
+
+                return null;
+            });
+        $this->parkingRepository->shouldNotReceive('getMaxStayById');
         $this->tariffCrudService->shouldNotReceive('create');
         $this->outboxRepository->shouldNotReceive('createPending');
 
@@ -116,7 +122,53 @@ class CreateTariffWorkflowTest extends TestCase
             $this->assertArrayHasKey('parking_id', $e->getDetails());
         }
 
-        $this->assertSame(['tx:begin'], $this->steps->getArrayCopy());
+        // Транзакция не открывается
+        $this->assertSame(['parking'], $this->steps->getArrayCopy());
+    }
+
+    public function test_grace_not_shorter_than_parking_max_stay_is_rejected_without_write(): void
+    {
+        $parking = Mockery::mock(Model::class);
+        $maxStay = ParkingMaxStayDto::make()
+            ->setAmount(1)
+            ->setUnit(TimeUnitEnum::HOUR);
+
+        $this->parkingRepository->shouldReceive('oneById')->once()->with(self::PARKING_ID)->andReturn($parking);
+        $this->parkingRepository->shouldReceive('getMaxStayById')->once()->with(self::PARKING_ID)->andReturn($maxStay);
+        $this->tariffCrudService->shouldNotReceive('create');
+        $this->outboxRepository->shouldNotReceive('createPending');
+
+        $workflow = $this->workflow(maxPrice: null, partnerFails: false, brokerFails: false);
+        $dto = $this->dto(price: 50000)->setGraceMinutes(60);
+
+        try {
+            $workflow->execute($dto);
+            $this->fail('Ожидался ValidationAppException');
+        } catch (ValidationAppException $e) {
+            $this->assertArrayHasKey('grace_minutes', $e->getDetails());
+        }
+
+        // Транзакция не открывается
+        $this->assertSame([], $this->steps->getArrayCopy());
+    }
+
+    public function test_grace_shorter_than_parking_max_stay_creates_tariff(): void
+    {
+        $maxStay = ParkingMaxStayDto::make()
+            ->setAmount(1)
+            ->setUnit(TimeUnitEnum::HOUR);
+
+        $this->expectTariffCreated(TariffStatusEnum::ACTIVE, scheduledAt: null);
+        $this->parkingRepository->shouldReceive('getMaxStayById')->once()->with(self::PARKING_ID)->andReturn($maxStay);
+        $this->expectOutboxEventWritten();
+        $this->outboxRepository->shouldReceive('markPublished')->once()->andReturn(true);
+        $this->exceptionHandler->shouldNotReceive('report');
+
+        $workflow = $this->workflow(maxPrice: null, partnerFails: false, brokerFails: false);
+        $dto = $this->dto(price: 50000)->setGraceMinutes(59);
+        $tariff = $workflow->execute($dto);
+
+        $this->assertSame(self::TARIFF_ID, $tariff->id);
     }
 
     public function test_outbox_event_is_written_in_tariff_transaction_and_published_after_commit(): void
@@ -135,6 +187,7 @@ class CreateTariffWorkflowTest extends TestCase
 
         $this->assertSame(self::TARIFF_ID, $tariff->id);
         $this->assertSame([
+            'parking',
             'tx:begin',
             'create',
             'outbox:' . OutboxTariffEventRoutingKeyEnum::TARIFF_CREATED->value . ':' . self::TARIFF_ID,
@@ -219,7 +272,11 @@ class CreateTariffWorkflowTest extends TestCase
             ->shouldReceive('oneById')
             ->once()
             ->with(self::PARKING_ID)
-            ->andReturn($parking);
+            ->andReturnUsing(function () use ($parking): Model {
+                $this->steps[] = 'parking';
+
+                return $parking;
+            });
 
         $this->tariffCrudService
             ->shouldReceive('create')

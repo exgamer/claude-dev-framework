@@ -7,6 +7,7 @@ namespace App\ParkingApp\Core\Http\Middleware;
 use App\ParkingApp\Core\Enums\RequestHeaderEnum;
 use App\ParkingApp\Core\Helpers\SignatureHelper;
 use App\ParkingApp\Core\Http\Signature\SignatureNonceRepositoryInterface;
+use App\ParkingApp\Core\Http\Signature\SignedMessage;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Contracts\Config\Repository as Config;
@@ -16,8 +17,7 @@ use MPS\Core\Exceptions\UnAuthorizeAppException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Подпись машинного вызова (алиас verify.signature, контекст Integration): HMAC метода, пути с query и тела, окно времени,
- * затем одноразовый nonce. Не принята — 401 без причины в ответе.
+ * Подпись машинного вызова (алиас verify.signature, контекст Integration).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -51,26 +51,30 @@ final class VerifySignatureMiddleware
     }
 
     /**
+     * HMAC метода, пути с query и тела, окно времени, затем одноразовый nonce. Не принята — 401 без причины в ответе.
+     *
      * @param Closure(Request): Response $next
      *
      * @throws UnAuthorizeAppException
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $signature = SignatureHelper::parse($request->header(RequestHeaderEnum::SIGNATURE->value));
+        $header = $request->header(RequestHeaderEnum::SIGNATURE->value);
+        $signature = SignatureHelper::parse($header);
 
         if ($signature === null) {
             throw new UnAuthorizeAppException('Подпись недействительна');
         }
 
-        if (abs(Carbon::now()->getTimestamp() - $signature->timestamp) > $this->toleranceSeconds) {
+        $now = Carbon::now()->getTimestamp();
+
+        if (abs($now - $signature->timestamp) > $this->toleranceSeconds) {
             throw new UnAuthorizeAppException('Подпись недействительна');
         }
 
-        $method = $request->getMethod();
-        $target = $request->getRequestUri();
+        $message = new SignedMessage($request->getMethod(), $request->getRequestUri(), $request->getContent());
 
-        if (! SignatureHelper::verify($this->secret, $signature, $method, $target, $request->getContent())) {
+        if (! SignatureHelper::verify($this->secret, $signature, $message)) {
             throw new UnAuthorizeAppException('Подпись недействительна');
         }
 

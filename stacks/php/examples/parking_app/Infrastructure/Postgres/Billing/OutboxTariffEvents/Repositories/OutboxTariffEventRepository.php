@@ -30,6 +30,15 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
         parent::__construct();
     }
 
+    public function getLatestByTariffId(int $tariffId): ?OutboxTariffEvent
+    {
+        /** @var ?OutboxTariffEvent */
+        return $this->getQuery()
+            ->where('tariff_id', $tariffId)
+            ->orderByDesc('id')
+            ->first();
+    }
+
     public function createPending(OutboxTariffEventDto $dto, OutboxTariffEventRoutingKeyEnum $routingKey): OutboxTariffEvent
     {
         /** @var OutboxTariffEvent $event */
@@ -53,7 +62,7 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
     {
         $updated = $this->getQuery()
             ->whereKey($id)
-            ->whereIn('status', $this->deliverableStatuses())
+            ->whereIn('status', OutboxTariffEventStatusEnum::deliverableValues())
             ->update([
                 'status' => OutboxTariffEventStatusEnum::PUBLISHED->value,
                 'published_at' => Carbon::now(),
@@ -66,6 +75,7 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
     {
         $this->getQuery()
             ->whereKey($id)
+            ->whereIn('status', OutboxTariffEventStatusEnum::deliverableValues())
             ->update(['status' => OutboxTariffEventStatusEnum::FAILED->value]);
     }
 
@@ -73,6 +83,7 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
     {
         $this->getQuery()
             ->whereKey($id)
+            ->whereIn('status', OutboxTariffEventStatusEnum::deliverableValues())
             ->update(['status' => OutboxTariffEventStatusEnum::AWAITING_RETRY->value]);
     }
 
@@ -93,7 +104,7 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
         // возьмёт параллельный прогон, RETURNING отдаёт ID. Блокировка живёт только в этом запросе, публикация — без
         // транзакции. Новое событие ещё не обновлялось (updated_at NULL) — возраст по created_at
         $table = $this->model->getTable();
-        [$pending, $awaitingRetry] = $this->deliverableStatuses();
+        [$pending, $awaitingRetry] = OutboxTariffEventStatusEnum::deliverableValues();
 
         $rows = $this->model->getConnection()->select(
             "UPDATE {$table} SET updated_at = CURRENT_TIMESTAMP
@@ -113,16 +124,5 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
         sort($ids);
 
         return $ids;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function deliverableStatuses(): array
-    {
-        return array_map(
-            static fn (OutboxTariffEventStatusEnum $status): string => $status->value,
-            OutboxTariffEventStatusEnum::deliverable(),
-        );
     }
 }

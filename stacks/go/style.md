@@ -83,7 +83,7 @@ import (
 
   ```go
   // допустимо: аргумент — один вызов маппера от входных данных
-  result, err := h.workflow.Handle(ctx, mapper.ToInput(req))
+  result, err := h.workflow.Exec(ctx, mapper.ToInput(req))
 
   // плохо: вызов в аргументе и индекс по результату
   return toResponse(s.withMedia(ctx, []*Tariff{tariff})[0]), nil

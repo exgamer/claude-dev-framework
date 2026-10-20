@@ -30,6 +30,7 @@ func SetRoutes(a *app.App, handler *Handler, adminAuth gin.HandlerFunc) error {
 			v1.Use(adminmiddleware.ResolveAdminParkingsMiddleware())
 
 			v1.GET("/tariffs", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.Index())
+			v1.GET("/tariffs/default", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.Default())
 			v1.GET("/tariffs/:id", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.View())
 			v1.POST("/tariffs", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.create"), adminmiddleware.RequireJSONMiddleware(), handler.Create())
 			v1.PATCH("/tariffs/:id", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.update"), adminmiddleware.RequireJSONMiddleware(), handler.Update())

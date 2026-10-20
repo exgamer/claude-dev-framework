@@ -3,13 +3,15 @@ package tariff
 import (
 	"git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/pagination"
 
+	"example.com/parking-service/internal/common"
 	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 	tariffworkflow "example.com/parking-service/internal/workflows/billing/tariff"
 )
 
-func indexRequestToSearch(request indexRequest) *tariffdomain.Search {
+func indexRequestToSearch(request indexRequest, scope tariffdomain.ParkingScope) *tariffdomain.Search {
 	return &tariffdomain.Search{
 		ParkingID: request.ParkingID,
+		Scope:     scope,
 		Page:      request.Page,
 		PerPage:   request.PerPage,
 	}
@@ -19,7 +21,7 @@ func createRequestToParams(request createRequest) *tariffworkflow.CreateTariffPa
 	return &tariffworkflow.CreateTariffParams{
 		ParkingID:    request.ParkingID,
 		Name:         request.Name,
-		Currency:     request.Currency,
+		Currency:     common.Currency(request.Currency),
 		GraceMinutes: request.GraceMinutes,
 		Price:        request.Price,
 	}
@@ -41,7 +43,7 @@ func tariffToData(tariff *tariffdomain.Tariff) *tariffData {
 		ID:           tariff.ID,
 		ParkingID:    tariff.ParkingID,
 		Name:         tariff.Name,
-		Currency:     tariff.Currency,
+		Currency:     string(tariff.Currency),
 		IsDefault:    tariff.IsDefault,
 		IsActive:     tariff.IsActive,
 		GraceMinutes: tariff.GraceMinutes,

@@ -9,8 +9,7 @@ use Illuminate\Console\Command;
 use Throwable;
 
 /**
- * Повтор отправки зависших событий о тарифах. Запускается по расписанию (routes/console.php хоста); параллельный
- * запуск безопасен — выборка пропускает строки, взятые другим прогоном.
+ * Повтор отправки зависших событий о тарифах по расписанию (routes/console.php хоста).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -21,6 +20,7 @@ class RetryOutboxTariffEventsConsoleCommand extends Command
     protected $description = 'Повторяет отправку в RabbitMQ зависших событий о тарифах, пока они есть';
 
     /**
+     * Параллельный запуск безопасен: выборка пропускает строки, взятые другим прогоном.
      * Сбой отдельного события Command отправил в трекер; ошибка выборки — наверх, cron падает и уходит в Sentry.
      *
      * @throws Throwable

@@ -31,7 +31,12 @@ type PostgresRepository struct {
 	client *gorm.DB
 }
 
-func (r *PostgresRepository) GetByID(ctx context.Context, id uint, parkingIDs []uint) (*tariffdomain.Tariff, error) {
+// GetByID Скоуп без All и без IDs — ни одной парковки: nil, nil без запроса
+func (r *PostgresRepository) GetByID(ctx context.Context, id uint, scope tariffdomain.ParkingScope) (*tariffdomain.Tariff, error) {
+	if !scope.All && len(scope.IDs) == 0 {
+		return nil, nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -39,8 +44,8 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uint, parkingIDs []
 		Where("id = ?", id).
 		Where("deleted_at IS NULL")
 
-	if parkingIDs != nil {
-		query = query.Where("parking_id IN ?", parkingIDs)
+	if !scope.All {
+		query = query.Where("parking_id IN ?", scope.IDs)
 	}
 
 	var model tariff
@@ -79,15 +84,20 @@ func (r *PostgresRepository) GetDefaultByParkingID(ctx context.Context, parkingI
 	return tariffToEntity(&model), nil
 }
 
-func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search, parkingIDs []uint) (*pagination.Paginated[tariffdomain.Tariff], error) {
+func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search) (*pagination.Paginated[tariffdomain.Tariff], error) {
 	paginated, err := helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).
 		SetTimeout(10*time.Second).
 		SetPerPage(search.PerPage).
 		Paginated(search.Page, func(db *gorm.DB) *gorm.DB {
 			query := db.Model(&tariff{}).Where("deleted_at IS NULL")
 
-			if parkingIDs != nil {
-				query = query.Where("parking_id IN ?", parkingIDs)
+			// скоуп: All — без условия, иначе только свои; пустой IDs — ни одной записи
+			switch {
+			case search.Scope.All: // без условия
+			case len(search.Scope.IDs) == 0:
+				query = query.Where("FALSE")
+			default:
+				query = query.Where("parking_id IN ?", search.Scope.IDs)
 			}
 
 			if search.ParkingID != 0 {

@@ -7,16 +7,21 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use MPS\Core\Enums\CurrencyEnum;
+use MPS\Core\Exceptions\OperationFailedAppException;
 
 /**
  * Перенос тарифов из public.tariffs с прежними id; в public они остаются до отдельной чистки.
- * Статус или валюта вне enum — миграция падает: значение решает владелец данных, не перенос.
  */
 return new class () extends Migration {
     private string $tableName = 'parking.tariffs';
 
     private string $sourceTableName = 'public.tariffs';
 
+    /**
+     * Статус или валюта вне enum — миграция падает: значение решает владелец данных, не перенос.
+     *
+     * @throws OperationFailedAppException
+     */
     public function up(): void
     {
         if (! Schema::hasTable($this->sourceTableName)) {
@@ -37,7 +42,7 @@ return new class () extends Migration {
             ->all();
 
         if ($unknownIds) {
-            throw new RuntimeException(sprintf(
+            throw new OperationFailedAppException(sprintf(
                 'В public.tariffs статус или валюта вне enum, тарифы не перенесены: исправить данные и повторить (id=%s, первые 100)',
                 implode(', ', $unknownIds),
             ));
@@ -68,10 +73,12 @@ return new class () extends Migration {
             return;
         }
 
-        // Удаляются тарифы с id из public: созданные после переноса не задеты, пока в public.tariffs никто не пишет
+        // Перенесённая строка — тот же id и тот же created_at, что в public; строка, бывшая в parking до переноса (её пропустил ON CONFLICT), не совпадёт по created_at
         DB::statement("
-            DELETE FROM {$this->tableName}
-            WHERE id IN (SELECT id FROM {$this->sourceTableName})
+            DELETE FROM {$this->tableName} AS target
+            USING {$this->sourceTableName} AS source
+            WHERE target.id = source.id
+                AND target.created_at IS NOT DISTINCT FROM source.created_at
         ");
     }
 };

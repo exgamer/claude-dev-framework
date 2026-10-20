@@ -118,7 +118,7 @@ func (r *OutboxTariffEventRepository) MakeStale(id uint, age time.Duration) {
 }
 
 func (r *OutboxTariffEventRepository) setStatus(id uint, status outboxdomain.Status) {
-	if item, ok := r.Items[id]; ok {
+	if item, ok := r.Items[id]; ok && item.IsDeliverable() {
 		item.Status = status
 		r.UpdatedAt[id] = time.Now()
 	}
