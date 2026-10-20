@@ -10,7 +10,7 @@ trigger: /dev-architect
 
 ## Шаг 1 — Правила
 
-Прочитай: `{DF}/core/*.md`, `{DF}/architecture/*.md`, `{DF}/regulations/*.md`, `{DF}/approaches/process/impact-analysis.md`, `{DF}/stacks/<stack>/structure.md` и `conventions.md`, `{DF}/approaches/process/planning.md`; по теме задачи — нужные `{DF}/approaches/patterns/*.md` (деньги/колбэки шлюзов — `payments.md` обязательно). Режим `refactor` — `legacy-refactor.md`, `migrate` — `stack-migration.md` и `structure.md` обоих стеков. Локальные `.claude/dev-rules.md` проекта.
+Прочитай: `{DF}/core/principles.md`, `{DF}/core/decisions.md`, `{DF}/core/style.md`; из `{DF}/core/rules-evolution.md` — разделы «Лог отклонений по задаче» (формат строк `rules-log.md`) и «Куда писать» (целевой файл в предложении); `{DF}/architecture/*.md`, `{DF}/regulations/*.md` кроме `git.md` и `code-review.md`, `{DF}/approaches/process/impact-analysis.md`, `{DF}/stacks/<stack>/structure.md` и `conventions.md`, `{DF}/approaches/process/planning.md`; по теме задачи — нужные `{DF}/approaches/patterns/*.md` (деньги/колбэки шлюзов — `payments.md` обязательно). Режим `refactor` — `legacy-refactor.md`, `migrate` — `stack-migration.md` и `structure.md` обоих стеков. Локальные `.claude/dev-rules.md` проекта. История решений (`core/decisions-log.md`) не читается — она для `/dev-rule`; git и ревью — не работа архитектора.
 
 Запуск напрямую (не субагентом `/dev`): проверь доступ к IDE и при недоступности предложи включить — `{DF}/approaches/process/code-navigation.md`, «Проверка при старте»; работу это не останавливает.
 

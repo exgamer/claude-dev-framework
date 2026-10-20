@@ -40,7 +40,7 @@
 ## Имена
 
 - Имя обещает ровно то, что делает код. `Enqueue`/`dispatch`/`Schedule` без очереди — ошибка.
-- Имя файла = что в нём объявлено (`repository.go`, `publisher.go`, `dto.go`), не абстракция (`ports.go`, `types.go`, `utils.go`).
+- Имя файла = что в нём объявлено (`repository.go`, `publisher.go`, `dto.go`), не абстракция (`ports.go`, `types.go`, `utils.go`). Исключение по списку стека — файлы групп интерфейсов модуля домена в Go (`modules.go`, `system.go`, `stacks/go/conventions.md` п. 12).
 - Имя файла сложной операции — конкретное действие + тип: `calculate_session_debt_workflow.go`, `recalculate_debt_command.go`, не `workflow.go`/`command.go`.
 - Аббревиатуры целиком заглавными: `ID`, `URL`, `HTTP`, `DTO`, `JSON`.
 

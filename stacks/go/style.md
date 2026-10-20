@@ -6,7 +6,7 @@
 
 - Ресиверы — короткая форма, первая буква типа: `r *Repository`, `s *Service`, `h *Handler`
 - Аббревиатуры в именах — все буквы заглавные: `ID`, `URL`, `HTTP`, `DTO`, `JSON`. Примеры: `createDTO` (не `createDto`), `userID` (не `userId`)
-- Интерфейсы — по роли без суффикса `-er`: `Repository`, `Service`, `Handler`
+- Интерфейсы — по роли без суффикса `-er`: `Repository`, `Service`, `Handler`. Узкие интерфейсы-зависимости (`conventions.md` п. 12) — по действию или роли, `-er` допустим: `Publisher`, `Clock`, `TemplateReader`, `TokenVerifier`
 
 ---
 

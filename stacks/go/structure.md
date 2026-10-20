@@ -52,7 +52,7 @@ Common         → любой слой        ✗
 
 ### Domain Layer
 - **Что**: бизнес-логика. Не зависит от БД, HTTP, любых внешних систем.
-- **Состав**: `entity.go` (доменная модель без ORM/JSON тегов), `repository.go` (интерфейс), `service.go` (бизнес-операции через интерфейс репозитория).
+- **Состав**: `entity.go` (доменная модель без ORM/JSON тегов), `repository.go` (интерфейс), `service.go` (бизнес-операции через интерфейс репозитория); по необходимости — `tx_manager.go`, `modules.go`, `system.go` (`conventions.md` п. 12).
 - **Правило**: domain объявляет интерфейс Repository сам; infrastructure его реализует.
 
 ### Infrastructure Layer
@@ -103,7 +103,10 @@ internal/
 │       └── {module}/
 │           ├── entity.go
 │           ├── dto.go
-│           ├── repository.go
+│           ├── repository.go               ← данные: хранилища и внешние системы как источник данных
+│           ├── tx_manager.go               ← опционально: интерфейсы транзакций
+│           ├── modules.go                  ← опционально: интерфейсы соседних модулей домена (O-6)
+│           ├── system.go                   ← опционально: Clock, IDGenerator, ChangeNotifier…
 │           ├── service.go
 │           └── {entity}_validator.go       ← опционально: доменные инварианты DTO (O-18)
 │
@@ -222,6 +225,7 @@ main()
 
 **Опционально:**
 - [ ] `domains/{domain}/{module}/{entity}_validator.go` — если есть доменные инварианты сверх формата запроса (O-18)
+- [ ] `domains/{domain}/{module}/modules.go`, `system.go` — если модулю нужны соседние модули домена или системные зависимости (`conventions.md` п. 12); транзакции — `tx_manager.go`
 - [ ] `infrastructure/redis/{domain}/{module}/repository.go`
 - [ ] `infrastructure/http/{provider}/{product}/model.go` (или `http/{service}/{module}/`)
 - [ ] `infrastructure/http/{provider}/{product}/repository.go`
