@@ -132,14 +132,16 @@ def run_go(project: Path, base):
     cmd = ["golangci-lint", "run", "--config", str(cfg)]
     if base:
         cmd += ["--new-from-rev", base]
+    print(f"домены (правила «домен не импортирует другой»): {', '.join(domains_of(project)) or 'нет internal/domains'}", flush=True)
     print(f"конфиг: {cfg}\n$ {' '.join(cmd + ['./...'])}", flush=True)
-    res = subprocess.run(cmd + ["./..."], cwd=project, capture_output=True, text=True)
+    env = dict(os.environ, PWD=str(project))  # $PWD — алиас-симлинк проекта даёт ложный «0 issues»
+    res = subprocess.run(cmd + ["./..."], cwd=project, env=env, capture_output=True, text=True)
     out = res.stdout + res.stderr
     # Тесты проекта не компилируются (ошибка типизации в *_test.go) — она прячет анализ пакета: повтор без тестов
     if res.returncode and re.search(r"_test\.go:\d+:\d+: .*\(typecheck\)", out):
         print("тесты проекта не компилируются — анализ без тестов (--tests=false); ошибка тестов — проблема проекта:", flush=True)
         print("\n".join(l for l in out.splitlines() if "_test.go" in l and "(typecheck)" in l), flush=True)
-        res = subprocess.run(cmd + ["--tests=false", "./..."], cwd=project, capture_output=True, text=True)
+        res = subprocess.run(cmd + ["--tests=false", "./..."], cwd=project, env=env, capture_output=True, text=True)
         out = res.stdout + res.stderr
     sys.stdout.write(out)
     return res.returncode
@@ -186,7 +188,7 @@ def php_namespace(project: Path, sub: str) -> str:
     sys.exit(f"нет psr-4 для {sub} в composer.json проекта")
 
 
-def run_php(project: Path, sub: str, container: str, base):
+def run_php(project: Path, sub: str, container: str, base, no_install=False):
     sys.path.insert(0, str(Path(__file__).parent))
     import php_rules
     root = php_namespace(project, sub)
@@ -199,6 +201,9 @@ def run_php(project: Path, sub: str, container: str, base):
     ns = f"DevFrameworkLint\\P{tag}"
     have = docker(container, f"cat {PHP_TOOLS}/composer.json 2>/dev/null").stdout
     if docker(container, f"test -x {PHP_TOOLS}/vendor/bin/phpstan").returncode or "DevFrameworkLint" not in have:
+        if no_install:
+            print(f"инструменты фреймворка в {container}:{PHP_TOOLS} не установлены, а --no-install — не запускался", flush=True)
+            return 2
         print(f"ставлю инструменты фреймворка в {container}:{PHP_TOOLS} (не в проект)", flush=True)
         docker(container, f"mkdir -p {PHP_TOOLS} && cat > {PHP_TOOLS}/composer.json", PHP_TOOLS_COMPOSER)
         r = docker(container, f"cd {PHP_TOOLS} && rm -f composer.lock && COMPOSER_NO_INTERACTION=1 composer update --no-progress -q")
@@ -226,11 +231,14 @@ parameters:
     files = []
     if base:
         diff = subprocess.check_output(["git", "diff", "--name-only", "--diff-filter=ACMR", base, "--", sub], cwd=project).decode().split()
-        files = [f"{cpath}/{f}" for f in diff if f.endswith(".php")]
+        # новые файлы задачи ещё не в git — git diff их не показывает, а нарушение в них — тоже нарушение
+        diff += subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard", "--", sub], cwd=project).decode().split()
+        files = [f"{cpath}/{f}" for f in sorted(set(diff)) if f.endswith(".php")]
         if not files:
             print(f"нет изменённых PHP-файлов в {sub} относительно {base}")
             return 0
     cmd = f"cd {cpath} && php -d memory_limit=2G {PHP_TOOLS}/vendor/bin/phpstan analyse -c {work}/phpstan.neon --no-progress " + " ".join(files)
+    print(f"домены (правила «домен не знает другие»): {', '.join(domains) or 'нет ' + sub + '/Domains'}", flush=True)
     print(f"правила: {container}:{work}\n$ {cmd}", flush=True)
     r = docker(container, cmd + " 2>&1")
     sys.stdout.write("\n".join(l for l in r.stdout.splitlines() if "Deprecated: PHP Startup" not in l) + "\n")
@@ -244,13 +252,14 @@ def main():
     p.add_argument("--base", help="ревизия, от которой смотреть новое (дифф задачи)")
     p.add_argument("--render", action="store_true", help="только напечатать собранный конфиг (go)")
     p.add_argument("--sub", help="php: каталог подпроекта (psr-4 из composer.json проекта), например parking_app")
+    p.add_argument("--no-install", action="store_true", help="php: не ставить инструменты (агент ревью — без сети): нет — «не запускался», код 2")
     p.add_argument("--container", default=os.environ.get("PHP_CONTAINER", "php-8.5"), help="php: контейнер с PHP проекта")
     a = p.parse_args()
     project = Path(a.project).expanduser().resolve()
     if a.stack == "php":
         if not a.sub:
             sys.exit("php: нужен --sub <каталог подпроекта>")
-        return run_php(project, a.sub, a.container, a.base)
+        return run_php(project, a.sub, a.container, a.base, a.no_install)
     if a.render:
         sys.stdout.write(render_go(project))
         return 0

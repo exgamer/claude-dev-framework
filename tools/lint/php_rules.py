@@ -137,6 +137,13 @@ parameters:
                 - '*/Infrastructure/*'
                 - '*/database/migrations/*'
                 - '*/tests/*'
+        -
+            class: 'DB'
+            message: 'фасад DB (глобальный алиас DB) — только в Infrastructure (репозиторий, менеджер транзакций), миграциях и тестах; транзакция — TransactionManagerInterface::run()'
+            allowIn:
+                - '*/Infrastructure/*'
+                - '*/database/migrations/*'
+                - '*/tests/*'
     disallowedFunctionCalls:
         -
             function:

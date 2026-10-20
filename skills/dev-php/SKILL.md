@@ -49,7 +49,7 @@ trigger: /dev-php
 
 ## Шаг 6 — Самопроверка
 
-Пройди **памятку** `{DF}/stacks/php/checklist.md` по каждому пункту, который задевает твой код (пометки **О**/**В**/**И** — уровни каталога тегов `{DF}/approaches/process/review-tags.md`, с ними же придёт ревью), и `{DF}/approaches/process/self-check.md`. Есть `threats.md` или чувствительные зоны — ещё `{DF}/stacks/php/security.md` по своему коду. `review-findings.md` — материал ревьюера, целиком не читаешь. Прогони `composer csfix-validate`, `composer phpstan`, `composer test:run` (или аналоги из `composer.json` проекта; субагент `/dev` — только по своим путям, `subagent.md`); в режиме IDE — ещё `lint_files` по своим файлам — покажи результат; если не запускал — так и скажи.
+Пройди **памятку** `{DF}/stacks/php/checklist.md` по каждому пункту, который задевает твой код (пометки **О**/**В**/**И** — уровни каталога тегов `{DF}/approaches/process/review-tags.md`, с ними же придёт ревью), и `{DF}/approaches/process/self-check.md` — в том числе прогон правил фреймворка анализаторами `{DF}/tools/lint/lint.py` по своему диффу: находки исправить до сдачи. Есть `threats.md` или чувствительные зоны — ещё `{DF}/stacks/php/security.md` по своему коду. `review-findings.md` — материал ревьюера, целиком не читаешь. Прогони `composer csfix-validate`, `composer phpstan`, `composer test:run` (или аналоги из `composer.json` проекта; субагент `/dev` — только по своим путям, `subagent.md`); в режиме IDE — ещё `lint_files` по своим файлам — покажи результат; если не запускал — так и скажи.
 
 ## Шаг 7 — Итог
 

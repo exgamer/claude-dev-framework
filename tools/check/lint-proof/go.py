@@ -32,6 +32,7 @@ CASES = [  # (имя, путь файла, код, что должно быть 
  ("разрешено: константа ALL_CAPS", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nconst ZZ_LIMIT = 1\n', None),
  ("разрешено: имя с подчёркиванием", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc zzF() int {\n\tmax_value := 1\n\n\treturn max_value\n}\n', None),
  ("разрешено: внешний тест workflow импортирует workflow", "internal/workflows/billing/tariff/zz_v_test.go", f'package tariff_test\nimport _ "{M}/internal/workflows/billing/tariff"\n', None),
+ ("Url вместо URL", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc ZzF() string {\n\tbaseUrl := "x"\n\n\treturn baseUrl\n}\n', "var-naming"),
  ("Id вместо ID", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc ZzF() int {\n\tparkingId := 1\n\n\treturn parkingId\n}\n', "var-naming"),
 ]
 env = dict(os.environ, GOFLAGS="-mod=mod", GOPROXY="off", GOSUMDB="off", GOPRIVATE="", GONOPROXY="")

@@ -16,6 +16,7 @@ CASES = [  # (имя, файл, было, стало, что должно быт
     ("строка таблицы без правила в конфиге", "tools/check/lint-proof/RULES.md", "| nlreturn |", "| zz-rule |", "правила «zz-rule» нет в конфиге"),
     ("случай доказательства потерян", "tools/check/lint-proof/go.py", '("ctx не первым",', '("zz ctx",', "случая «ctx не первым» нет"),
     ("тег не из каталога", "tools/check/lint-proof/RULES.md", "| `initialism-case` |", "| `zz-missing-tag` |", "zz-missing-tag"),
+    ("пустой «Остаток — агенту»", "tools/check/lint-proof/RULES.md", "| пустые строки между логическими блоками, builder по вызову на строку |", "|  |", "пустая колонка"),
     ("место запуска не вызывает прогон", "skills/dev-rule/SKILL.md", "golangci-lint run", "golangci-lint-zz", "не вызывает прогон Go"),
 ]
 

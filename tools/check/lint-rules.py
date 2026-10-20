@@ -22,12 +22,14 @@ STACKS = {
     "Go": {
         "configs": ["stacks/go/examples/tariff/.golangci.yml"],
         "proof": "tools/check/lint-proof/go.py",
-        "runs": {"skills/dev-rule/SKILL.md": "golangci-lint run"},
+        "runs": {"skills/dev-rule/SKILL.md": "golangci-lint run", "approaches/process/self-check.md": "tools/lint/lint.py",
+                 "approaches/process/review.md": "tools/lint/lint.py"},
     },
     "PHP": {
         "configs": ["stacks/php/examples/phpstan-rules.neon", "stacks/php/examples/tests/Architecture/LayersArchitecture.php"],
         "proof": "tools/check/lint-proof/php.py",
-        "runs": {"skills/dev-rule/SKILL.md": "php-check/run.sh", "tools/php-check/run.sh": "phpstan analyse"},
+        "runs": {"skills/dev-rule/SKILL.md": "php-check/run.sh", "tools/php-check/run.sh": "phpstan analyse",
+                 "approaches/process/self-check.md": "tools/lint/lint.py", "approaches/process/review.md": "tools/lint/lint.py"},
     },
 }
 
@@ -45,7 +47,7 @@ def table_rows():
             stack = "PHP"
         if stack and line.startswith("| ") and not line.startswith("| Правило") and not line.startswith("|---"):
             cells = [c.strip() for c in line.strip().strip("|").split(" | ")]
-            if len(cells) == 5:
+            if len(cells) == 7:
                 rows.append((stack, cells))
     return rows
 
@@ -78,8 +80,12 @@ def main():
     seen_rules = {s: set() for s in STACKS}
     seen_cases = {s: set() for s in STACKS}
     rows = table_rows()
-    for stack, (source, tag, rule, cases, runs) in rows:
+    for stack, (source, tag, rule, exact, rest, cases, runs) in rows:
         where = f"{TABLE}: {stack}: {rule}"
+        if not exact.strip() or not rest.strip():
+            problems.append(f"{where}: пустая колонка «Ловит точно» или «Остаток — агенту»")
+        if not [c for c in cases.split(";") if c.strip() and not c.strip().startswith("разрешено")]:
+            problems.append(f"{where}: нет ни одного случая-нарушения — «Ловит точно» не доказано")
         for path, item in re.findall(r"`([^`]+\.md)`(?:\s*п\.\s*([0-9]+[a-z]?))?", source):
             if not os.path.isfile(path):
                 problems.append(f"{where}: нет файла-источника {path}")

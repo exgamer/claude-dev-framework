@@ -68,6 +68,30 @@ if git -C "$PROJECT" rev-parse --git-dir >/dev/null 2>&1; then
   echo "git     симлинки — в .git/info/exclude"
 fi
 
+# Анализаторы — на машину, не в проект: правила фреймворка гоняет tools/lint/lint.py своим конфигом (tools/lint/README.md)
+if [ -f "$PROJECT/go.mod" ]; then
+  if command -v golangci-lint >/dev/null 2>&1 && golangci-lint version 2>/dev/null | grep -q "version 2\."; then
+    echo "lint    golangci-lint v2 — есть"
+  else
+    echo "lint    golangci-lint v2 не найден — нужен для правил фреймворка на Go-проекте (tools/lint/lint.py go)"
+    if command -v brew >/dev/null 2>&1 && [ -t 0 ]; then
+      read -r -p "        поставить через brew (brew install golangci-lint)? [y/N] " answer
+      if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
+        brew install golangci-lint
+      fi
+    else
+      echo "        поставить: brew install golangci-lint (или https://golangci-lint.run/welcome/install/)"
+    fi
+  fi
+fi
+if [ -f "$PROJECT/composer.json" ]; then
+  if command -v docker >/dev/null 2>&1; then
+    echo "lint    PHP: инструменты фреймворка (phpstan, phpat, disallowed-calls) поставит tools/lint/lint.py php при первом запуске — в PHP-контейнер проекта, в /tmp/df-lint, не в проект"
+  else
+    echo "lint    PHP: нужен docker с PHP-контейнером проекта — в нём tools/lint/lint.py php гоняет правила фреймворка"
+  fi
+fi
+
 echo
 echo "Стопы для ~/.claude/settings.json (добавить вручную, если ещё нет) — спрашивать перед коммитом, пушем и разрушающим SQL:"
 cat <<'JSON'
