@@ -1,0 +1,52 @@
+package tariff
+
+import (
+	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/response"
+	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/validators"
+	"github.com/gin-gonic/gin"
+
+	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
+)
+
+func NewHandler(tariffService *tariffdomain.Service) *Handler {
+	return &Handler{
+		tariffService: tariffService,
+	}
+}
+
+// Handler Тарифы для машинного вызова партнёра; права администратора и скоуп парковок к нему не применяются
+type Handler struct {
+	tariffService *tariffdomain.Service
+}
+
+// @Summary		Тариф по ID для партнёра
+// @Description	Машинный вызов: ключ API и HMAC-подпись запроса, повтор подписи — 401. Партнёр видит тариф любой парковки
+// @Tags			integration-tariff
+// @Produce		json
+// @Param			id	path	int	true	"ID тарифа"
+// @Security		PartnerAPIKey && PartnerSignature
+// @Success		200	{object}	tariffResponse
+// @Failure		400	{object}	structures.BadRequestErrorResponse
+// @Failure		404	{object}	structures.NotFoundErrorResponse
+// @Failure		500	{object}	structures.InternalServerResponse
+// @Router			/api/v1/integration/tariffs/{id} [get]
+func (h *Handler) View() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := validators.GetIntQueryParam(c, "id")
+		if err != nil {
+			response.BadRequest(c, err, nil)
+
+			return
+		}
+
+		// Машинный вызов без пользователя: скоупа нет, nil передаётся явно — без ограничения по парковкам
+		tariff, err := h.tariffService.GetByID(c.Request.Context(), uint(id), nil)
+		if err != nil {
+			response.ErrorResponse(c, err)
+
+			return
+		}
+
+		response.Success(c, tariffToData(tariff))
+	}
+}

@@ -1,0 +1,161 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\ParkingApp\Core\Database\Query;
+
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use InvalidArgumentException;
+use MPS\Core\Components\CRUD\DataObjects\SearchDataObject;
+use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterface;
+
+/**
+ * Поиск формы (1) пагинации, P-19: search() CRUD-репозитория ядра → ['items', 'pagination', 'params']; эталон модуля — форма (2), Page + paginate() репозитория.
+ * С id — один элемент; expanded строкой через запятую — массивом.
+ * search() ядра принимает perPage только int, «без пагинации» в нём не выражается: perPage — целое ≥ 1, весь набор по id — searchByIds().
+ *
+ * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ */
+class PaginatedQueryHelper
+{
+    private int $defaultPerPage = 30;
+
+    private string $dataKey = 'items';
+
+    private bool $asArray = true;
+
+    public static function instance(CRUDRepositoryInterface $repo): self
+    {
+        return new self($repo);
+    }
+
+    public function __construct(
+        private readonly CRUDRepositoryInterface $repo,
+    ) {
+    }
+
+    public function setDefaultPerPage(int $value): self
+    {
+        $this->defaultPerPage = $value;
+
+        return $this;
+    }
+
+    public function setDataKey(string $value): self
+    {
+        $this->dataKey = $value;
+
+        return $this;
+    }
+
+    public function asArray(bool $value = true): self
+    {
+        $this->asArray = $value;
+
+        return $this;
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     *
+     * @throws InvalidArgumentException perPage не целое ≥ 1 (в том числе false)
+     */
+    public function search(SearchDataObject $dto): array
+    {
+        $id = $dto->getId();
+        $params = $dto->getParams();
+        $perPage = $dto->getPerPage() ?? $this->defaultPerPage;
+
+        if (! is_int($perPage) || $perPage < 1) {
+            throw new InvalidArgumentException('perPage — целое не меньше 1; весь набор по id — searchByIds()');
+        }
+
+        if (! empty($params['expanded']) && is_string($params['expanded'])) {
+            $expanded = explode(',', $params['expanded']);
+            $params['expanded'] = array_map('trim', $expanded);
+        }
+
+        $searchResult = $this->repo->search(
+            params: $params,
+            id: $id,
+            perPage: $perPage,
+        );
+
+        if ($searchResult instanceof LengthAwarePaginator) {
+            return $this->fromPaginator($searchResult, $id, $params);
+        }
+
+        $items = $this->asArray ? $searchResult->toArray() : $searchResult->all();
+
+        if ($id !== null) {
+            return array_shift($items) ?? [];
+        }
+
+        return [
+            $this->dataKey => $items,
+            'params' => $params,
+        ];
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    public function searchById(int|string $id): array
+    {
+        $result = $this->searchByIds([$id]);
+
+        return array_shift($result) ?? [];
+    }
+
+    /**
+     * @param array<int, int|string> $ids
+     *
+     * @return array<int|string, mixed> при $keyBy — карта первичный ключ => элемент
+     */
+    public function searchByIds(array $ids, bool $keyBy = true): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $primaryKey = $this->repo->getPrimaryKeyName();
+
+        $models = $this->repo->allByCondition(
+            static fn (Builder $query) => $query->whereIn($primaryKey, $ids),
+        );
+        $result = $this->asArray ? $models->toArray() : $models->all();
+
+        if (! $keyBy) {
+            return $result;
+        }
+
+        $keyed = collect($result)->keyBy($primaryKey);
+
+        return $keyed->toArray();
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return array<int|string, mixed>
+     */
+    private function fromPaginator(LengthAwarePaginator $paginator, mixed $id, array $params): array
+    {
+        $collection = $paginator->getCollection();
+        $items = $this->asArray ? $collection->toArray() : $collection->all();
+
+        if ($id !== null) {
+            return array_shift($items) ?? [];
+        }
+
+        $pagination = $paginator->toArray();
+        unset($pagination['data']);
+
+        return [
+            $this->dataKey => $items,
+            'pagination' => $pagination,
+            'params' => $params,
+        ];
+    }
+}

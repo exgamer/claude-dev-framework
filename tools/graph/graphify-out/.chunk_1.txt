@@ -1,0 +1,3 @@
+/Users/olzhaskulzhambekov/AIProjects/dev-framework/tools/graph/corpus/approaches/patterns/cache.md
+/Users/olzhaskulzhambekov/AIProjects/dev-framework/tools/graph/corpus/architecture/layers.md
+/Users/olzhaskulzhambekov/AIProjects/dev-framework/tools/graph/corpus/stacks/go/structure.md

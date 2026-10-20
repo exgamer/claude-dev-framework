@@ -1,0 +1,143 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\ParkingApp\Core\Http\Middleware;
+
+use App\ParkingApp\Core\Enums\RequestHeaderEnum;
+use App\ParkingApp\Core\Helpers\SignatureHelper;
+use App\ParkingApp\Core\Http\Middleware\VerifySignatureMiddleware;
+use App\ParkingApp\Core\Http\Signature\SignatureNonceRepositoryInterface;
+use Carbon\Carbon;
+use Illuminate\Config\Repository as Config;
+use Illuminate\Http\Request;
+use Mockery;
+use Mockery\MockInterface;
+use MPS\Core\Exceptions\InvalidConfigurationAppException;
+use MPS\Core\Exceptions\UnAuthorizeAppException;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Response;
+
+/**
+ * Подпись машинного вызова: верная — запрос проходит и занимает nonce; битая, просроченная, повторная — 401,
+ * и nonce при отказе по подписи не занимается; нет секрета в конфиге — ошибка конфигурации.
+ *
+ * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ */
+class VerifySignatureMiddlewareTest extends TestCase
+{
+    private const SECRET = 'test-signature-secret';
+
+    private const NOW = 1788150000;
+
+    private const NONCE = '11111111-2222-3333-4444-555555555555';
+
+    private const TARGET = '/parking/integration/tariffs/42?locale=ru';
+
+    /** @var array<string, true> */
+    private array $usedNonces = [];
+
+    private SignatureNonceRepositoryInterface&MockInterface $nonceRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Carbon::setTestNow(Carbon::createFromTimestamp(self::NOW));
+        $this->nonceRepository = Mockery::mock(SignatureNonceRepositoryInterface::class);
+        $this->nonceRepository
+            ->shouldReceive('remember')
+            ->andReturnUsing(function (string $nonce): bool {
+                if (isset($this->usedNonces[$nonce])) {
+                    return false;
+                }
+
+                $this->usedNonces[$nonce] = true;
+
+                return true;
+            });
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        Mockery::close();
+        parent::tearDown();
+    }
+
+    public function test_signed_request_passes_and_takes_nonce(): void
+    {
+        $request = $this->request(SignatureHelper::header(self::SECRET, self::NOW, self::NONCE, 'GET', self::TARGET, ''));
+
+        $response = $this->handle($request);
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertArrayHasKey(self::NONCE, $this->usedNonces);
+    }
+
+    public function test_timestamp_inside_window_passes(): void
+    {
+        $request = $this->request(SignatureHelper::header(self::SECRET, self::NOW - 299, self::NONCE, 'GET', self::TARGET, ''));
+
+        $this->assertSame(Response::HTTP_OK, $this->handle($request)->getStatusCode());
+    }
+
+    public function test_replayed_nonce_is_unauthorized(): void
+    {
+        $header = SignatureHelper::header(self::SECRET, self::NOW, self::NONCE, 'GET', self::TARGET, '');
+        $this->handle($this->request($header));
+
+        $this->expectException(UnAuthorizeAppException::class);
+
+        $this->handle($this->request($header));
+    }
+
+    public function test_rejected_signature_does_not_take_nonce(): void
+    {
+        $cases = [
+            'нет заголовка' => null,
+            'чужой секрет' => SignatureHelper::header('other', self::NOW, self::NONCE, 'GET', self::TARGET, ''),
+            'другой путь' => SignatureHelper::header(self::SECRET, self::NOW, self::NONCE, 'GET', '/parking/integration/tariffs/43', ''),
+            'время вне окна' => SignatureHelper::header(self::SECRET, self::NOW - 301, self::NONCE, 'GET', self::TARGET, ''),
+            'время из будущего' => SignatureHelper::header(self::SECRET, self::NOW + 301, self::NONCE, 'GET', self::TARGET, ''),
+        ];
+
+        foreach ($cases as $case => $header) {
+            try {
+                $this->handle($this->request($header));
+                $this->fail('Ожидалось UnAuthorizeAppException: ' . $case);
+            } catch (UnAuthorizeAppException) {
+                $this->assertSame([], $this->usedNonces, $case);
+            }
+        }
+    }
+
+    public function test_missing_secret_is_configuration_error(): void
+    {
+        $this->expectException(InvalidConfigurationAppException::class);
+
+        new VerifySignatureMiddleware($this->nonceRepository, new Config([
+            'parking-app' => ['integration_signature' => ['secret' => '', 'tolerance_seconds' => 300]],
+        ]));
+    }
+
+    private function handle(Request $request): Response
+    {
+        $middleware = new VerifySignatureMiddleware($this->nonceRepository, new Config([
+            'parking-app' => ['integration_signature' => ['secret' => self::SECRET, 'tolerance_seconds' => 300]],
+        ]));
+
+        return $middleware->handle($request, fn (Request $request): Response => new Response());
+    }
+
+    private function request(?string $header): Request
+    {
+        $request = Request::create(self::TARGET);
+
+        if ($header !== null) {
+            $request->headers->set(RequestHeaderEnum::SIGNATURE->value, $header);
+        }
+
+        return $request;
+    }
+}
