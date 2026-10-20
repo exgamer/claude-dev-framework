@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\ParkingApp\Infrastructure\Http\PartnerBilling\Tariffs;
 
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
+use App\ParkingApp\Infrastructure\Http\PartnerBilling\DTO\PartnerTariffRequestDto;
 use App\ParkingApp\Workflows\Billing\Tariffs\TariffNotifierInterface;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Client\ConnectionException;
@@ -54,13 +55,15 @@ class PartnerBillingTariffsNotifier implements TariffNotifierInterface
      */
     public function sendCreated(int $tariffId, TariffDto $dto): void
     {
-        $request = HttpClientFactory::makeRequest(HttpRequestTypeEnum::POST, $this->baseUrl . '/tariffs', [
-            'external_id' => $tariffId,
-            'parking_id' => $dto->getParkingId(),
-            'name' => $dto->getName(),
-            'currency' => $dto->getCurrency()->value,
-            'price' => $dto->getPrice(),
-        ]);
+        $partnerTariff = PartnerTariffRequestDto::make()
+            ->setExternalId($tariffId)
+            ->setParkingId($dto->getParkingId())
+            ->setName($dto->getName())
+            ->setCurrency($dto->getCurrency())
+            ->setPrice($dto->getPrice());
+        // Ключи тела — поля DTO в snake_case, enum — значением (ArrayableTrait ядра)
+        $body = $partnerTariff->toArrayWithSnakeKeys();
+        $request = HttpClientFactory::makeRequest(HttpRequestTypeEnum::POST, $this->baseUrl . '/tariffs', $body);
         // Таймаут — на запрос: HttpClient применяет HttpClientConfig один раз на процесс (static в applyConfig)
         $pendingRequest = $this->client->freshRequest()->timeout($this->timeoutSeconds);
         $request->setRequestInstance($pendingRequest);

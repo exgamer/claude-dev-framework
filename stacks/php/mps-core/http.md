@@ -6,7 +6,7 @@
 
 ## Структура
 
-Раскладка — `../structure.md`: `Entrypoints/{Context}/{Domain}/{Module}/Http/{Controllers,Requests/{Entity},Responses}/`, `routes.php` и `ServiceProvider.php` — на уровне `Entrypoints/{Context}/{Domain}/`. Имена Request — `Requests/{Entity}/{Create,Update,Index}Request` (P-5).
+Раскладка — `../structure.md`: `Entrypoints/{Context}/{Domain}/{Module}/Http/{Controllers,Requests/{Entity},Responses}/`, `routes.php` и `ServiceProvider.php` — на уровне `Entrypoints/{Context}/{Domain}/`. Имена Request — `Requests/{Entity}/{Create,Update,Index}Request`, для действия над записью по id пути — `{View,{Action}}Request` (P-5, `../style.md`, «Имена»).
 
 ## Controller
 
@@ -35,7 +35,7 @@ class TariffController extends Controller
     #[OA\Get(path: '/parking/admin/tariffs', summary: 'Список тарифов', tags: ['Admin Parking: Тарифы'], /* parameters, responses */)]
     public function index(IndexRequest $request): JsonResponse
     {
-        // Список в форме (2) — явный метод репозитория paginate…({E}FilterDto, Page) (форма — по «Список» design.md, P-19, п. 2a); контекст из middleware — полем DTO (п. 19a; не выставлен — исключение в геттере DTO, null — только явно)
+        // Список в форме (2) — явный метод репозитория paginate…({E}FilterDto, Page) (форма — по «Список» design.md, P-19, п. 2c); контекст из middleware — полем DTO (п. 19a; не выставлен — исключение в геттере DTO, null — только явно)
         $filter = TariffFilterDto::make()
             ->fromArray($request->validated())
             ->setParkingIds(RequestHelper::getParkingIds($request));
@@ -102,7 +102,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(schema: 'TariffCreateRequest', required: ['parking_id', 'name'], properties: [
     new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
     new OA\Property(property: 'name', description: 'Название', type: 'string', example: 'Стандарт'),
-    new OA\Property(property: 'currency', description: 'Валюта, по умолчанию KZT', type: 'string', example: 'KZT'),
+    new OA\Property(property: 'currency', ref: '#/components/schemas/CurrencyEnum', description: 'Валюта, по умолчанию KZT'),   // enum ядра — схема в Core/OpenApi (swagger.md)
     new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
 ], type: 'object')]
 class CreateRequest extends Request
@@ -110,7 +110,7 @@ class CreateRequest extends Request
     public function rules(): array
     {
         return [
-            'parking_id' => ['required', 'integer', 'gt:0'],
+            'parking_id' => ['required', 'integer', 'gt:0', 'max:' . self::ID_MAX],
             'name' => ['required', 'string', 'max:255'],
             'currency' => ['sometimes', 'string', Rule::enum(CurrencyEnum::class)],   // не прислано — умолчание DTO; явный null — 422
             'grace_minutes' => ['nullable', 'integer', 'min:0', 'max:' . TimeUnitEnum::DAY->minutes()],          // очищаемое
@@ -128,12 +128,11 @@ class IndexRequest extends Request
     public function rules(): array
     {
         return [
-            'page' => ['integer', 'gt:0'],
-            'per_page' => ['integer', 'between:1,100'],
-            'parking_id' => ['integer', 'gt:0'],
-            'name' => ['string', 'max:255'],
-            'status' => [Rule::enum(TariffStatusEnum::class)],
-            'sort' => [Rule::enum(TariffSortEnum::class)],
+            'page' => ['sometimes', 'integer', 'min:0', 'max:' . Page::MAX_PAGE],              // 0 — первая страница (regulations/rest-api.md); верх — глубокий OFFSET
+            'per_page' => ['sometimes', 'integer', 'between:1,' . Page::MAX_PER_PAGE],
+            'parking_id' => ['nullable', 'integer', 'gt:0', 'max:' . self::ID_MAX],        // предел bigint: больше — 422, не 500
+            'status' => ['nullable', 'string', Rule::enum(TariffStatusEnum::class)],
+            'sort' => ['sometimes', 'string', Rule::enum(TariffSortEnum::class)],
         ];
     }
 }
@@ -148,10 +147,9 @@ Query-параметры `IndexRequest` описываются `#[OA\Parameter]`
 ```php
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:admin-api', 'permission:parking.tariffs', 'api.response'])   // алиасы из bootstrap/app.php, не ::class
+Route::middleware(['api.response', 'auth:admin-api', 'resolve.admin.parkings', 'permission:parking.admin.tariffs'])   // api.response — первым: иначе 401/403 middleware без обёртки (п. 20); алиасы из bootstrap/app.php, не ::class; право — на модуль (`architecture/layers.md`); раздельные права на чтение/запись — по маршруту, если нужно (как в эталоне)
     ->prefix('parking/admin')                                                        // {подпроект}/{context}
-    ->as('parking.admin.')
-    ->whereNumber('id')
+    ->as('parking.admin.')                                                           // без whereNumber('id'): id пути — 422 в Request (п. 20)
     ->group(function () {
         Route::get('tariffs', [TariffController::class, 'index'])->name('tariffs.index');
         Route::get('tariffs/{id}', [TariffController::class, 'view'])->name('tariffs.view');
@@ -175,29 +173,32 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(schema: 'TariffResponse', properties: [
     new OA\Property(property: 'id', description: 'ID тарифа', type: 'integer', example: 1),
     new OA\Property(property: 'name', description: 'Название', type: 'string', example: 'Стандарт'),
-    new OA\Property(property: 'status', description: 'Статус', type: 'string', example: 'active'),
+    new OA\Property(property: 'status', ref: '#/components/schemas/TariffStatusEnum', description: 'Статус'),
 ], type: 'object')]
 class TariffResponse extends JsonResource
 {
 }
 ```
 
-Форма (1) списка — `PaginateResource::make($service->search($search))` над `SearchDataObject` (`repository.md`, «Форма (1)»). Какую писать — раздел «Список» `design.md` (P-19, `../conventions.md` п. 2a).
+Форма (1) списка — `PaginateResource::make($service->search($search))` над `SearchDataObject` (`repository.md`, «Форма (1)»). Какую писать — раздел «Список» `design.md` (P-19, `../conventions.md` п. 2c).
 
 ## Entrypoint ServiceProvider
 
 ```php
 namespace App\ParkingApp\Entrypoints\Admin\Billing;
 
-use MPS\Core\Modules\ModuleServiceProvider;
+use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
-class ServiceProvider extends ModuleServiceProvider
+/**
+ * Подключает routes.php админки Billing автозагрузкой ModuleServiceProvider; middleware и права — в самих маршрутах.
+ *
+ * @author …
+ */
+class ServiceProvider extends CoreServiceProvider
 {
-    public static function getName(): string
-    {
-        return 'admin:billing';
-    }
 }
 ```
+
+Пустой, как в эталоне: `getName()` ядра не переопределяется (`domain.md`).
 
 Регистрируется в корневом `ServiceProvider.php` подпроекта (`../structure.md`, чеклист модуля).

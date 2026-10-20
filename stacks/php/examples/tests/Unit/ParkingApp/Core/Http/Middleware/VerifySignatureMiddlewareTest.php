@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Config\Repository as Config;
 use Illuminate\Http\Request;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\UnAuthorizeAppException;
@@ -27,6 +28,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class VerifySignatureMiddlewareTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const SECRET = 'test-signature-secret';
 
     private const NOW = 1788150000;
@@ -62,7 +65,6 @@ class VerifySignatureMiddlewareTest extends TestCase
     protected function tearDown(): void
     {
         Carbon::setTestNow();
-        Mockery::close();
         parent::tearDown();
     }
 
@@ -134,11 +136,12 @@ class VerifySignatureMiddlewareTest extends TestCase
 
     private function handle(Request $request): Response
     {
-        $middleware = new VerifySignatureMiddleware($this->nonceRepository, new Config([
+        $config = new Config([
             'parking-app' => ['integration_signature' => ['secret' => self::SECRET, 'tolerance_seconds' => 300]],
-        ]));
+        ]);
+        $middleware = new VerifySignatureMiddleware($this->nonceRepository, $config);
 
-        return $middleware->handle($request, fn (Request $request): Response => new Response());
+        return $middleware->handle($request, static fn (): Response => new Response());
     }
 
     private function request(?string $header): Request

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Фрагмент routes/console.php хоста: расписание консольных команд эталона
+// Фрагмент routes/console.php хоста: расписание консольных команд
 
 use Illuminate\Support\Facades\Schedule;
 

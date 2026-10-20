@@ -18,7 +18,7 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Репозиторий тарифов
+ * Тарифы в parking.tariffs: каждый публичный метод — один запрос, скоуп парковок — условием в запросе, а не фильтром после.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -147,7 +147,7 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
     {
         /** @var Tariff $tariff */
         $tariff = $this->model->newInstance();
-        // Дата активации пишется только при создании: перенос даты отложенный Job не догонит (граница эталона)
+        // Дата активации пишется только при создании: перенос даты отложенный Job не догонит
         $tariff->fill([
             ...$this->columns($dto),
             'status' => $status,
@@ -158,10 +158,17 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
         return $tariff;
     }
 
-    public function updateFromDto(Tariff $tariff, TariffDto $dto): bool
+    /**
+     * @throws QueryException ошибка БД, кроме нарушения индекса тарифа по умолчанию (оно — false)
+     */
+    public function updateFromDto(int $id, TariffDto $dto): bool
     {
+        $columns = $this->columns($dto);
+
         try {
-            $tariff->fill($this->columns($dto))->save();
+            $this->getQuery()
+                ->whereKey($id)
+                ->update($columns);
         } catch (QueryException $e) {
             if ($this->isUniqueViolation($e, self::DEFAULT_TARIFF_UNIQUE_INDEX)) {
                 return false;
@@ -173,6 +180,9 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
         return true;
     }
 
+    /**
+     * @throws QueryException ошибка БД, кроме нарушения индекса тарифа по умолчанию (оно — false)
+     */
     public function setDefault(int $id, bool $isDefault): bool
     {
         try {
@@ -235,7 +245,7 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
     }
 
     /**
-     * Колонки тарифа из DTO: status и is_default задаются отдельно.
+     * Колонки тарифа из DTO: status и is_default задаются отдельно; update() мимо $casts — enum значением.
      *
      * @return array<string, mixed>
      */
@@ -244,7 +254,7 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
         return [
             'parking_id' => $dto->getParkingId(),
             'name' => $dto->getName(),
-            'currency' => $dto->getCurrency(),
+            'currency' => $dto->getCurrency()->value,
             'price' => $dto->getPrice(),
             'grace_minutes' => $dto->getGraceMinutes(),
         ];

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Фрагмент config/rabbit-config.php хоста (подключается в config/app.php как 'rabbit-config'): топология эталона,
+// Фрагмент config/rabbit-config.php хоста (подключается в config/app.php как 'rabbit-config'): топология модуля тарифов,
 // ключи — домен.модуль.действие
 return [
     'billing' => [

@@ -2,8 +2,7 @@ package tariff
 
 import "slices"
 
-// ParkingScope Скоуп парковок из точки входа. Нулевое значение — ни одной парковки;
-// «без ограничения» — только явный All: true (super-admin, integration, consumer, консоль)
+// ParkingScope Скоуп парковок из точки входа: нулевое значение — ни одной, «без ограничения» — только All: true
 type ParkingScope struct {
 	All bool
 	IDs []uint

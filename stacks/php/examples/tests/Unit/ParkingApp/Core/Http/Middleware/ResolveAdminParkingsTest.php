@@ -8,6 +8,7 @@ use App\ParkingApp\Core\Http\Middleware\ResolveAdminParkings;
 use App\ParkingApp\Core\Http\RequestHelper;
 use Illuminate\Http\Request;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use MPS\Core\Exceptions\AccessDeniedAppException;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\UnAuthorizeAppException;
@@ -21,15 +22,11 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ResolveAdminParkingsTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const OWN_PARKING_ID = 15;
 
     private const OTHER_PARKING_ID = 16;
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     public function test_admin_parkings_are_put_into_request_attributes(): void
     {
@@ -97,7 +94,8 @@ class ResolveAdminParkingsTest extends TestCase
 
     private function handle(Request $request): void
     {
-        (new ResolveAdminParkings())->handle($request, fn (Request $request): Response => new Response());
+        $middleware = new ResolveAdminParkings();
+        $middleware->handle($request, static fn (): Response => new Response());
     }
 
     /**

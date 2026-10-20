@@ -8,7 +8,7 @@ use App\ParkingApp\Core\Requests\Request;
 use OpenApi\Attributes as OA;
 
 /**
- * Тариф по умолчанию парковки.
+ * Query тарифа по умолчанию: parking_id обязателен — у парковки один тариф по умолчанию.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -30,7 +30,7 @@ class ViewDefaultRequest extends Request
     public function rules(): array
     {
         return [
-            'parking_id' => ['required', 'integer', 'gt:0'],
+            'parking_id' => ['required', 'integer', 'gt:0', 'max:' . self::ID_MAX],
         ];
     }
 }

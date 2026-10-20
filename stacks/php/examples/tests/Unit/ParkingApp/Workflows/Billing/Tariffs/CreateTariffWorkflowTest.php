@@ -73,12 +73,6 @@ class CreateTariffWorkflowTest extends TestCase
         $this->exceptionHandler = Mockery::mock(ExceptionHandler::class);
     }
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     public function test_price_above_registry_limit_is_rejected_without_write(): void
     {
         $this->parkingRepository->shouldNotReceive('oneById');
@@ -242,7 +236,7 @@ class CreateTariffWorkflowTest extends TestCase
 
     public function test_scheduled_tariff_activation_is_dispatched_at_scheduled_time_after_commit(): void
     {
-        $scheduledAt = Carbon::now()->addDay();
+        $scheduledAt = Carbon::now()->addDay()->startOfSecond();
 
         $this->expectTariffCreated(TariffStatusEnum::SCHEDULED, $scheduledAt);
         $this->expectOutboxEventWritten();
@@ -250,7 +244,9 @@ class CreateTariffWorkflowTest extends TestCase
         $this->exceptionHandler->shouldNotReceive('report');
 
         $workflow = $this->workflow(maxPrice: null, partnerFails: false, brokerFails: false);
-        $workflow->execute($this->dto(price: 50000)->setScheduledAt($scheduledAt));
+        $dto = $this->dto(price: 50000);
+        $dto->setScheduledAt($scheduledAt);
+        $workflow->execute($dto);
 
         Queue::assertPushed(
             ActivatePlannedTariffJob::class,

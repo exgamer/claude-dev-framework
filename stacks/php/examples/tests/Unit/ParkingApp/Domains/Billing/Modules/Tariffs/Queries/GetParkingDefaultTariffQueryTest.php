@@ -11,6 +11,7 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepository
 use App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Models\OutboxTariffEvent;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -21,6 +22,8 @@ use PHPUnit\Framework\TestCase;
  */
 class GetParkingDefaultTariffQueryTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const PARKING_ID = 15;
 
     private const TARIFF_ID = 10;
@@ -38,12 +41,6 @@ class GetParkingDefaultTariffQueryTest extends TestCase
         $this->tariffRepository = Mockery::mock(TariffRepositoryInterface::class);
         $this->outboxRepository = Mockery::mock(OutboxTariffEventRepositoryInterface::class);
         $this->query = new GetParkingDefaultTariffQuery($this->tariffRepository, $this->outboxRepository);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
     public function test_default_tariff_comes_with_last_event_status(): void

@@ -14,7 +14,7 @@ use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\ValidationAppException;
 
 /**
- * Интерфейс CRUD-сервиса тарифов.
+ * Чтение и изменение тарифов с проверкой скоупа парковок и доменных инвариантов; тариф по умолчанию назначает SetDefaultTariffCommand.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

@@ -1,6 +1,6 @@
 # Возможности mps/core и mps/utils: что уже есть
 
-Перед тем как писать хелпер, клиент, кеш, фильтр или middleware — найти задачу здесь. Есть в ядре → использовать ядро; самописная замена — **[ОШИБКА]** (`../conventions.md`, «Пакеты ядра»).
+Перед тем как писать хелпер, клиент, кеш, фильтр или middleware — найти задачу здесь. Есть в ядре → использовать ядро; самописная замена — `repository-reinvents-core-helper` (`../conventions.md`, «Пакеты ядра»).
 
 - Собрано по `reference/*.md` — полному списку классов и public-методов, сгенерированному из исходников:
   - `mps-core-v1.6.0.md`, `mps-utils-v2.6.2.md` — версии из `vendor/` PHP-монолита;
@@ -17,7 +17,7 @@
 | Задача | Что взять |
 |---|---|
 | DTO | `MPS\Core\DataObjects\DataObject`: `::make()`, `fromArray()`, `toArray()`, `toArrayWithSnakeKeys()`, `toArrayWithCamelKeys()`, `validated()`; коллекция — `DataObjectCollection` (`pushItem`) |
-| Репозиторий БД | `MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository` (+ `CRUDRepositoryInterface`): `create`, `oneById`, `oneByIdOrFail` (не вызывать — `*OrFail` не используются, `conventions.md` п. 12a), `oneByCondition`, `allByCondition`, `countByCondition`, `isUnique`, `search`, `update`, `updateById`, `upsert`, `delete`, `deleteById`; запросы — `getQuery()`; `search`/`filterSearch()`/`SearchDataObject` — форма (1) списка; какая форма — раздел «Список» `design.md` (P-19, `conventions.md` п. 2a) |
+| Репозиторий БД | `MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository` (+ `CRUDRepositoryInterface`): `create`, `oneById`, `oneByIdOrFail` (не вызывать — `*OrFail` не используются, `conventions.md` п. 12a), `oneByCondition`, `allByCondition`, `countByCondition`, `isUnique`, `search`, `update`, `updateById`, `upsert`, `delete`, `deleteById`; запросы — `getQuery()`; `search`/`filterSearch()`/`SearchDataObject` — форма (1) списка; какая форма — раздел «Список» `design.md` (P-19, `conventions.md` п. 2c) |
 | Сервис | `MPS\Core\Services\Service`; сложный сервис поверх CRUD — `CrudServiceDecorator` (core ≥ 1.7.0); CRUD целиком — `Components\CRUD\Services\Database\Eloquent\CRUDService` (`create/update/delete(*CommandDataObject)`, `searchById`, `deleteById`), поиск — `SearchAwareTrait` (`search`, `searchById`, `searchByIds`) |
 | Параметры поиска (форма (1) списка `search()`, P-19) | `Components\CRUD\DataObjects\SearchDataObject` (`setParams`, `setPerPage`, `setPage`) |
 | События CRUD | `Components\CRUD\Events\{Before,After}{Modify,Delete}Event`, `AfterSearchEvent` |
@@ -86,7 +86,7 @@
 
 | Задача | Что взять |
 |---|---|
-| Клиент внешнего сервиса (utils 2.6.x) | `MPS\Utils\Components\Http\Repository\HttpRepository` — база для инфра-репозитория: `request(HttpRequestTypeEnum, url, data)`, `extract()`, `concurrent()`; клиент — `HttpClientInterface` (`get/post/put/patch/delete`, `request(HttpRequest)`), конфиг — `HttpClientConfig` |
+| Клиент внешнего сервиса (utils 2.6.x) | `HttpClientInterface` (`get/post/put/patch/delete`, `request(HttpRequest)`) через DI в конструкторе адаптера, таймаут — на каждый запрос (`HttpClientConfig` применяется раз на процесс), как адаптеры эталона (`../examples/parking_app/Infrastructure/Http/`). База `MPS\Utils\Components\Http\Repository\HttpRepository` (`request(HttpRequestTypeEnum, url, data)`, `extract()`, `concurrent()`) — не обязательна; без таймаута на запрос — нет (`approaches/patterns/performance.md`, `external-call-without-timeout`) |
 | Параллельные запросы | `ConcurrentRequestManagerInterface` / `HttpClient::concurrent()` |
 | Fluent-построитель (utils ≥ 2.8) | `MPS\Utils\Components\Http\HttpRequestBuilder\HttpRequestBuilder::post($url)->withHeaders()->withBody()->withConfig()->send()`; параллельно — `HttpConcurrentBuilder::make()->add(alias, req)->send()` |
 | Шина (ServiceBus) | `MPS\Utils\Components\Integration\ServiceBus\Repositories\{Repository, CRUDRepository}` |

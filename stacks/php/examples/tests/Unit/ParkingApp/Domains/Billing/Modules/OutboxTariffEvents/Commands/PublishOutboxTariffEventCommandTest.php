@@ -15,6 +15,7 @@ use App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Models\Out
 use ArrayObject;
 use Illuminate\Config\Repository as Config;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
@@ -28,6 +29,8 @@ use PHPUnit\Framework\TestCase;
  */
 class PublishOutboxTariffEventCommandTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const OUTBOX_ID = 77;
 
     private const TARIFF_ID = 10;
@@ -47,12 +50,6 @@ class PublishOutboxTariffEventCommandTest extends TestCase
         $this->published = new ArrayObject();
     }
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     public function test_pending_event_is_published_and_marked_published(): void
     {
         $this->expectEvent(OutboxTariffEventStatusEnum::PENDING);
@@ -63,7 +60,8 @@ class PublishOutboxTariffEventCommandTest extends TestCase
             ->andReturn(true);
         $this->repository->shouldNotReceive('incrementAttempts');
 
-        $this->command(brokerFails: false)->execute(self::OUTBOX_ID);
+        $command = $this->command(brokerFails: false);
+        $command->execute(self::OUTBOX_ID);
 
         $this->assertSame(
             [self::OUTBOX_ID . ':tariff.created:' . self::TARIFF_ID],
@@ -79,7 +77,8 @@ class PublishOutboxTariffEventCommandTest extends TestCase
             $this->repository->shouldNotReceive('markPublished');
             $this->repository->shouldNotReceive('incrementAttempts');
 
-            $this->command(brokerFails: false)->execute(self::OUTBOX_ID);
+            $command = $this->command(brokerFails: false);
+            $command->execute(self::OUTBOX_ID);
         }
 
         $this->assertSame([], $this->published->getArrayCopy());
@@ -94,7 +93,8 @@ class PublishOutboxTariffEventCommandTest extends TestCase
             ->andReturn(null);
         $this->repository->shouldNotReceive('markPublished');
 
-        $this->command(brokerFails: false)->execute(self::OUTBOX_ID);
+        $command = $this->command(brokerFails: false);
+        $command->execute(self::OUTBOX_ID);
 
         $this->assertSame([], $this->published->getArrayCopy());
     }
@@ -117,7 +117,8 @@ class PublishOutboxTariffEventCommandTest extends TestCase
         $this->expectException(OperationFailedAppException::class);
         $this->expectExceptionMessage('RabbitMQ недоступен');
 
-        $this->command(brokerFails: true)->execute(self::OUTBOX_ID);
+        $command = $this->command(brokerFails: true);
+        $command->execute(self::OUTBOX_ID);
     }
 
     public function test_broker_failure_on_last_attempt_marks_failed_for_manual_review(): void
@@ -135,7 +136,8 @@ class PublishOutboxTariffEventCommandTest extends TestCase
         $this->repository->shouldNotReceive('markAwaitingRetry');
 
         try {
-            $this->command(brokerFails: true)->execute(self::OUTBOX_ID);
+            $command = $this->command(brokerFails: true);
+            $command->execute(self::OUTBOX_ID);
             $this->fail('Ожидался OperationFailedAppException');
         } catch (OperationFailedAppException $e) {
             $this->assertSame(

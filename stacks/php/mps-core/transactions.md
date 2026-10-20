@@ -11,11 +11,7 @@
 
 ## Когда добавлять транзакцию вручную
 
-Workflow, Service, Command — одинаково (решение O-8, `approaches/patterns/transactions.md`):
-когда сценарий делает **больше одного модифицирующего запроса** (в разные таблицы или отдельными
-запросами в одну), они — внутри одного `run()`; один модифицирующий запрос — без своей транзакции,
-кроме транзакции ради блокировки `FOR UPDATE`/`FOR SHARE` — основание «Конкурентность» `design.md`.
-Проверки перед записью в `run()` не переносятся — гонку закрывает `approaches/patterns/concurrency.md`.
+Когда нужна и когда нет — `approaches/patterns/transactions.md` (O-8); здесь — механика `run()`.
 Сервисы доменов внутри `run()` попадают в ту же транзакцию (транзакция на соединении, вложенные — savepoint).
 
 Типичные места:
@@ -67,12 +63,12 @@ use MPS\Core\Components\Database\Transaction\NoopTransactionManager;
 ```php
 use MPS\Core\Components\Database\Transaction\TransactionManagerInterface;
 
-final readonly class CreateAgreementCommand
+final class CreateAgreementCommand
 {
     public function __construct(
-        private TransactionManagerInterface $transactionManager,
-        private AgreementServiceInterface $agreementService,
-        private AgreementPeriodServiceInterface $agreementPeriodService,
+        private readonly TransactionManagerInterface $transactionManager,
+        private readonly AgreementServiceInterface $agreementService,
+        private readonly AgreementPeriodServiceInterface $agreementPeriodService,
     ) {
     }
 
@@ -93,15 +89,21 @@ final readonly class CreateAgreementCommand
 class AgreementTransactionService extends Service implements AgreementTransactionServiceInterface
 {
     public function __construct(
-        private TransactionManagerInterface $transactionManager,
-        protected AgreementTransactionRepositoryInterface $repository,
-        protected AgreementPeriodServiceInterface $periodService,
+        private readonly TransactionManagerInterface $transactionManager,
+        private readonly AgreementTransactionRepositoryInterface $repository,
+        private readonly AgreementPeriodServiceInterface $periodService,
     ) {
     }
 
     public function create(AgreementTransactionDto $dto): AgreementTransaction
     {
-        return $this->transactionManager->run(fn () => $this->createTransaction($dto));
+        // записи — на месте внутри замыкания, не в отдельном методе (../checklist.md п. 48)
+        return $this->transactionManager->run(function () use ($dto): AgreementTransaction {
+            $transaction = $this->repository->createFromDto($dto);
+            $this->periodService->createForTransaction($transaction->id, $dto->getPeriods());
+
+            return $transaction;
+        });
     }
 }
 ```
@@ -130,8 +132,7 @@ DB::transaction(function () use ($closure) {
 
 ## Где НЕ нужна транзакция
 
-- Один модифицирующий запрос — в workflow, Service, Command (одиночный `create` / `update` / `delete` через `CRUDService` ядро и так оборачивает); кроме транзакции ради блокировки `FOR UPDATE`/`FOR SHARE` — основание «Конкурентность» `design.md`
-- Операции только на чтение (`search`, `find`, `get`)
+- Один модифицирующий запрос и только чтение (`search`, `find`, `get`) — `approaches/patterns/transactions.md`, «Не нужна»
 - Очередь сообщений: транзакция не защищает от дублей в RabbitMQ
 
 ---

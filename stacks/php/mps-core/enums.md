@@ -11,7 +11,7 @@ Enum-ы живут в `Domains/{Domain}/Modules/{Module}/Enums/`.
 ## StatusEnum
 
 ```php
-namespace App\Domains\YourDomain\Modules\YourModule\Enums;
+namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Enums;
 
 use MPS\Core\Enums\Enumerable;
 use MPS\Core\Enums\EnumerableTrait;
@@ -38,7 +38,7 @@ enum YourStatusEnum: int implements Enumerable
 Атрибутом (`../conventions.md` п. 18), не docblock-аннотацией:
 
 ```php
-#[OA\Schema(schema: 'YourStatusEnum', type: 'integer', enum: [1, 2])]
+#[OA\Schema(schema: 'YourStatusEnum', type: 'integer', enum: [YourStatusEnum::ACTIVE->value, YourStatusEnum::INACTIVE->value])]
 enum YourStatusEnum: int implements Enumerable
 ```
 

@@ -15,10 +15,14 @@ parking_app/                                   ← корень подпроек
 ├── Core/                                      ← общее для подпроекта, не бизнес-логика
 │   ├── Database/Managers/                     ← TransactionManagerInterface, NoopTransactionManager — только при mps/core < 1.10; с 1.10 — из ядра, своих нет (`mps-core/transactions.md`)
 │   ├── Database/Query/Page.php                ← страница списка для paginate…(FilterDto, Page): `make(int, int)`, `fromRequest()`, `getNumber()`, `getPerPage()` (форма (2) списка P-19; P-22 — **тестовый вариант** API `Page`; эталон — `examples/parking_app/Core/Database/Query/Page.php`)
-│   ├── Database/Query/PaginatedQueryHelper.php ← форма (1) списка (P-19, `conventions.md` п. 2a) — `search()` ядра; эталон — `examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`
+│   ├── Database/Query/PaginatedQueryHelper.php ← форма (1) списка (P-19, `conventions.md` п. 2c) — `search()` ядра; эталон — `examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`
+│   ├── Database/Query/SearchRepositoryInterface.php ← CRUD ядра + `search(…, ?int $page)` + `allByIds()` — контракт репозитория для `PaginatedQueryHelper` (у интерфейса ядра `page` нет)
+│   ├── Providers/ServiceProvider.php          ← базовый провайдер подпроекта над классом ядра: от него — провайдеры доменов (подхватывает `definitions.php`)
 │   ├── Requests/Request.php                   ← базовый FormRequest, от него и IndexRequest; `Requests/SearchRequest.php` — форма (1) списка (P-19), эталон — `examples/parking_app/Core/Requests/SearchRequest.php`
 │   ├── Resources/                             ← `PaginatedResource` — форма пагинации (items/pagination), от неё наследуется {E}PaginatedResponse (форма (2), P-22); `PaginateResource` — форма (1) (P-19), эталон — `examples/parking_app/Core/Resources/PaginateResource.php`
 │   ├── Http/Middleware/
+│   ├── Http/RequestHelper.php                 ← чтение контекста, положенного middleware в атрибуты запроса (`getParkingIds()`; нет атрибута — `InvalidConfigurationAppException`)
+│   ├── Http/Signature/                        ← value-объекты подписи запроса (`SignedMessage`, `SignedRequest`, `RequestSignature`) и порт хранилища nonce `SignatureNonceRepositoryInterface`
 │   ├── Rules/                                 ← свои правила валидации — только когда нет в ядре (RegexRule + RegexEnum::MOBILE_PHONE, mps-core/capabilities.md)
 │   └── Enums/, Helpers/, OpenApi/
 │
@@ -46,6 +50,7 @@ parking_app/                                   ← корень подпроек
 │   └── {Module}/Http/
 │       ├── Controllers/{Entity}Controller.php
 │       ├── Requests/{Entity}/{Create,Update,Index}Request.php
+│       ├── Requests/{Entity}/{View,{Action}}Request.php   ← действие над записью по id пути (`ViewRequest`, `SetDefaultRequest`): `id` пути проверяется в `rules()` (`conventions.md` п. 20)
 │       └── Responses/{Entity}Response.php, {Entity}PaginatedResponse.php
 ├── Entrypoints/Queue/{Domain}/{Module}/{Event}Handler.php   ← обработчики RabbitMQ (контекст Queue, mps-core/jobs.md)
 ├── Entrypoints/Console/{Domain}/{ServiceProvider,commands}.php, {Module}/{Action}ConsoleCommand.php   ← консоль (mps-core/cli.md)
@@ -57,18 +62,33 @@ parking_app/                                   ← корень подпроек
     │   ├── Providers/database/migrations/                     ← миграции домена
     │   └── {Module}/Models/{Entity}.php, Repositories/{Entity}Repository.php
     ├── Postgres/Common/Providers/definitions.php              ← TransactionManagerInterface → DatabaseTransactionManager (mock: Noop) — только при mps/core < 1.10; с 1.10 биндинг регистрирует ядро
+    ├── Postgres/Database/Managers/DatabaseTransactionManager.php ← реализация `TransactionManagerInterface` над `DB::transaction` — только при mps/core < 1.10 (`mps-core/transactions.md`)
     ├── Redis/, Cache/{Domain}/{Module}/                       ← кэш-репозитории
     ├── Http/{Provider}/Providers/ServiceProvider.php, definitions.php ← интерфейс порта → адаптер (+ mock) всех продуктов провайдера
     ├── Http/{Provider}/{Product}/                             ← адаптер внешней системы, по её имени (решение G-2): {Provider}{Product}Repository.php или …Notifier.php — по роли порта (architecture/integrations.md), Mocks/
+    ├── Http/{Provider}/DTO/                                   ← DTO интеграции (запрос и ответ внешней системы по её контракту, `conventions.md` п. 11b); домену — не отдаются
     ├── Http/{Service}/{Module}/                               ← наш другой микросервис
+    ├── Cache/Common/, Postgres/Common/                         ← общее для адаптеров одного типа инфраструктуры (схема, nonce подписи и т.п.); не путать со слоем `Common/` подпроекта — бизнес-словаря здесь нет
     └── RabbitMQ/{Domain}/{Module}/Publishers/{E}Publisher.php, Mocks/; провайдер — `RabbitMQ/{Domain}/Providers/`   ← публикатор в брокер (порт `…PublisherInterface` домена в `Repositories/`); эталон — `examples/parking_app/Infrastructure/RabbitMQ/Billing/OutboxTariffEvents/Publishers/`
+
+config/database.php                            ← у приложения, не в подпроекте: `statement_timeout` подключения `pgsql` (`server_options`, `DB_STATEMENT_TIMEOUT_MS`, `approaches/patterns/performance.md`); эталон — `examples/config/database.php`
 ```
+
+**Биндинги DI — только в `definitions.php` (полный перечень мест; `conventions.md` п. 7, `mps-core/rules.md` и памятка ссылаются сюда):**
+- `Domains/{D}/definitions.php` — сервисы домена (`Interface → класс`); Command/Query — интерфейс и биндинг только если их подменяют в тестах (`conventions.md` п. 5);
+- `Infrastructure/Postgres/{D}/Providers/definitions.php` — репозитории домена (`RepositoryInterface → Repository`);
+- `Infrastructure/{Cache,RabbitMQ}/{D}/Providers/definitions.php` — кэш-репозитории и публикаторы домена; `Infrastructure/{Postgres,Cache}/Common/Providers/definitions.php` — общие для доменов (как в эталоне);
+- `Infrastructure/Http/{Provider}/Providers/definitions.php` — интерфейс порта → адаптер внешней системы (+ `mock`), ниже;
+- `Core/definitions.php` — **только** технические библиотеки подпроекта без бизнес-логики (`Core/{Lib}/…`, ниже, «`Core/`»; AINA-2744); биндинг интерфейса домена, workflow или инфраструктуры здесь — `di-outside-definitions`;
+- `config/definitions.php` приложения — только глобальные биндинги приложения; биндинги домена туда не добавляются.
+
+Новый домен — свои `definitions.php` в `Domains/{D}/` и `Infrastructure/{Type}/{D}/Providers/`. Биндинг в другом месте (в т. ч. `$this->app->bind()` в провайдере, кроме исключения `conventions.md` п. 7) — нарушение п. 7.
 
 **Провайдер `Infrastructure/Http/{Provider}`** — `Providers/ServiceProvider.php` (extends `MPS\Core\Modules\ModuleServiceProvider`, подхватывает `definitions.php` рядом) и `Providers/definitions.php` (`abstract` — интерфейс порта домена/workflow, `concrete` — адаптер, `mock` — `{Product}/Mocks/…Mock`); один провайдер на внешнюю систему, как `Postgres/{Domain}/Providers/`. Эталон — `examples/parking_app/Infrastructure/Http/CityParking/Providers/`.
 
 **Контроллер** наследует базовый контроллер приложения Laravel (`App\Http\Controllers\Controller`, как в эталоне `examples/parking_app/Entrypoints/Admin/Billing/Tariffs/Http/Controllers/TariffController.php`); свой базовый контроллер в `Core/` не заводится, пока нет общей логики контроллеров подпроекта.
 
-**Infrastructure — всегда с типом** (решение P-10): `Infrastructure/{Postgres,Redis,Http,RabbitMQ,…}/…`. `Infrastructure/{Domain}/` без типа (`Infrastructure/Acms`, `Infrastructure/User/Models`) в новом коде — **[ВНИМАНИЕ]**.
+**Infrastructure — всегда с типом** (решение P-10): `Infrastructure/{Postgres,Redis,Http,RabbitMQ,…}/…`. `Infrastructure/{Domain}/` без типа (`Infrastructure/Acms`, `Infrastructure/User/Models`) в новом коде — `file-wrong-location` (уровень — `approaches/process/review-tags.md`; существующий — унаследованное, `approaches/process/review.md` п. 3a).
 
 **`Core/` — только техническое общее подпроекта** (решение P-11): транзакции, пагинация, базовые Request/Resource, middleware, правила валидации. Общей бизнес-логики «для всех доменов» нет: нужна двум доменам — workflow или свой домен. `Domains/Shared/` в новом коде не заводится. Бизнес-понятия, нужные двум и более доменам (enum, value-объекты, чистые функции над ними), — не в `Core/`, а в `Common/` (`architecture/layers.md`, «Общий бизнес-словарь»). Техническая библиотека подпроекта без бизнес-логики (над расширением PHP или ФС: архивы, файлы) — `Core/{Lib}/{Services,Drivers,DTO,Enums,Exceptions}`, интерфейсы рядом с реализацией, регистрация — `Core/definitions.php` (AINA-2744).
 
@@ -115,7 +135,7 @@ parking_app/                                   ← корень подпроек
 - [ ] биндинг репозитория в `Infrastructure/Postgres/{D}/Providers/definitions.php`
 - [ ] миграция в `Infrastructure/Postgres/{D}/Providers/database/migrations/`
 - [ ] `Entrypoints/{Ctx}/{D}/{M}/Http/Controllers/{E}Controller.php` с OpenAPI-атрибутами
-- [ ] `Entrypoints/{Ctx}/{D}/{M}/Http/Requests/{E}/{Create,Update,Index}Request.php`
+- [ ] `Entrypoints/{Ctx}/{D}/{M}/Http/Requests/{E}/{Create,Update,Index}Request.php`; действие по id пути — `{View,{Action}}Request.php`
 - [ ] `Entrypoints/{Ctx}/{D}/{M}/Http/Responses/{E}Response.php` (+ `{E}PaginatedResponse.php` для списка)
 - [ ] маршруты в `Entrypoints/{Ctx}/{D}/routes.php`
 - [ ] новый домен/контекст — провайдер добавлен в корневой `ServiceProvider.php` подпроекта
@@ -163,4 +183,4 @@ parking_app/                                   ← корень подпроек
 
 Большие тестовые данные (бомба, файл на десятки МБ) — разреженный файл (`ftruncate`) или поток, не строка в памяти: `str_repeat` на 50 МБ вместе с Laravel превышает `memory_limit` 128M и роняет весь набор (AINA-2744).
 
-Тест внутри подпроекта (`{подпроект}/…/Tests/`) в новом коде — **[ВНИМАНИЕ]**. Почему: тест рядом с кодом выпадает из наборов `phpunit.xml` — известный случай, набор указывал на несуществующий путь `Domains/Billing/src/`, и тест не запускался.
+Тест внутри подпроекта (`{подпроект}/…/Tests/`) в новом коде — `file-wrong-location`. Почему: тест рядом с кодом выпадает из наборов `phpunit.xml` — известный случай, набор указывал на несуществующий путь `Domains/Billing/src/`, и тест не запускался.

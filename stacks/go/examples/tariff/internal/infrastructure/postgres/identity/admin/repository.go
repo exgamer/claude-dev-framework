@@ -11,8 +11,6 @@ import (
 	admindomain "example.com/parking-service/internal/domains/identity/admin"
 )
 
-const queryTimeout = 10 * time.Second
-
 // buildingPermissionPrefix Право на здание — building.<key>; парковка здания — buildings.parking_id
 const buildingPermissionPrefix = "building."
 
@@ -30,7 +28,7 @@ type PostgresRepository struct {
 }
 
 func (r *PostgresRepository) GetByID(ctx context.Context, id uint) (*admindomain.Admin, error) {
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	var model admin
@@ -50,7 +48,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id uint) (*admindomain
 }
 
 func (r *PostgresRepository) GetPermissionNames(ctx context.Context, adminID uint) ([]string, error) {
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	var names []string
@@ -69,7 +67,7 @@ func (r *PostgresRepository) GetPermissionNames(ctx context.Context, adminID uin
 }
 
 func (r *PostgresRepository) GetAllowedParkingIDs(ctx context.Context, adminID uint) ([]uint, error) {
-	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	permissionNames := r.client.WithContext(ctx).

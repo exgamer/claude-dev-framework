@@ -4,28 +4,45 @@
 
 ## Структура файла
 
+Образец — миграция эталона `../examples/parking_app/Infrastructure/Postgres/Billing/Providers/database/migrations/2026_10_07_100001_create_tariffs_table.php` (колонки `currency`, `price`, `is_default`, `grace_minutes` опущены):
+
 ```php
 <?php
 
+declare(strict_types=1);
+
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class () extends Migration {
-    private string $tableName = 'your_table';
+    private string $tableName = 'parking.tariffs';
 
     public function up(): void
     {
         Schema::create($this->tableName, function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->string('name');
-            $table->smallInteger('status')->default(1);
+            $table->unsignedBigInteger('parking_id')->comment('ID парковки');
+            $table->string('name')->comment('Название тарифа');
+            $table->string('status', 20)
+                ->default(TariffStatusEnum::ACTIVE->value)
+                ->comment('Статус: ' . TariffStatusEnum::ACTIVE->value . ', ' . TariffStatusEnum::ARCHIVED->value);
             $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'));
             $table->timestamp('updated_at')->nullable();
+            $table->softDeletes();
+
+            $table->index('parking_id');
+
+            $table->foreign('parking_id')
+                ->references('id')
+                ->on('parking.parkings')
+                ->onUpdate('restrict')
+                ->onDelete('restrict');
         });
 
-        DB::statement("CREATE TRIGGER on_update_current_timestamp BEFORE UPDATE ON {$this->tableName} FOR EACH ROW EXECUTE PROCEDURE on_update_current_timestamp()");
+        DB::statement("CREATE TRIGGER on_update_current_timestamp BEFORE UPDATE ON {$this->tableName} FOR EACH ROW EXECUTE PROCEDURE parking.on_update_current_timestamp()");
     }
 
     public function down(): void
@@ -36,11 +53,14 @@ return new class () extends Migration {
 ```
 
 **Обязательные правила:**
+- `declare(strict_types=1);` — как в любом PHP-файле (`../checklist.md` п. 33)
 - Анонимный класс: `return new class () extends Migration`
-- `private string $tableName` — всегда, имя таблицы через свойство
-- Триггер `on_update_current_timestamp` — для каждой таблицы с `updated_at`
+- `private string $tableName` — всегда, имя таблицы через свойство, **со схемой подпроекта** (`parking.tariffs`; `approaches/patterns/migrations.md`)
+- Триггер `on_update_current_timestamp` — для каждой таблицы с `updated_at`; функция — из схемы подпроекта (`parking.on_update_current_timestamp()`, создаётся миграцией `Infrastructure/Postgres/Common/Providers/database/migrations/`): подпроект не зависит от функции в `public`
 - `created_at` — `default(DB::raw('CURRENT_TIMESTAMP'))`, не `$table->timestamps()`
 - `updated_at` — `nullable()`, обновляется триггером
+- Внешние ключи — явно (раздел ниже); `comment()` у колонок данных — как в эталоне
+- Удаление индекса — `DB::statement('DROP INDEX parking.<имя>')`, не `$table->dropIndex()`: Laravel на Postgres пишет `drop index "<имя>"` без схемы, и вне `search_path` миграция падает; имя индекса по колонкам — `<схема>_<таблица>_<колонки>_index` (эталон — `2026_10_20_100400_replace_parking_id_index_on_tariffs_table.php`)
 
 ---
 
@@ -67,8 +87,8 @@ YYYY_MM_DD_HHMMSS_{описание}.php
 $table->foreign('product_offer_id')
     ->references('id')
     ->on('product_offers')
-    ->onUpdate('RESTRICT')
-    ->onDelete('RESTRICT');
+    ->onUpdate('restrict')
+    ->onDelete('restrict');
 ```
 
 По умолчанию `RESTRICT` для обоих событий — явно указывать всегда.
@@ -95,12 +115,13 @@ public function down(): void
 ```
 
 ```php
-// 2. ..._fill_payment_system_in_orders_table.php — данные
+// 2. ..._fill_payment_system_in_orders_table.php — данные: разовая правка — сырой SQL одним UPDATE, значения — из enum
 public function up(): void
 {
-    /** @var OrderRepositoryInterface $repository */
-    $repository = app(OrderRepositoryInterface::class);
-    $repository->fillPaymentSystem(PaymentMethodEnum::CARD, PaymentSystemEnum::EPAY);
+    DB::update(
+        "UPDATE {$this->tableName} SET payment_system = ? WHERE payment_method = ? AND payment_system IS NULL",
+        [PaymentSystemEnum::EPAY->value, PaymentMethodEnum::CARD->value],
+    );
 }
 
 public function down(): void
@@ -126,4 +147,4 @@ public function down(): void
 }
 ```
 
-Data-миграция пишет через типизированный метод репозитория или сервиса (`fillPaymentSystem(PaymentMethodEnum, PaymentSystemEnum)` — один `UPDATE … WHERE`, P-20), не массивом в `update()` ядра (`../conventions.md` п. 11a) и не через `getRepository()` у сервиса. Зависимость — `app(Interface::class)`: у миграции нет конструктора (`../conventions.md` п. 6). **Исключение — сырой SQL прямо в миграции:** перенос данных между схемами/таблицами, которых не знает ни один доменный репозиторий (`public` → схема подпроекта), и массовая правка одним `UPDATE … WHERE`/`INSERT … SELECT` без бизнес-решений; значения enum проверяются до переноса, откат — только перенесённое (эталон — `stacks/php/examples/parking_app/Infrastructure/Postgres/Billing/Providers/database/migrations/2026_10_20_100001_copy_tariffs_from_public.php`). Новый метод репозитория ради разовой миграции не заводится.
+Data-миграция: **разовая правка без бизнес-решений** (заполнить колонку, массовый `UPDATE … WHERE`/`INSERT … SELECT`, перенос между схемами/таблицами, которых не знает ни один доменный репозиторий, — `public` → схема подпроекта) — **сырой SQL прямо в миграции**, плейсхолдеры `?`, значения — из enum; значения enum проверяются до переноса, откат — только перенесённое (эталон — `stacks/php/examples/parking_app/Infrastructure/Postgres/Billing/Providers/database/migrations/2026_10_20_100001_copy_tariffs_from_public.php`). Новый метод репозитория ради разовой миграции не заводится. Метод репозитория или сервиса — только когда он **уже есть** или нужен домену и вне миграции (типизированный, один `UPDATE … WHERE`, P-20); не массивом в `update()` ядра (`../conventions.md` п. 11a) и не через `getRepository()` у сервиса; зависимость — `app(Interface::class)`: у миграции нет конструктора (`../conventions.md` п. 6).

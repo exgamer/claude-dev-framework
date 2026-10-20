@@ -11,9 +11,9 @@ const (
 	vectorSecret    = "vector-secret"
 	vectorTimestamp = int64(1788150000)
 	vectorNonce     = "11111111-2222-3333-4444-555555555555"
-	vectorPath      = "/api/v1/integration/tariffs/42"
+	vectorPath      = "/api/integration/v1/billing/tariffs/42"
 	vectorBody      = `{"a":1}`
-	vectorHex       = "aef0607db22c169c20df74d33bf170e8ff20b1cdc9238e35391e1a3dfcf9925e"
+	vectorHex       = "dd308087b520b5821cf5f1269857c8f9746f5d18463bb2c856d8244ac3bbc512"
 )
 
 func vectorRequest(method string) Request {
@@ -67,7 +67,7 @@ func TestVerifyRejects(t *testing.T) {
 		want                       error
 	}{
 		"other secret": {"other", "POST", vectorPath, vectorBody, inWindow, ErrMismatch},
-		"other path":   {vectorSecret, "POST", "/api/v1/integration/tariffs/43", vectorBody, inWindow, ErrMismatch},
+		"other path":   {vectorSecret, "POST", "/api/integration/v1/billing/tariffs/43", vectorBody, inWindow, ErrMismatch},
 		"other method": {vectorSecret, "GET", vectorPath, vectorBody, inWindow, ErrMismatch},
 		"other body":   {vectorSecret, "POST", vectorPath, `{"a":2}`, inWindow, ErrMismatch},
 		"too old":      {vectorSecret, "POST", vectorPath, vectorBody, inWindow.Add(2 * time.Minute), ErrExpired},

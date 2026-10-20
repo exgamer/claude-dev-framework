@@ -30,15 +30,19 @@
 
 ## entity.go
 
+Деньги — целым числом в минимальных единицах валюты (`regulations/entity.md`, «Value Object»), не `float64`; статус — свой тип из `{name}_enum.go`. Эталон — `../examples/tariff/internal/domains/billing/tariff/entity.go`.
+
 ```go
 package product
 
+// Product Товар каталога
 type Product struct {
-    ID         uint
-    Name       string
-    Price      float64
-    CategoryID uint
-    Status     int
+	ID   uint
+	Name string
+	// Price Цена в минимальных единицах валюты (тиын для KZT)
+	Price      uint
+	CategoryID uint
+	Status     Status
 }
 ```
 
@@ -47,12 +51,13 @@ type Product struct {
 ```go
 package product
 
+// Search Фильтр списка: Page 0 → 1, PerPage 0 → 30 (умолчание хелпера пагинации SDK)
 type Search struct {
-    ID         uint
-    Name       string
-    CategoryID uint
-    Page       uint
-    PerPage    uint
+	ID         uint
+	Name       string
+	CategoryID uint
+	Page       uint
+	PerPage    uint
 }
 ```
 
@@ -64,22 +69,23 @@ type Search struct {
 package product
 
 import (
-    "context"
-    "github.com/exgamer/gosdk-db-core/pkg/query/pagination"
+	"context"
+
+	"git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/pagination"
 )
 
 type Repository interface {
-    Paginated(ctx context.Context, s *Search) (*pagination.Paginated[Product], error)
-    GetByID(ctx context.Context, id uint) (*Product, error)
-    Create(ctx context.Context, m *Product) (*Product, error)
-    Update(ctx context.Context, m *Product) error
-    Delete(ctx context.Context, id uint) error
+	Paginated(ctx context.Context, s *Search) (*pagination.Paginated[Product], error)
+	GetByID(ctx context.Context, id uint) (*Product, error)
+	Create(ctx context.Context, m *Product) (*Product, error)
+	Update(ctx context.Context, m *Product) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type CacheRepository interface {
-    Set(ctx context.Context, m *Product) error
-    GetByID(ctx context.Context, id uint) (*Product, error)
-    Invalidate(ctx context.Context, id uint) error
+	Set(ctx context.Context, m *Product) error
+	GetByID(ctx context.Context, id uint) (*Product, error)
+	Invalidate(ctx context.Context, ids ...uint) error
 }
 ```
 
@@ -93,35 +99,39 @@ type CacheRepository interface {
 package product
 
 import (
-    "context"
-    "github.com/exgamer/gosdk-db-core/pkg/query/pagination"
+	"context"
+
+	"git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/pagination"
 )
 
-type Service struct {
-    repository Repository
+func NewService(repository Repository) *Service {
+	return &Service{
+		repository: repository,
+	}
 }
 
-func NewService(repository Repository) *Service {
-    return &Service{repository: repository}
+type Service struct {
+	repository Repository
 }
 
 func (s *Service) GetByID(ctx context.Context, id uint) (*Product, error) {
-    return s.repository.GetByID(ctx, id)
+	return s.repository.GetByID(ctx, id)
 }
 
 func (s *Service) Paginated(ctx context.Context, search *Search) (*pagination.Paginated[Product], error) {
-    return s.repository.Paginated(ctx, search)
+	return s.repository.Paginated(ctx, search)
 }
 
 func (s *Service) Create(ctx context.Context, m *Product) (*Product, error) {
-    return s.repository.Create(ctx, m)
+	return s.repository.Create(ctx, m)
 }
 
 func (s *Service) Update(ctx context.Context, m *Product) (*Product, error) {
-    if err := s.repository.Update(ctx, m); err != nil {
-        return nil, err
-    }
-    return m, nil
+	if err := s.repository.Update(ctx, m); err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 ```
 
@@ -129,13 +139,18 @@ func (s *Service) Update(ctx context.Context, m *Product) (*Product, error) {
 
 Константы, которые используются в нескольких местах (хендлер, сервис, репозиторий, тесты), выносятся в отдельный файл `{name}_enum.go`:
 
+Значения — свой тип, не голый `int` (эталон — `../examples/tariff/internal/domains/billing/outbox_tariff_event/status_enum.go`):
+
 ```go
 package product
 
+// Status Статус товара
+type Status uint
+
 const (
-    StatusActive   = 1
-    StatusInactive = 2
-    StatusDeleted  = 3
+	StatusActive Status = iota + 1
+	StatusInactive
+	StatusDeleted
 )
 ```
 
@@ -156,16 +171,16 @@ const (
 ```go
 // recalculate_debt_command.go
 type RecalculateDebtCommand struct {
-    repository      Repository
-    cacheRepository CacheRepository
+	repository      Repository
+	cacheRepository CacheRepository
 }
 
 func NewRecalculateDebtCommand(repository Repository, cacheRepository CacheRepository) *RecalculateDebtCommand {
-    return &RecalculateDebtCommand{repository: repository, cacheRepository: cacheRepository}
+	return &RecalculateDebtCommand{repository: repository, cacheRepository: cacheRepository}
 }
 
 func (c *RecalculateDebtCommand) Exec(ctx context.Context, dto RecalculateDebtDTO) (*Tariff, error) {
-    // бизнес-логика
+	// бизнес-логика
 }
 ```
 
@@ -174,22 +189,22 @@ func (c *RecalculateDebtCommand) Exec(ctx context.Context, dto RecalculateDebtDT
 ```go
 // get_active_session_query.go
 type GetActiveSessionQuery struct {
-    repository      Repository
-    cacheRepository CacheRepository
+	repository      Repository
+	cacheRepository CacheRepository
 }
 
 func NewGetActiveSessionQuery(repository Repository, cacheRepository CacheRepository) *GetActiveSessionQuery {
-    return &GetActiveSessionQuery{repository: repository, cacheRepository: cacheRepository}
+	return &GetActiveSessionQuery{repository: repository, cacheRepository: cacheRepository}
 }
 
 func (q *GetActiveSessionQuery) Exec(ctx context.Context, dto GetActiveSessionDTO) (*Session, error) {
-    // логика с кешированием, фолбеком и тп
+	// логика с кешированием, фолбеком и тп
 }
 ```
 
 Разница с workflow: Command/Query живут внутри одного домена, workflow оркестрирует несколько доменов.
 
-Command/Query берёт только репозитории **своего** домена; репозиторий или сервис чужого домена в конструкторе — **[ОШИБКА]**, сценарий переносится в workflow (он — агрегат и берёт чужие репозитории напрямую, O-7).
+Command/Query берёт только репозитории **своего** домена; репозиторий или сервис чужого домена в конструкторе — тег `domain-cross-domain-access`, сценарий переносится в workflow (он — агрегат и берёт чужие репозитории напрямую, O-7).
 
 Нужны несколько модулей своего домена — Command/Query лежит в модуле-владельце результата, остальные модули получает через интерфейсы, объявленные в этом модуле (решение O-6).
 
@@ -197,19 +212,19 @@ Command/Query берёт только репозитории **своего** д
 
 ## Cross-domain зависимость
 
-Сервис, Command/Query домена чужой домен не берёт — ни репозиторий, ни сервис, ни интерфейс на чужой сервис (O-7, **[ОШИБКА]**). Нужны данные или проверка по другому домену — workflow: берёт интерфейсы репозиториев/сервисов доменов напрямую (`parkingdomain.Repository`) и передаёт данные домену параметрами; свой интерфейс объявляет только для того, чего у доменов нет (`CreateTariffTxManager`). Эталон — `examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go`:
+Сервис, Command/Query домена чужой домен не берёт — ни репозиторий, ни сервис, ни интерфейс на чужой сервис (O-7, тег `domain-cross-domain-access`). Нужны данные или проверка по другому домену — workflow: берёт интерфейсы репозиториев/сервисов доменов напрямую (`parkingdomain.Repository`) и передаёт данные домену параметрами; свой интерфейс объявляет только для того, чего у доменов нет (`CreateTariffTxManager`). Эталон — `examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go`:
 
 ```go
 // плохо: сервис домена order с интерфейсом на чужой сервис
 type Service struct {
-    repository  Repository
-    cityService CityServiceInterface
+	repository  Repository
+	cityService CityServiceInterface
 }
 
 // хорошо: internal/workflows/order/order/create_order_workflow.go
 type CreateOrderWorkflow struct {
-    cityRepository  citydomain.Repository
-    orderRepository orderdomain.Repository
+	cityRepository  citydomain.Repository
+	orderRepository orderdomain.Repository
 }
 ```
 

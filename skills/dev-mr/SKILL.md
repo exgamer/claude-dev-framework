@@ -24,7 +24,7 @@ trigger: /dev-mr
 
 ## Шаг 2 — Правила стека
 
-Для сверки замечаний с правилами: `{DF}/stacks/<stack>/checklist.md` всегда; `security.md`, `review-findings.md`, PHP — `review-tags.md`; остальное (`conventions.md`, `style.md`, `mps-core/*` / `go-sdk/*`, `{DF}/approaches/patterns/*`) — grep по теме замечания, не целиком. Для правок — как разработчик стека: `{DF}/skills/dev-<stack>/SKILL.md`, Шаги 1, 3–5.
+Для сверки замечаний с правилами: `{DF}/stacks/<stack>/checklist.md` всегда; каталоги тегов (`{DF}/approaches/process/review-tags.md`, `{DF}/stacks/<stack>/review-tags.md`) и каталог тегов безопасности (`{DF}/approaches/process/security.md`, «Каталог тегов безопасности»); `security.md`, `review-findings.md` стека; остальное (`conventions.md`, `style.md`, `mps-core/*` / `go-sdk/*`, `{DF}/approaches/patterns/*`) — grep по теме замечания, не целиком. Для правок — как разработчик стека: `{DF}/skills/dev-<stack>/SKILL.md`, Шаги «Правила», «Что уже есть в SDK» / «Что уже есть в ядре», «Образец», «Код».
 
 ## Остановки
 

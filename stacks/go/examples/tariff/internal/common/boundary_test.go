@@ -17,7 +17,7 @@ import (
 // commonImportPath Пакеты самого Common — единственный разрешённый импорт не из стандартной библиотеки
 const commonImportPath = "example.com/parking-service/internal/common"
 
-// ioImports Стандартная библиотека с вводом-выводом и контекстом запроса: в словаре не нужна (`common-with-logic`)
+// ioImports Стандартная библиотека с вводом-выводом и контекстом запроса: в словаре не нужна
 var ioImports = []string{`context`, `database/sql`, `net/http`, `os`}
 
 // TestCommon_ImportsOnlyStdlibAndCommon Граница Common: код словаря импортирует только стандартную библиотеку без I/O и сам Common.
@@ -30,7 +30,7 @@ func TestCommon_ImportsOnlyStdlibAndCommon(t *testing.T) {
 	assert.Empty(t, violations)
 }
 
-// TestCommon_BoundaryCatchesForbiddenImport Сама проверка ловит импорт домена, фреймворка и I/O; образец — в testdata, чтобы grep проверки 0b не принял его за код Common
+// TestCommon_BoundaryCatchesForbiddenImport Проверка ловит импорт домена, фреймворка и I/O; образец лежит в testdata, вне кода Common
 func TestCommon_BoundaryCatchesForbiddenImport(t *testing.T) {
 	source, err := os.ReadFile(filepath.Join("testdata", "forbidden_imports.go.txt"))
 	require.NoError(t, err)

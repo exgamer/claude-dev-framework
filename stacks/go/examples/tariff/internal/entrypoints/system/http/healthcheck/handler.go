@@ -2,16 +2,21 @@ package healthcheck
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/logger"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 // probeTimeout Предел одной проверки зависимости: зависшая БД не держит пробу дольше
 const probeTimeout = 2 * time.Second
+
+// errNotReady Ответ пробы без причины: адреса и тексты драйверов наружу не отдаются
+var errNotReady = errors.New("сервис не готов принимать трафик")
 
 // Dependency Обязательная зависимость для readiness: недоступна — сервис не принимает трафик
 type Dependency struct {
@@ -50,8 +55,9 @@ func (h *Handler) Ready() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		for _, dependency := range h.dependencies {
 			if err := probe(c.Request.Context(), dependency); err != nil {
-				// Проба повторяется каждые несколько секунд — в Sentry не отправляем, сбой виден по 503 и в логах вызовов
-				response.ErrorResponseUntrackableSentry(c, http.StatusServiceUnavailable, err, nil)
+				// Проба повторяется каждые несколько секунд — причина в лог без errorreporter, иначе Sentry засыпает однотипными событиями
+				logger.Warning(c.Request.Context(), "readiness: "+err.Error())
+				response.ErrorResponseUntrackableSentry(c, http.StatusServiceUnavailable, errNotReady, nil)
 
 				return
 			}
@@ -66,7 +72,7 @@ func probe(ctx context.Context, dependency Dependency) error {
 	defer cancel()
 
 	if err := dependency.Probe(ctx); err != nil {
-		return fmt.Errorf("%s unavailable", dependency.Name)
+		return fmt.Errorf("%s unavailable: %w", dependency.Name, err)
 	}
 
 	return nil

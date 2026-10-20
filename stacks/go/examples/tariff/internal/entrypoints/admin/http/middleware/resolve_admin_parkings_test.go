@@ -26,6 +26,7 @@ var (
 type scopeRecorder struct {
 	scope  tariffdomain.ParkingScope
 	body   string
+	noBody bool
 	called bool
 }
 
@@ -37,6 +38,7 @@ func (s *scopeRecorder) handler(c *gin.Context) {
 		return
 	}
 
+	s.noBody = c.Request.Body == http.NoBody
 	body, _ := io.ReadAll(c.Request.Body)
 	s.scope, s.body, s.called = scope, string(body), true
 	c.Status(http.StatusOK)
@@ -71,6 +73,7 @@ func TestResolveAdminParkingsMiddleware_PutsScopeIntoContext(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, tariffdomain.ParkingScope{IDs: []uint{7}}, recorder.scope)
+	assert.True(t, recorder.noBody, "GET без тела: хендлер получает http.NoBody")
 }
 
 func TestResolveAdminParkingsMiddleware_SuperAdminIsUnrestricted(t *testing.T) {

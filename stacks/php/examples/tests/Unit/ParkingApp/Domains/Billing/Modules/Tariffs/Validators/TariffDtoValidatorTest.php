@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\ParkingApp\Domains\Billing\Modules\Tariffs\Validators;
 
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
-use Carbon\Carbon;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Validators\TariffDtoValidator;
+use Carbon\Carbon;
 use PHPUnit\Framework\TestCase;
 
 /**

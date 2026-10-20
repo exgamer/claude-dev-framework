@@ -7,7 +7,7 @@
 2. Инициализацию App через `app.NewApp()`
 3. Запуск через `appInstance.RunAll()` и `appInstance.WaitForShutdown()`
 
-Никакой бизнес-логики, никакой конфигурации — всё это в `internal/app/app.go`.
+Никакой бизнес-логики и конфигурации: сборка приложения — в `internal/app/app.go` (`app.md`), конфигурация — в `config.go` модулей-владельцев.
 
 ## Шаблон
 
@@ -15,9 +15,9 @@
 package main
 
 import (
-    "log"
+	"log"
 
-    "git.mpinnovations.kz/.../internal/app"
+	"git.mpinnovations.kz/.../internal/app"
 )
 
 // @title        Service Name (API)
@@ -26,16 +26,16 @@ import (
 // @host         0.0.0.0:8090
 // @BasePath     /
 func main() {
-    appInstance, err := app.NewApp()
-    if err != nil {
-        log.Fatal(err)
-    }
+	appInstance, err := app.NewApp()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    err = appInstance.RunAll()
-    if err != nil {
-        log.Fatal(err)
-    }
+	err = appInstance.RunAll()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    appInstance.WaitForShutdown()
+	appInstance.WaitForShutdown()
 }
 ```

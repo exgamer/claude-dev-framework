@@ -1,0 +1,23 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/phpstan/phpstan-mockery/extension.neon
+
+# Уровень — stacks/php/conventions.md п. 23
+parameters:
+    level: 5
+    paths:
+        - parking_app
+        - tests
+    tmpDir: .phpstan
+    ignoreErrors:
+        # mps-core: CRUDRepository::query() объявлен контрактом Query\Builder, на деле — Eloquent\Builder
+        - message: "#^Call to an undefined method Illuminate\\\\Contracts\\\\Database\\\\Query\\\\Builder::whereKey\\(\\)\\.$#"
+          path: parking_app/Infrastructure/Postgres
+        # mps-core: CRUDRepositoryInterface::oneById() возвращает базовый Model — атрибуты парковки (модель хоста) ему не известны
+        - message: "#^Access to an undefined property (Illuminate\\\\Database\\\\Eloquent\\\\Model|MPS\\\\Core\\\\Models\\\\Model@anonymous.+)::\\$name\\.$#"
+          paths:
+              - parking_app/Workflows
+              - tests/Unit/ParkingApp/Workflows
+        # mps-utils: HttpClient::request() без @throws ConnectionException, хотя пропускает его
+        - message: "#^Dead catch - Illuminate\\\\Http\\\\Client\\\\ConnectionException is never thrown in the try block\\.$#"
+          path: parking_app/Infrastructure/Http

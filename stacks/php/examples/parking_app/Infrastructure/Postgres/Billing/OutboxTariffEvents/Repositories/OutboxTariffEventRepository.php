@@ -14,7 +14,7 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Репозиторий outbox событий о тарифах
+ * Outbox событий о тарифах: строка pending, смена статуса доставки, захват зависших на повтор одним UPDATE с FOR UPDATE SKIP LOCKED.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

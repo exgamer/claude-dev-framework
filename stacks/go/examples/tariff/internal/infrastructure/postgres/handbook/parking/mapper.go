@@ -12,7 +12,6 @@ func modelToEntity(model *parking) *parkingdomain.Parking {
 
 	return &parkingdomain.Parking{
 		ID:       model.ID,
-		LPMHost:  model.LPMHost,
 		IsActive: model.IsActive,
 		Currency: common.Currency(model.Currency),
 	}

@@ -13,6 +13,7 @@ func SetRoutes(a *app.App, handler *Handler) error {
 		return err
 	}
 
+	// Вне схемы /api/<context>/<version>/...: проба оркестратора, не ресурс API — путь задаёт манифест деплоя
 	health := router.Group("/healthcheck")
 	{
 		health.Use(middleware.RequestInfoMiddleware(a))

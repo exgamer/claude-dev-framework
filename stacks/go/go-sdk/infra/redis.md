@@ -1,6 +1,6 @@
 # Redis
 
-Пакет: `github.com/exgamer/gosdk-redis-core/pkg/redis`
+Пакет: `git.mpinnovations.kz/mps/go-packages/gosdk-redis-core/pkg/redis` (как в `go.mod` эталона; GitHub — `github.com/exgamer/gosdk-redis-core/pkg/redis`)
 
 ## Схема ключей
 
@@ -33,32 +33,74 @@ value, err := helper.GetString("key")
 
 ## Пример репозитория
 
+Каждый вызов — со своим коротким таймаутом (`context.WithTimeout`, `../../checklist.md` п. 19; кеш не должен держать запрос дольше БД), ошибка — обёрнута с ID (п. 20). Эталон — `../../examples/tariff/internal/infrastructure/redis/billing/tariff/repository.go`.
+
 ```go
-const keyPrefix = "{service}:tariff:"
+const (
+	keyPrefix = "{service}:tariff:"
+	ttl       = 2 * time.Hour
+	timeout   = 2 * time.Second
+)
 
 func NewRedisRepository(client *redis.Client) *RedisRepository {
-    return &RedisRepository{client: client}
+	return &RedisRepository{
+		client: client,
+	}
 }
 
-type RedisRepository struct{ client *redis.Client }
-
-func (r *RedisRepository) Set(ctx context.Context, m *domain.Tariff) error {
-    return rediscore.NewHelper[domain.Tariff](ctx, r.client).
-        SetStruct(keyPrefix+strconv.FormatUint(uint64(m.ID), 10), *m, 2*time.Hour)
+type RedisRepository struct {
+	client *redis.Client
 }
 
 func (r *RedisRepository) GetByID(ctx context.Context, id uint) (*domain.Tariff, error) {
-    return rediscore.NewHelper[domain.Tariff](ctx, r.client).
-        GetStruct(keyPrefix + strconv.FormatUint(uint64(id), 10))
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	tariff, err := rediscore.NewHelper[domain.Tariff](ctx, r.client).GetStruct(key(id))
+	if err != nil {
+		return nil, fmt.Errorf("get tariff cache failed (tariff_id=%d): %w", id, err)
+	}
+
+	return tariff, nil
 }
 
-// Инвалидация нескольких ключей сразу
-func (r *RedisRepository) Invalidate(ctx context.Context, id uint) error {
-    idStr := strconv.FormatUint(uint64(id), 10)
-    return r.client.Unlink(
-        ctx,
-        "{service}:tariff:"+idStr,
-        "{service}:tariff-periods:"+idStr,
-    ).Err()
+func (r *RedisRepository) Set(ctx context.Context, tariff *domain.Tariff) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if err := rediscore.NewHelper[domain.Tariff](ctx, r.client).SetStruct(key(tariff.ID), *tariff, ttl); err != nil {
+		return fmt.Errorf("set tariff cache failed (tariff_id=%d): %w", tariff.ID, err)
+	}
+
+	return nil
+}
+
+// Invalidate Один UNLINK на все ключи всех записей, а не вызов на запись
+func (r *RedisRepository) Invalidate(ctx context.Context, ids ...uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(ids)*2)
+
+	for _, id := range ids {
+		idStr := strconv.FormatUint(uint64(id), 10)
+		keys = append(keys, keyPrefix+idStr, "{service}:tariff-periods:"+idStr)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if err := r.client.Unlink(ctx, keys...).Err(); err != nil {
+		return fmt.Errorf("invalidate tariff cache failed (tariff_ids=%v): %w", ids, err)
+	}
+
+	return nil
+}
+
+func key(id uint) string {
+	return keyPrefix + strconv.FormatUint(uint64(id), 10)
 }
 ```
+
+Таймауты Redis-репозиториев действуют только при `REDIS_CONTEXT_TIMEOUT_ENABLED=true` (`../../review-findings.md`).

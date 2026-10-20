@@ -47,11 +47,7 @@ class CommonBoundaryTest extends TestCase
         $violations = [];
 
         foreach ($this->commonFiles() as $file) {
-            foreach ($this->imports($file) as $import) {
-                if ($this->isForbiddenImport($import)) {
-                    $violations[] = $file->getPathname() . ': use ' . $import;
-                }
-            }
+            $violations = [...$violations, ...$this->importViolations($file)];
         }
 
         $this->assertSame([], $violations);
@@ -62,24 +58,57 @@ class CommonBoundaryTest extends TestCase
         $violations = [];
 
         foreach ($this->commonFiles() as $file) {
-            $constructor = (new ReflectionClass($this->className($file)))->getConstructor();
-
-            if (! $constructor) {
-                continue;
-            }
-
-            foreach ($constructor->getParameters() as $parameter) {
-                $type = $parameter->getType();
-
-                if ($type instanceof ReflectionNamedType && $this->isAllowedConstructorType($type)) {
-                    continue;
-                }
-
-                $violations[] = $file->getPathname() . ': $' . $parameter->getName() . ' ' . $type;
-            }
+            $violations = [...$violations, ...$this->constructorViolations($file)];
         }
 
         $this->assertSame([], $violations);
+    }
+
+    /**
+     * Запрещённые импорты файла.
+     *
+     * @return list<string>
+     */
+    private function importViolations(SplFileInfo $file): array
+    {
+        $violations = [];
+
+        foreach ($this->imports($file) as $import) {
+            if ($this->isForbiddenImport($import)) {
+                $violations[] = $file->getPathname() . ': use ' . $import;
+            }
+        }
+
+        return $violations;
+    }
+
+    /**
+     * Параметры конструктора класса файла, которые — зависимость (не скаляр, не Common, не дата).
+     *
+     * @return list<string>
+     */
+    private function constructorViolations(SplFileInfo $file): array
+    {
+        $reflection = new ReflectionClass($this->className($file));
+        $constructor = $reflection->getConstructor();
+
+        if (! $constructor) {
+            return [];
+        }
+
+        $violations = [];
+
+        foreach ($constructor->getParameters() as $parameter) {
+            $type = $parameter->getType();
+
+            if ($type instanceof ReflectionNamedType && $this->isAllowedConstructorType($type)) {
+                continue;
+            }
+
+            $violations[] = $file->getPathname() . ': $' . $parameter->getName() . ' ' . $type;
+        }
+
+        return $violations;
     }
 
     /**
@@ -87,11 +116,15 @@ class CommonBoundaryTest extends TestCase
      */
     private function commonFiles(): array
     {
-        $root = dirname((string) (new ReflectionClass(ServiceProvider::class))->getFileName()) . '/Common';
+        $provider = new ReflectionClass(ServiceProvider::class);
+        $providerPath = (string) $provider->getFileName();
+        $root = dirname($providerPath) . '/Common';
         $files = [];
 
+        $directory = new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS);
+
         /** @var SplFileInfo $file */
-        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS)) as $file) {
+        foreach (new RecursiveIteratorIterator($directory) as $file) {
             if ($file->getExtension() === 'php') {
                 $files[] = $file;
             }

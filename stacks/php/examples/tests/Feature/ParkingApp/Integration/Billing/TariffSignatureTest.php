@@ -16,10 +16,12 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * GET /parking/integration/tariffs/{id}: верная HMAC-подпись — тариф без скоупа, иначе — 401 без вызова сервиса.
+ * GET /parking/integration/tariffs/{id}: верная HMAC-подпись — тариф без скоупа, иначе — 401 без вызова сервиса;
+ * неверный id пути (0, -1, abc) при верной подписи — 422 из Request, а не 404 маршрута.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -83,11 +85,35 @@ class TariffSignatureTest extends TestCase
         $this->getSigned(self::TARGET, $nonce)->assertUnauthorized();
     }
 
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidIds(): array
+    {
+        return [
+            'ноль' => ['0'],
+            'отрицательный' => ['-1'],
+            'не число' => ['abc'],
+        ];
+    }
+
+    #[DataProvider('invalidIds')]
+    public function test_signed_request_with_invalid_id_is_validation_error(string $id): void
+    {
+        $this->service->shouldNotReceive('findById');
+
+        $this->getSigned('/parking/integration/tariffs/' . $id, (string) Str::uuid())
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonValidationErrors('id', 'data.details');
+    }
+
     private function getSigned(string $target, string $nonce): TestResponse
     {
         $header = $this->header($target, $nonce);
 
-        return $this->getJson($target, [RequestHeaderEnum::SIGNATURE->value => $header]);
+        // getJson() шлёт в GET тело «[]», а подписано пустое — как у реального клиента
+        return $this->withHeaders([RequestHeaderEnum::SIGNATURE->value => $header])->get($target, ['Accept' => 'application/json']);
     }
 
     private function header(string $target, string $nonce): string

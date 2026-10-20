@@ -8,7 +8,7 @@ use App\ParkingApp\Common\Enums\TimeUnitEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 
 /**
- * Доменные инварианты тарифа.
+ * Инварианты тарифа на любом пути записи (HTTP, консоль, workflow): непустое название, льготный период до суток, дата активации не в прошлом; ошибки — по полям, 422.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

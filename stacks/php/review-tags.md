@@ -1,94 +1,47 @@
-# Теги находок (PHP)
+# Теги находок (PHP): дополнение к общему каталогу
 
-Из `php-reviewer` (раздел 5.6). Правила тегов — `approaches/process/review.md`, «Теги». Теги безопасности — колонка «Тег» в `security.md`.
+Общий каталог и правила уровней — `approaches/process/review-tags.md` (уровень находки — только в каталогах, O-24: новый код — уровень каталога, унаследованное — [ВНИМАНИЕ], `approaches/process/review.md` п. 3a); теги безопасности — `approaches/process/security.md`, «Каталог тегов безопасности». Здесь — теги, у которых механизм есть только в PHP (Laravel + mps/core); как именовать и когда заводить новый — `review.md`, «Теги».
 
-> `workflow-takes-repository-directly` переопределён решением O-7: workflow (`Workflows/`) **может** брать репозитории любых доменов — не находка. Command/Query/Service домена с репозиторием чужого домена — тег `domain-cross-domain-access`, **[ОШИБКА]**.
+> `workflow-takes-repository-directly` переопределён решением O-7: workflow (`Workflows/`) **может** брать репозитории любых доменов — не находка. Command/Query/Service домена с репозиторием чужого домена — тег `domain-cross-domain-access` (общий каталог).
 
+| Тег | Уровень | Суть | Источник правила |
+|---|---|---|---|
+| `request-missing-vs-null-not-distinguished` | [ОШИБКА] | Не различает «поле не прислали» и «прислали null» (`sometimes`+`nullable`, `?? null`/`isset` вместо `array_key_exists`) | `conventions.md` п. 11b |
+| `update-request-optional-fields` | [ОШИБКА] | PUT: поле в `UpdateRequest` необязательно к передаче (`nullable`/`sometimes` без `present`), а сервис пишет DTO целиком — неприсланное поле затирается `null` | `conventions.md` п. 12 (O-10) |
+| `array-key-unchecked` | [ОШИБКА] | `$arr['key']`/`$arr[0]`/деструктуризация по массиву из внешних данных (payload, ответ API, config, `explode`/`preg_match`, `keyBy`-карта) без проверки ключа — `Undefined array key` → `null` → `TypeError`/500 | `conventions.md` п. 11b |
+| `repository-bypasses-core-query` | [ОШИБКА] | `Model::query()`/`DB::table()` в репозитории вместо `$this->getQuery()` | `conventions.md` п. 2 |
+| `repository-reinvents-core-helper` | [ОШИБКА] | Самописная замена готового класса ядра/`Core/` подпроекта (`LoggerAwareTrait`, `TransactionManagerInterface`, базовые Request, фильтры не из `QueryFilters\V2` в форме (1) списка `search()`) | `mps-core/capabilities.md`; `mps-core/repository.md` |
+| ~~`repository-missing-or-fail`~~ | — | не используется: `*OrFail`-методы не заводятся (`conventions.md` п. 12a) — сам `*OrFail` — `service-thin-wrapper` | — |
+| `expanded-param-used` | [ОШИБКА] | Параметр `expanded`/`{E}ExpandEnum`/`hasExpand()` — клиент выбирает состав ответа; связанные данные — всегда, методом своего репозитория пачкой по id | `conventions.md`, «Модели и внешние системы» |
+| `model-has-eloquent-relations` | [ОШИБКА] | `BelongsTo`/`HasMany` в модели вместо сборки через репозитории | `conventions.md`, «Модели и внешние системы» |
+| `model-wrong-domain-location` | [ОШИБКА] | Модель лежит не в домене/инфраструктуре своей сущности | `structure.md` |
+| ~~`service-orchestrates-foreign-repository`~~ | — | не используется (O-7): сервис домена не трогает чужой домен ни через репозиторий, ни через сервис — `domain-cross-domain-access` | — |
+| `service-transaction-not-via-manager` | [ОШИБКА] | `DB::transaction()`/`$repo->transaction()` вместо `TransactionManagerInterface::run()` | `conventions.md` п. 16; `mps-core/transactions.md` |
+| `octane-state-leak` | [ОШИБКА] | Под Octane/Swoole — статическое или синглтон-состояние, зависящее от запроса | `approaches/patterns/concurrency.md`, «Data race — PHP» |
+| `constant-not-enum` | [ВНИМАНИЕ] / [ОШИБКА] | Ключ (атрибут, заголовок, тег кэша) или значение домена (тип, статус, провайдер) константой вместо enum; список кейсов enum константой вместо метода enum — [ВНИМАНИЕ]. Повтор значения существующего enum, константа в интерфейсе репозитория/сервиса, копия подмножества, которое уже есть методом enum или константой, — [ОШИБКА] | `conventions.md` п. 12b |
+| `enum-not-enumerable` | [ВНИМАНИЕ] | Enum не реализует `MPS\Core\Enums\Enumerable` / без `EnumerableTrait` | `style.md`, «Имена»; `mps-core/enums.md` |
+| `enum-contains-business-logic` | [ОШИБКА] | `match`/условие с бизнес-решением или обращение к сервису внутри enum вместо `labels()`/`values()`; предикаты-классификаторы легаси | `review-findings.md`, «Enums / Models» |
+| `dto-enum-as-string` | [ОШИБКА] | Поле DTO с фиксированным набором значений хранится строкой, а не enum (сравнения через `->value`) | `conventions.md` п. 11; `mps-core/data-objects.md` |
+| `dto-setter-widened-type` | [ВНИМАНИЕ] | Тип аргумента сеттера DTO шире типа свойства (`int\|string`, ручное приведение) «на случай строк» — ядро приводит само | `core/principles.md`, «Честность результата»; `mps-core/data-objects.md` |
+| `dataobject-assembly-in-constructor` | [ВНИМАНИЕ] | Сложная сборка DTO из нескольких источников — в конструкторе DTO или контроллере вместо фабрики | `review-findings.md`, «DataObjects» |
+| `search-filter-outside-dto` | [ОШИБКА] | Контекст-фильтр списка (здания, организация) передан в сервис отдельным аргументом и вписывается в параметры внутри него вместо поля `{E}FilterDto`, выставленного в контроллере | `conventions.md` п. 19a |
+| `list-form-not-as-designed` | [ВНИМАНИЕ] | Новый список не по форме из раздела «Список» `design.md`; существующий на форме (1) — не нарушение | `conventions.md` п. 2c (P-19) |
+| `command-query-form` | [ВНИМАНИЕ] | Command/Query наследует базовый класс ядра (`MPS\Core\Commands\Command`, `MPS\Core\Queries\Query`), реализует `prepare()`/`get()`/`setQueryParams()`, параметры — fluent-сеттерами с массивом или точка входа не `execute(...)` с типизированными аргументами | `mps-core/commands.md`, «Форма Command и Query» |
+| `exception-not-domain-type` | [ОШИБКА] | `\RuntimeException`/`\Exception` вместо `*AppException` ядра | `conventions.md` п. 13 |
+| `invariants-inline` | [ВНИМАНИЕ] | Доменные инварианты проверяются inline в сервисе/workflow, а не в `{E}DtoValidator` (или в сущности `New*`/`Restore*`, если так выбрано в `design.md`) | `conventions.md` п. 10 |
+| `exception-generic-with-type` | [ВНИМАНИЕ] | `new AppException(..., AppErrorTypeEnum::X)` при готовом классе исключения ядра для этого типа | `conventions.md` п. 13 (P-12) |
+| `deprecated-core-api` | [ОШИБКА] | Устаревшее API ядра в новом коде (`RabbitManager::putIn`, `QueryFilters` V1, `FileManager::upload`, `setMessagePrefix`; `getOrCreate`/`getCacheKeyByParts` — с utils ≥ 2.6.4) | `conventions.md` п. 22 |
+| `dto-suffix-uppercase` | [ВНИМАНИЕ] | Суффикс `DTO` вместо `Dto` в новом PHP-коде (`BuildingDataDTO`) | `style.md`, «Имена» (P-5, P-7) |
+| `di-outside-definitions` | [ОШИБКА] | Биндинг DI не в `definitions.php` из перечня `structure.md` («Биндинги DI»): `$app->singleton()`/`$this->app->bind()` в провайдере (кроме порта подпроекта с переопределением извне), биндинг домена в `config/definitions.php` | `conventions.md` п. 7 |
+| `console-failure-not-reported` | [ОШИБКА] | Fail консольной команды/крона уходит только в `$this->error()`, не в Sentry | `checklist.md` п. 23; `review-findings.md`, «Ошибки, логи, Sentry» |
+| `phpstan-errors` | [ОШИБКА] / [ВНИМАНИЕ] | Ошибки phpstan в файлах дифа: на уровне проекта — [ОШИБКА]; уровня 5 сверх уровня проекта (проект ниже 5) — [ВНИМАНИЕ]; `@phpstan-ignore` в коде вместо `ignoreErrors` для шума mps — [ОШИБКА] | `conventions.md` п. 23 |
+| `response-double-wrap` | [ОШИБКА] | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`api.response`) | `conventions.md` п. 19 |
+| ~~`controller-manual-response-wrapper`~~ | — | не используется — тот же паттерн, что `response-double-wrap` | — |
+| `controller-response-macro` | [ОШИБКА] | Ответ через макрос/mixin фасада (`Response::ok()`, `Response::deleted()`) вместо `response()->json(...)` | `conventions.md` п. 19 |
+| `api-response-not-first` | [ОШИБКА] | `api.response` не первым в middleware группы маршрутов: отказы middleware перед ним (401/403) уходят без `success/data` | `conventions.md` п. 20 |
+| `route-middleware-not-aliased` | [ВНИМАНИЕ] | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` | `conventions.md` п. 20 |
+| `controller-missing-swagger` | [ОШИБКА] | Эндпоинт без Swagger-аннотации, без `500` в ответах или `404` не по `conventions.md` п. 18 (нет у поиска по ID или лишний у `index`/`create`) | `conventions.md` п. 18 |
+| `controller-auth-via-facade` | [ОШИБКА] | `Auth::id()`/`auth()` в глубине сервиса вместо `$request->user()` в контроллере | `conventions.md` п. 19a |
+| ~~`workflow-takes-repository-directly`~~ | — | не используется (O-7): workflow вправе брать репозитории напрямую; для Command/Query домена — `domain-cross-domain-access` | — |
 
-В сохранённом файле (отчёт) колонка **«Категория»/«Уязвимость»** каждой строки — это **не архитектурный слой** (`Repository`/`Service`/`Domain`...), а **конкретный, стабильный kebab-case тег самого паттерна нарушения**. По этому тегу считаются у автора MR повторяющиеся ошибки одного типа (например, чтобы увидеть «этот разработчик регулярно делает прямые запросы в сервисе») — общий слой для этого бесполезен, а свободный текст не даёт точных совпадений.
-
-Как именовать и когда заводить новый — `approaches/process/review.md`, «Теги» (одно место правила).
-
-Известные теги — для [БЕЗОПАСНОСТЬ] см. колонку «Тег» в 5.1; для остальных находок (из ``review-findings.md``):
-
-| Тег | Когда использовать |
-|---|---|
-| `workflow-calls-workflow` | Workflow вызывает другой workflow (через конструктор, `app()`, `new`) — [ОШИБКА]; общая логика — в сервисы/Command/Query доменов (`architecture/layers.md`) |
-| `workflow-duplicates-domain-port` | Workflow объявляет свой порт внешней системы (интерфейс в `Workflows/`), хотя порт на эту систему уже есть в домене, — [ВНИМАНИЕ]; берётся порт домена. Порт из workflow получил второго потребителя — переносится в домен внешней системы (`architecture/layers.md`, «Свои интерфейсы-зависимости») |
-| `request-missing-bounds` | Число/массив в Request без верхней границы (`max:`/`between:`) — DoS через тело запроса |
-| `request-queries-db` | Request ходит в БД: `exists:`/`unique:`, `Rule::exists/unique`, своё правило или замыкание с моделью/`DB::`/репозиторием, запрос в `prepareForValidation`/`withValidator`/`after` (P-17) |
-| `request-business-rule-in-validation` | Бизнес-правило (не enum допустимых значений) проверяется в Request вместо сервиса |
-| `request-missing-vs-null-not-distinguished` | Не различает «поле не прислали» и «прислали null» (`sometimes`+`nullable`, `?? null` вместо `array_key_exists`) |
-| `update-request-optional-fields` | PUT: поле в `UpdateRequest` необязательно к передаче (`nullable`/`sometimes` без `present`), а сервис пишет DTO целиком — неприсланное поле затирается `null` |
-| `repository-bypasses-core-query` | `Model::query()`/`DB::table()` вместо `$this->getQuery()` |
-| `write-array-instead-of-dto` | Данные на запись передаются массивом вместо DTO/типизированных аргументов: контроллер → сервис/workflow (`$request->validated()`, `->all()`), сервис/Command/workflow → репозиторий (`create($data)`, `updateById($id, $dto->toArray…())`, литерал `['col' => $v]`) (`conventions.md` п. 11a, P-18) |
-| ~~`repository-missing-or-fail`~~ | не используется: `*OrFail`-методы не заводятся (`conventions.md` п. 12a) — сам `*OrFail` находка с тегом `service-thin-wrapper` |
-| `repository-returns-mapped-structure` | Repository делает `keyBy`/`map`/сборку структур вместо сырых данных |
-| `expanded-param-used` | Параметр `expanded`/`{E}ExpandEnum`/`hasExpand()` — клиент выбирает состав ответа; связанные данные — всегда, методом своего репозитория пачкой по id (`conventions.md`, «Модели и внешние системы») |
-| `repository-cross-domain-access` | Repository пишет в таблицу чужого домена, вызывает его репозиторий или несёт его бизнес-логику; read-only подзапрос (`EXISTS`/`JOIN`) с комментарием, чья таблица, — не находка (`architecture/cross-domain.md`) |
-| `repository-reinvents-core-helper` | Самописная замена готового класса ядра/`Core/` подпроекта (`LoggerAwareTrait`, `TransactionManagerInterface`, базовые Request, `QueryFilters\V2` в коде на форме (1) списка `search()`) — `mps-core/capabilities.md` |
-| `service-direct-db-query` | Прямой запрос к БД (`DB::`, `Model::where`/`query()`/`find`, `->get()` по модели) в сервисе, Command/Query **или workflow** вместо метода репозитория; тег один для всех трёх |
-| ~~`service-orchestrates-foreign-repository`~~ | не используется (O-7): сервис домена не трогает чужой домен ни через репозиторий, ни через сервис — тег `domain-cross-domain-access` |
-| `multi-write-without-transaction` | Workflow, Service или Command делает больше одного модифицирующего запроса (в разные таблицы или в одну) без общей транзакции — [ОШИБКА] (O-8) |
-| `needless-transaction` | Своя транзакция вокруг одного модифицирующего запроса без блокировки по `concurrency.md` — [ВНИМАНИЕ] (O-8) |
-| `race-on-related-state` | Состояние связанной записи (активна, не удалена) проверено, а гонка между проверкой и записью не закрыта: нет ни `FOR SHARE` в `run()`, ни принятого риска с ответом пользователя (`approaches/patterns/concurrency.md`, «Race condition — решения») |
-| `race-risk-accepted-silently` | Риск гонки принят без ответа пользователя (комментарий «принятый риск», в «Открытых вопросах» `design.md` вопроса нет) — [ОШИБКА] (`concurrency.md`, «Принятие риска») |
-| `service-transaction-not-via-manager` | `DB::transaction()`/`$repo->transaction()` вместо `TransactionManagerInterface` |
-| `service-method-name-mismatch` | Имя метода не соответствует тому, что он реально делает |
-| `service-status-branching-duplicated` | Ветвление по статусам (`if`/`elseif`) продублировано в нескольких методах вместо state machine |
-| `service-side-effect-timing-wrong` | Побочный эффект (Storage/HTTP/очередь) не снаружи транзакции или до записи вместо после |
-| ~~`controller-manual-response-wrapper`~~ | не используется — тот же паттерн, что `response-double-wrap` |
-| `response-double-wrap` | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`api.response`) |
-| `service-thin-wrapper` | Метод-обёртка над одной проверкой/вызовом в сервисе или репозитории (`findByIdOrFail`/любой `*OrFail`, `assertValid`, внутренний `getById` → свой репозиторий); публичный `findById(): ?Model` для точки входа — не находка |
-| `constant-not-enum` | Значение-ключ или значение домена (тип, статус) константой класса/интерфейса вместо enum; повтор значения существующего enum — [ОШИБКА] |
-| `duplicated-enum` | Копия понятия другого домена (тот же набор значений под другим именем) вместо переноса в `Common/`; импорт enum чужого домена (`architecture/layers.md`, «Общий бизнес-словарь») — [ОШИБКА] |
-| `common-with-logic` | В `Common/` — класс с зависимостями в конструкторе, ввод-вывод, сущность, сервис, процесс (`architecture/layers.md`, «Общий бизнес-словарь») — [ОШИБКА] |
-| `search-filter-outside-dto` | Контекст-фильтр списка (здания, организация) передан в сервис отдельным аргументом и вписывается в параметры внутри него вместо поля `{E}FilterDto`, выставленного в контроллере (`conventions.md` п. 19a) |
-| `list-without-default-sort` | Метод списка без явного `orderBy` по умолчанию (`conventions.md` п. 12c) |
-| `request-filter-not-applied` | Поле валидируется в `IndexRequest`, но не попадает в `{E}FilterDto` / не применяется в методе списка репозитория (в форме (1) списка — в `filterSearch`) |
-| `request-access-check` | Проверка доступа (здание/организация пользователя) в правилах FormRequest вместо middleware |
-| `route-middleware-not-aliased` | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` |
-| `access-check-outside-middleware` | Права/контекст (роль или право на операцию, здания, организация) проверяются или вычисляются в контроллере или сервисе, а не в middleware на маршруте → атрибуты запроса → `RequestHelper` (для Go — тот же тег) |
-| `controller-response-macro` | Ответ через макрос/mixin фасада (`Response::ok()`, `Response::deleted()`) вместо `response()->json(...)` |
-| `controller-missing-swagger` | Эндпоинт без Swagger-аннотации, без `500` в ответах или без `404` у эндпойнта, ищущего запись по ID (`view`/`update`/`delete`, действие над записью); `404` у `index`/`create` — лишний |
-| `controller-auth-via-facade` | `Auth::id()` в глубине сервиса вместо `request()->user()` в контроллере |
-| ~~`workflow-takes-repository-directly`~~ | не используется (O-7): workflow вправе брать репозитории напрямую; для Command/Query домена — `domain-cross-domain-access` |
-| `workflow-trusts-transport-request` | Workflow или Command домена не проверяет доменные инварианты (`{E}DtoValidator`, P-8), полагаясь на Request, — ломается при вызове из консоли/очереди |
-| `domain-cross-domain-access` | Код в `Domains/` (Service, Command, Query) обращается к чужому домену — модель, репозиторий или сервис; место такого сценария — workflow (O-7) |
-| `command-query-form` | Command/Query наследует базовый класс ядра (`MPS\Core\Commands\Command`, `MPS\Core\Queries\Query`), реализует `prepare()`/`get()`/`setQueryParams()`, параметры — fluent-сеттерами с массивом или точка входа не `execute(...)` с типизированными аргументами — [ВНИМАНИЕ] (`mps-core/commands.md`, «Форма Command и Query») |
-| `dataobject-assembly-in-constructor` | Сложная сборка DTO из нескольких источников — в конструкторе/контроллере вместо фабрики |
-| `enum-contains-business-logic` | `match`/условие с бизнес-решением внутри enum вместо `labels()`/`values()` |
-| `model-has-eloquent-relations` | `BelongsTo`/`HasMany` в модели вместо сборки через репозитории |
-| `model-wrong-domain-location` | Модель лежит не в домене/инфраструктуре своей сущности |
-| `adapter-named-not-by-role` | Порт/адаптер внешней системы назван не по роли (`*Gateway`, `*Service`, `*Client`, имя системы в имени порта) вместо `…Repository` (данные) / `…Notifier`, `…Publisher`, `…Sender` (отправка) — `architecture/integrations.md` |
-| `adapter-config-via-global` | `app()`/`config()` внутри метода вместо инъекции в конструктор |
-| `adapter-missing-config-validation` | Отсутствующий обязательный конфиг даёт молчаливый дефолт вместо `InvalidConfigurationAppException` |
-| `error-swallowed-silently` | `catch` без rethrow и без `AppException` с контекстом |
-| `exception-not-domain-type` | `\RuntimeException`/`\Exception` вместо `*AppException` ядра |
-| `console-failure-not-reported` | Fail консольной команды/крона уходит только в `$this->error()`, не в Sentry |
-| `n-plus-one-query` | Запрос к БД внутри цикла вместо пачки по `ids` |
-| `bulk-operation-not-chunked` | Большая выборка/массовая операция без `chunk()`/`cursor()`/батчей |
-| `in-memory-state-not-shared` | Кэш/дедупликатор/счётчик в памяти процесса — ломается при 2+ инстансах |
-| `enum-list-drift` | Новое значение enum не отражено во всех местах, где перечислен старый набор (`in:`, swagger `enum:`, словари фронта, мапперы/allowlist/`match` по этому enum) |
-| `legacy-pattern-copied` | Из легаси или соседнего кода перенесена реализация вопреки правилу стека (слой проверки, форма класса, фильтр, валидация) — в коде или в артефакте (`threats.md`, `design.md`) (`approaches/process/legacy-refactor.md`, O-17) |
-| `scope-param-defaults-unrestricted` | Параметр скоупа в сигнатуре сервиса/репозитория с умолчанием `= null` («без ограничения») или поле скоупа `{E}FilterDto`, которое без вызова сеттера читается как «без ограничения» (нет исключения «не выставлен», `conventions.md` п. 19a) — fail-open для будущих вызовов (`security.md`, `tenant-scope-missing`) |
-| `refactor-toggle` | Рефактор/перенос: старая и новая реализация выбираются флагом (конфиг/env/БД, DI по настройке, процент трафика, заголовок, shadow/dual-write) или контракт изменён под старым URL/событием без версии — вместо сохранённого контракта или новой версии (`approaches/process/legacy-refactor.md`, O-19) |
-| `deploy-risk-flag-enabled` | Раскомментированный крон/включённый флаг — риск первого прогона на накопленных данных |
-| `mr-hygiene-lockfile-drift` | `composer.lock` не обновлён вместе с `composer.json`, либо сгенерированные файлы (`.php-cs-fixer.cache`, `storage/api-docs/*.json`) уехали в MR |
-| `ai-style-comment` | Комментарий-пересказ кода построчно, сгенерированный ИИ |
-| `array-key-unchecked` | `$arr['key']`/`$arr[0]`/деструктуризация по массиву из внешних данных (payload, ответ API, config, `explode`/`preg_match`, `keyBy`-карта) без проверки ключа — `Undefined array key` → `null` → `TypeError`/500 (`conventions.md` п. 11b) |
-| `duplicated-format-logic` | Преобразование формата (нормализация телефона/ИИН/карты, форматирование денег/дат) написано inline или повторено, хотя есть в SDK/`Core/Helpers` или встречается второй раз (`core/principles.md`, «Повторяющаяся обработка — один хелпер»); inline при живом хелпере — [ОШИБКА] |
-| `else-after-return` | `else`/`elseif` после ветки, завершившейся `return`/`throw`/`continue`, или вложенный `if` вместо раннего выхода; цепочка `if/elseif` по значению вместо `match` (`core/style.md`, «Форма кода») |
-| `ai-style-text` | «ИИ-вода» в тексте для людей вне комментариев: Swagger, сообщение ошибки клиенту, коммит, описание MR, ответ в треде — вступления, благодарности, канцелярит, пересказ (`core/style.md`, «Любой текст для людей») |
-| `enum-not-enumerable` | Enum не реализует `MPS\Core\Enums\Enumerable` / без `EnumerableTrait` |
-| `dto-enum-as-string` | Поле DTO с фиксированным набором значений хранится строкой, а не enum (сравнения через `->value`) |
-| `dto-setter-widened-type` | Тип аргумента сеттера DTO шире типа свойства (`int\|string`, ручное приведение) «на случай строк» — ядро приводит само |
-| `comment-restates-name` | Описание метода/класса пересказывает его имя («Неудалённые здания по набору id» над `findAliveByIds`) |
-| `nested-call-chain` | Вложенный вызов глубже одного уровня — один уровень с коротким аргументом (`execute(Mapper::toDto($request))`) не находка (`array_values(array_unique(array_filter(array_map(…))))`), индекс или метод по результату вызова (`execute([getByKey($key)])[0]`, `foo(...)->bar()`), замыкание-поведение в свой метод (`$this->service(static fn ($q) => …)`, `->when($cond, fn …)` вместо `if`), лямбда длиннее строки/с ветвлением, параметр замыкания затеняет внешнюю переменную, глубина блоков > 2 (`core/style.md`, «Форма кода»; `stacks/php/style.md`) |
-| `repository-multi-query` | Публичный метод репозитория выполняет больше одного запроса: «заблокировать и удалить», «прочитать модель → `save()`», «удалить и вставить», «вставить и перечитать» — шаги разделить на методы, порядок и транзакцию отдать сервису/Command/workflow; постраничная выборка пагинатором и пакетный `upsert` — один запрос (`architecture/layers.md`; `conventions.md` п. 2b) |
-| `query-split-into-pieces` | Запрос репозитория собран из приватных методов-кусков (`activeQuery()`, `service(Closure)`, `withBuilding($q)`), колонки — константой `COLUMNS` вместо явного списка в `select`, один подзапрос в 4+ методах (повтор join и простых `where` — не находка), или запрос-монстр на 3+ подзапроса по чужим таблицам вместо сборки из нескольких репозиториев в сервисе/workflow; фильтры списка — в том же методе |
-| `list-form-not-as-designed` | Новый список не по форме из раздела «Список» `design.md` (P-19, `conventions.md` п. 2a): выбрана форма (2) `Page`, а написан `search()`/`filterSearch()`, или наоборот; раздела нет — вопрос, не находка. Код на форме (1), написанный до задачи, — не находка. **[ВНИМАНИЕ]** |
-
-Если ни один тег не подходит — придумай новый в этом же формате.
-
----
+Если ни один тег (здесь, в общем каталоге и в каталоге безопасности) не подходит — новый в этом же формате (`approaches/process/review-tags.md`, вводная).

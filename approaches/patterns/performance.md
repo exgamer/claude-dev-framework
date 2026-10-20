@@ -23,7 +23,7 @@
 | Массовые операции — батчами (`chunk`/`cursor`/`LIMIT … OFFSET`→keyset), вставка/обновление пачкой (`upsert`, batch insert), не по одной строке в цикле | `bulk-operation-not-chunked` |
 | `COUNT(*)` по большой таблице на каждый запрос списка — осознанно (кэш, приблизительный счётчик, keyset без общего числа) | `expensive-count` |
 | Глубокая пагинация (`OFFSET` десятков тысяч) на частом эндпойнте — keyset (`WHERE id < :last ORDER BY id DESC LIMIT n`) | `deep-offset-pagination` |
-| Каждый запрос — с **таймаутом** (Go: `context.WithTimeout`, 10s по умолчанию; PHP — таймауты соединения/запроса в конфиге) | `query-without-timeout` |
+| Каждый запрос к БД — с **таймаутом** (общее правило для стеков; механизм — по стеку). Go: `context.WithTimeout` на запрос, 10s по умолчанию; у `NewGormPaginatedHelper` и транзакции SDK таймаут встроен (`stacks/go/go-sdk/infra/postgres.md`). PHP: `statement_timeout` в настройках подключения Postgres (`config/database.php`, значение из env) — один раз на подключение, не в каждом запросе; плюс таймаут соединения | `query-without-timeout` |
 | **Транзакция короткая**: без внешних HTTP, публикаций, файлов, `sleep` внутри (`transactions.md`) | `long-transaction` |
 | Конкурентные счётчики, уникальность, статусы, повторы — по `concurrency.md` | `race-on-counter` и др. |
 
@@ -66,12 +66,12 @@
 
 - Связанные данные — **через репозитории пачкой** (`whereIn` по id), Eloquent-связей и eager loading нет (`stacks/php/conventions.md`).
 - Большие выборки — `chunk()` / `chunkById()` / `cursor()` / `lazy()`; не `->get()->toArray()` по большой таблице.
-- Список — в форме из раздела «Список» `design.md` (P-19, `stacks/php/conventions.md` п. 2a): (2) один метод репозитория `paginate…({E}FilterDto, Page)` с явным `orderBy`, (1) `search()` + `filterSearch()` с явной сортировкой; в обеих `per_page ≤ 100`; медленные запросы — `SlowQueryDetector` (`mps-core/capabilities.md`).
+- Список — в форме из раздела «Список» `design.md` (P-19, `stacks/php/conventions.md` п. 2c): (2) один метод репозитория `paginate…({E}FilterDto, Page)` с явным `orderBy`, (1) `search()` + `filterSearch()` с явной сортировкой; в обеих `per_page ≤ 100`; медленные запросы — `SlowQueryDetector` (`mps-core/capabilities.md`).
 - Octane: никакого статического/синглтон-состояния между запросами (`LogContext::clear()` и т.п.).
 - Локально для поиска N+1 и тяжёлых запросов — Debugbar/Telescope.
 
 ## Как проверять
 
 - Разработчик: самопроверка — пункты выше по своему коду; для новых тяжёлых запросов — `EXPLAIN`.
-- Ревью: по таблицам выше; находка — [ОШИБКА] (N+1, отсутствие пагинации/индекса/таймаута, гонка счётчика, тяжёлое в запросе) или [ВНИМАНИЕ] (остальное).
+- Ревью: по таблицам выше, теги оттуда; уровень каждого тега — каталог тегов (`approaches/process/review-tags.md`, «Производительность, кэш, списки»).
 - QA: для горячих путей с бюджетом — проверка на объёме данных, близком к реальному; нагрузочный тест — если требование есть в `requirements.md`.

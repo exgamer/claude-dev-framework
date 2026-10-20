@@ -8,7 +8,7 @@ use App\ParkingApp\Domains\Catalog\Modules\Parkings\DTO\ParkingMaxStayDto;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterface;
 
 /**
- * Интерфейс репозитория парковок.
+ * Парковки домена Catalog для workflow Billing: существование (oneById ядра) и наибольшая длительность стоянки.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

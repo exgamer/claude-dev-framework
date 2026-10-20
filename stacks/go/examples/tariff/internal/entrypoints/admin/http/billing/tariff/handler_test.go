@@ -3,6 +3,7 @@ package tariff
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	gosdkmiddleware "git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/middleware"
@@ -124,5 +125,68 @@ func TestHandler_Default_ParkingScope(t *testing.T) {
 				t.Fatalf("got %d, want %d: %s", w.Code, tc.want, w.Body.String())
 			}
 		})
+	}
+}
+
+// TestHandler_InvalidPathID id пути не положительное целое — 422 с полем id, до сервиса
+func TestHandler_InvalidPathID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewHandler(nil, nil, nil, nil)
+
+	r := gin.New()
+	r.Use(gosdkmiddleware.FormattedResponseMiddleware())
+	r.GET("/tariffs/:id", handler.View())
+	r.PATCH("/tariffs/:id", handler.Update())
+	r.POST("/tariffs/:id/set-default", handler.SetDefault())
+
+	for _, method := range []string{http.MethodGet, http.MethodPatch, http.MethodPost} {
+		for _, id := range []string{"abc", "0", "-1"} {
+			target := "/tariffs/" + id
+			if method == http.MethodPost {
+				target += "/set-default"
+			}
+
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(method, target, nil))
+
+			if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), `"id"`) {
+				t.Fatalf("%s %s: got %d %s, want 422 with field id", method, target, w.Code, w.Body.String())
+			}
+		}
+	}
+}
+
+// TestHandler_Index_PageBound Границы пагинации: page до 10000, per_page до 100, больше — 422 с полем
+// правило — в теге binding: тег validate валидатор gin не читает
+func TestHandler_Index_PageBound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	parkingAdmin := &admindomain.Admin{ID: 1, AllowedParkingIDs: []uint{7}}
+
+	cases := []struct {
+		target string
+		want   int
+		field  string
+	}{
+		{"/tariffs?page=10000&per_page=100", http.StatusOK, ""},
+		{"/tariffs?page=10001", http.StatusUnprocessableEntity, `"page"`},
+		{"/tariffs?per_page=101", http.StatusUnprocessableEntity, `"per_page"`},
+	}
+
+	for _, tc := range cases {
+		tariffs := billingfakes.NewTariffRepository(&tariffdomain.Tariff{ID: 1, ParkingID: 7})
+		handler := NewHandler(tariffdomain.NewService(tariffs, billingfakes.NewTariffCacheRepository()), nil, nil, nil)
+
+		r := gin.New()
+		r.Use(gosdkmiddleware.FormattedResponseMiddleware())
+		r.GET("/tariffs", withAdmin(parkingAdmin), adminmiddleware.ResolveAdminParkingsMiddleware(), handler.Index())
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.target, nil))
+
+		if w.Code != tc.want || !strings.Contains(w.Body.String(), tc.field) {
+			t.Fatalf("%s: got %d %s, want %d with field %s", tc.target, w.Code, w.Body.String(), tc.want, tc.field)
+		}
 	}
 }

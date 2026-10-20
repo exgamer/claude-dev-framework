@@ -7,7 +7,7 @@ namespace App\ParkingApp\Infrastructure\Postgres\Billing\Providers;
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Провайдер Postgres-инфраструктуры домена Billing.
+ * Подключает definitions.php (репозитории тарифов и outbox → Postgres) и миграции таблиц Billing.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

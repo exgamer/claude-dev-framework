@@ -7,7 +7,7 @@ namespace App\ParkingApp\Domains\Billing;
 use App\ParkingApp\Core\Providers\ServiceProvider as Base;
 
 /**
- * Провайдер домена Billing.
+ * Подключает definitions.php домена (интерфейс сервиса → реализация) автозагрузкой ModuleServiceProvider; своей логики нет.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

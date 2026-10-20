@@ -8,7 +8,7 @@ use MPS\Core\DataObjects\DataObject;
 use MPS\Core\Enums\CurrencyEnum;
 
 /**
- * Действующий тариф парковки.
+ * Строка списка для партнёра: цена в минимальных единицах, льготные минуты, признак «по умолчанию»; без статуса и дат.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

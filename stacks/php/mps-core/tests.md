@@ -44,10 +44,13 @@ class YourHelperTest extends TestCase
 namespace Tests\Unit\ParkingApp\Domains\YourDomain\YourModule;
 
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
 
 class YourServiceTest extends TestCase
 {
+    use MockeryPHPUnitIntegration; // закрывает Mockery и засчитывает ожидания как проверки; ручной tearDown с Mockery::close() не нужен
+
     public function test_something(): void
     {
         $repository = Mockery::mock(YourRepositoryInterface::class);
@@ -58,12 +61,6 @@ class YourServiceTest extends TestCase
 
         $this->assertEquals('Test', $result->name);
     }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 }
 ```
 
@@ -72,31 +69,36 @@ class YourServiceTest extends TestCase
 Полный стек с реальной БД. Каждый тест откатывается в транзакцию.
 
 ```php
-namespace Tests\Feature\ParkingApp\Admin\YourDomain\YourModule;
+namespace Tests\Feature\ParkingApp\Admin\YourDomain;
 
 use Tests\Feature\FeatureTestCase;
 
-class PositiveTest extends FeatureTestCase
+class TariffsTest extends FeatureTestCase
 {
+    // URL — {подпроект}/{context}/… (../conventions.md п. 20); ответ — в обёртке success/data от api.response (п. 19)
     public function test_create(): void
     {
-        $response = $this->json('POST', '/api/your-domain/admin/your-module', [
+        $response = $this->json('POST', '/parking/admin/tariffs', [
+            'parking_id' => 15,
             'name' => 'Test',
         ]);
 
         $response->assertStatus(201)
-            ->assertJsonStructure(['id', 'name', 'status']);
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['success', 'data' => ['id', 'name', 'status']]);
     }
 
     public function test_index(): void
     {
-        $response = $this->json('GET', '/api/your-domain/admin/your-module');
+        $response = $this->json('GET', '/parking/admin/tariffs');
 
         $response->assertStatus(200)
-            ->assertJsonStructure(['items', 'pagination']);
+            ->assertJsonStructure(['success', 'data' => ['items', 'pagination']]);
     }
 }
 ```
+
+Эталон — `../examples/tests/Feature/ParkingApp/Integration/Billing/TariffSignatureTest.php` (`assertJsonPath('data.id', …)`, ошибка — `assertJsonPath('success', false)`).
 
 ## Mock-классы
 

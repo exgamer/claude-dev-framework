@@ -7,30 +7,30 @@ import (
 // indexRequest Фильтр списка тарифов
 type indexRequest struct {
 	validation.Request
-	ParkingID uint `form:"parking_id" validate:"omitempty,gt=0"`
-	Page      uint `form:"page"`
-	PerPage   uint `form:"per_page" validate:"omitempty,lte=100"`
+	ParkingID uint `form:"parking_id" binding:"omitempty,gt=0"`
+	Page      uint `form:"page" binding:"omitempty,lte=10000"`
+	PerPage   uint `form:"per_page" binding:"omitempty,lte=100"`
 }
 
 // defaultRequest Тариф по умолчанию парковки
 type defaultRequest struct {
 	validation.Request
-	ParkingID uint `form:"parking_id" binding:"required" validate:"required,gt=0"`
+	ParkingID uint `form:"parking_id" binding:"required,gt=0"`
 }
 
 // createRequest Создание тарифа
 type createRequest struct {
 	validation.Request
-	ParkingID    uint   `json:"parking_id" binding:"required" validate:"required,gt=0"`
-	Name         string `json:"name" binding:"required" validate:"required,max=255"`
-	Currency     string `json:"currency" binding:"required" validate:"required,oneof=KZT RUB USD"`
-	GraceMinutes uint   `json:"grace_minutes" validate:"lte=1440"`
-	Price        uint   `json:"price" binding:"required" validate:"required,gt=0,lte=100000000"`
+	ParkingID    uint   `json:"parking_id" binding:"required,gt=0"`
+	Name         string `json:"name" binding:"required,max=255"`
+	Currency     string `json:"currency" binding:"required,oneof=KZT RUB USD"`
+	GraceMinutes uint   `json:"grace_minutes" binding:"lte=1440"`
+	Price        uint   `json:"price" binding:"required,gt=0,lte=100000000"`
 }
 
 // updateRequest Частичное обновление тарифа: отсутствующее поле не меняется
 type updateRequest struct {
 	validation.Request
-	Name         *string `json:"name" validate:"omitempty,max=255"`
-	GraceMinutes *uint   `json:"grace_minutes" validate:"omitempty,lte=1440"`
+	Name         *string `json:"name" binding:"omitempty,max=255"`
+	GraceMinutes *uint   `json:"grace_minutes" binding:"omitempty,lte=1440"`
 }

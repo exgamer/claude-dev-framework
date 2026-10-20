@@ -85,27 +85,32 @@ func (r *PostgresRepository) GetDefaultByParkingID(ctx context.Context, parkingI
 }
 
 func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search) (*pagination.Paginated[tariffdomain.Tariff], error) {
-	paginated, err := helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).
-		SetTimeout(10*time.Second).
-		SetPerPage(search.PerPage).
-		Paginated(search.Page, func(db *gorm.DB) *gorm.DB {
-			query := db.Model(&tariff{}).Where("deleted_at IS NULL")
+	// Таймаут — секунды числом: хелпер сам умножает на time.Second (gosdk-db-core v1.0.10, gorm_paginated_helper.go)
+	helper := helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).SetTimeout(10)
 
-			// скоуп: All — без условия, иначе только свои; пустой IDs — ни одной записи
-			switch {
-			case search.Scope.All: // без условия
-			case len(search.Scope.IDs) == 0:
-				query = query.Where("FALSE")
-			default:
-				query = query.Where("parking_id IN ?", search.Scope.IDs)
-			}
+	// per_page не передан — умолчание хелпера 30; SetPerPage(0) дал бы 20 из pagination.Pages
+	if search.PerPage > 0 {
+		helper.SetPerPage(search.PerPage)
+	}
 
-			if search.ParkingID != 0 {
-				query = query.Where("parking_id = ?", search.ParkingID)
-			}
+	paginated, err := helper.Paginated(search.Page, func(db *gorm.DB) *gorm.DB {
+		query := db.Model(&tariff{}).Where("deleted_at IS NULL")
 
-			return query.Order("id DESC")
-		})
+		// скоуп: All — без условия, иначе только свои; пустой IDs — ни одной записи
+		switch {
+		case search.Scope.All: // без условия
+		case len(search.Scope.IDs) == 0:
+			query = query.Where("FALSE")
+		default:
+			query = query.Where("parking_id IN ?", search.Scope.IDs)
+		}
+
+		if search.ParkingID != 0 {
+			query = query.Where("parking_id = ?", search.ParkingID)
+		}
+
+		return query.Order("id DESC")
+	})
 	if err != nil {
 		return nil, fmt.Errorf("paginate tariffs failed (parking_id=%d, page=%d): %w", search.ParkingID, search.Page, err)
 	}
@@ -136,13 +141,17 @@ func (r *PostgresRepository) Update(ctx context.Context, id uint, patch *tariffd
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	err := r.client.WithContext(ctx).
+	result := r.client.WithContext(ctx).
 		Model(&tariff{}).
 		Where("id = ?", id).
-		Updates(columns).
-		Error
-	if err != nil {
-		return fmt.Errorf("update tariff failed (tariff_id=%d): %w", id, err)
+		Where("deleted_at IS NULL").
+		Updates(columns)
+	if result.Error != nil {
+		return fmt.Errorf("update tariff failed (tariff_id=%d): %w", id, result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("update tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrTariffNotFound)
 	}
 
 	return nil
@@ -152,13 +161,20 @@ func (r *PostgresRepository) SetDefault(ctx context.Context, id uint, isDefault 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	err := r.client.WithContext(ctx).
+	result := r.client.WithContext(ctx).
 		Model(&tariff{}).
 		Where("id = ?", id).
-		Update("is_default", isDefault).
-		Error
+		Where("deleted_at IS NULL").
+		Update("is_default", isDefault)
+	if result.Error != nil {
+		return setDefaultError(result.Error, id)
+	}
 
-	return setDefaultError(err, id)
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("set default tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrTariffNotFound)
+	}
+
+	return nil
 }
 
 // setDefaultError Ошибка записи флага: нарушение индекса тарифа по умолчанию — tariffdomain.ErrDefaultTariffTaken, прочее — с ID тарифа

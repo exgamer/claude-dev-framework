@@ -61,20 +61,38 @@ final class RetryOutboxTariffEventsCommand
 
         do {
             $ids = $this->repository->claimForRetry($this->batchSize, $this->staleAfterSeconds);
-
-            foreach ($ids as $id) {
-                try {
-                    $this->publishCommand->execute($id);
-                    $published++;
-                } catch (OperationFailedAppException $e) {
-                    $failed++;
-                    $this->exceptionHandler->report($e);
-                }
-            }
+            $batchPublished = $this->publishBatch($ids);
+            $published += $batchPublished;
+            $failed += count($ids) - $batchPublished;
         } while (count($ids) === $this->batchSize); // неполная пачка — зависших событий больше нет
 
         return OutboxTariffEventRetryResultDto::make()
             ->setPublished($published)
             ->setFailed($failed);
+    }
+
+    /**
+     * Отправка пачки: сбой события — в трекер, остальные отправляются.
+     *
+     * @param list<int> $ids
+     *
+     * @return int сколько опубликовано
+     *
+     * @throws Throwable
+     */
+    private function publishBatch(array $ids): int
+    {
+        $published = 0;
+
+        foreach ($ids as $id) {
+            try {
+                $this->publishCommand->execute($id);
+                $published++;
+            } catch (OperationFailedAppException $e) {
+                $this->exceptionHandler->report($e);
+            }
+        }
+
+        return $published;
     }
 }

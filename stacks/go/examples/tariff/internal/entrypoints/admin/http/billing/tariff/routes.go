@@ -22,19 +22,21 @@ func SetRoutes(a *app.App, handler *Handler, adminAuth gin.HandlerFunc) error {
 		service.Use(middleware.DebugMiddleware())
 		service.Use(middleware.SentryMiddleware())
 
-		v1 := service.Group("/v1/admin")
+		// /api/<context>/<version>/<domain>/<entity>: модуль совпадает с сущностью — не повторяется
+		billing := service.Group("/admin/v1/billing")
 		{
-			v1.Use(middleware.FormattedResponseMiddleware())
-			v1.Use(middleware.MetricsMiddleware(a))
-			v1.Use(adminAuth)
-			v1.Use(adminmiddleware.ResolveAdminParkingsMiddleware())
+			billing.Use(middleware.FormattedResponseMiddleware())
+			billing.Use(middleware.MetricsMiddleware(a))
+			// Отказы auth-middleware оборачивает FormattedResponseMiddleware — они ставятся после неё
+			billing.Use(adminAuth)
+			billing.Use(adminmiddleware.ResolveAdminParkingsMiddleware())
 
-			v1.GET("/tariffs", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.Index())
-			v1.GET("/tariffs/default", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.Default())
-			v1.GET("/tariffs/:id", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.View())
-			v1.POST("/tariffs", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.create"), adminmiddleware.RequireJSONMiddleware(), handler.Create())
-			v1.PATCH("/tariffs/:id", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.update"), adminmiddleware.RequireJSONMiddleware(), handler.Update())
-			v1.POST("/tariffs/:id/set-default", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.update"), handler.SetDefault())
+			billing.GET("/tariffs", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.Index())
+			billing.GET("/tariffs/default", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.Default())
+			billing.GET("/tariffs/:id", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.view"), handler.View())
+			billing.POST("/tariffs", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.create"), adminmiddleware.RequireJSONMiddleware(), handler.Create())
+			billing.PATCH("/tariffs/:id", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.update"), adminmiddleware.RequireJSONMiddleware(), handler.Update())
+			billing.POST("/tariffs/:id/set-default", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.update"), handler.SetDefault())
 		}
 	}
 

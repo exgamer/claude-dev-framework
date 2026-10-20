@@ -9,11 +9,15 @@ use MPS\Core\Enums\EnumerableTrait;
 use OpenApi\Attributes as OA;
 
 /**
- * Статус тарифа.
+ * Жизненный цикл тарифа: запланированный (ждёт даты активации) → действующий → архивный.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
-#[OA\Schema(schema: 'TariffStatusEnum', type: 'string', enum: ['active', 'scheduled', 'archived'])]
+#[OA\Schema(schema: 'TariffStatusEnum', type: 'string', enum: [
+    TariffStatusEnum::ACTIVE->value,
+    TariffStatusEnum::SCHEDULED->value,
+    TariffStatusEnum::ARCHIVED->value,
+])]
 enum TariffStatusEnum: string implements Enumerable
 {
     use EnumerableTrait;

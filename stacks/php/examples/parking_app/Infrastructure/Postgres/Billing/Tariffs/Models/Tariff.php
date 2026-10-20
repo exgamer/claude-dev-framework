@@ -11,7 +11,7 @@ use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Models\Model;
 
 /**
- * Тариф парковки
+ * Строка parking.tariffs: мягкое удаление, статус и валюта — enum, у парковки один тариф по умолчанию (частичный уникальный индекс).
  *
  * @property int $id
  * @property int $parking_id

@@ -13,10 +13,10 @@ import (
 // APIKeyHeaderName Заголовок с ключом партнёра
 const APIKeyHeaderName = "Api-Key"
 
-// APIKeyMiddleware Пропускает запрос с ключом партнёра из конфига (сравнение — за постоянное время); ставится после FormattedResponseMiddleware.
-// Ключ не передан или не совпал — 401 без отправки в Sentry
+// APIKeyMiddleware Пропускает запрос с ключом партнёра из конфига; ключ не передан или не совпал — 401 без Sentry
 func APIKeyMiddleware(service *partnerdomain.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Сравнение ключа — за постоянное время, в сервисе partner
 		if err := service.AuthenticateAPIKey(c.GetHeader(APIKeyHeaderName)); err != nil {
 			response.ErrorResponseUntrackableSentry(c, http.StatusUnauthorized, errors.New("требуется ключ API"), nil)
 

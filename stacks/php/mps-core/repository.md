@@ -22,7 +22,7 @@
 
 ## Форма (1) — список через `search()` ядра
 
-Форма пагинации списка выбирается пользователем на задаче и записана в разделе «Список» `design.md` (P-19, `../conventions.md` п. 2a): (1) — ниже, (2) через `Page` (`paginate…({E}FilterDto, Page)`, рекомендация; эталон `../examples/parking_app` — на ней) — `../conventions.md` п. 2a, 12c, 12d. Существующий код на (1) — не нарушение. API (1) по справочнику ядра (`reference/mps-core-v1.10.2.md`): репозиторий — `CRUDRepository::search(array $params = [], $id = null, int $perPage = 30, ?int $page = null, ?BuilderContract $query = null): LengthAwarePaginatorContract|Collection` + хук `filterSearch()`; сервис — `search(SearchDataObject $dto): array` (`SearchAwareInterface`; `SearchDataObject`: `setParams`, `setPerPage`, `setPage`); запрос — наследник `Core/Requests/SearchRequest` подпроекта (`page`, `per_page`, `sort`, сортируемые поля — `$sortAttributes`); ответ — `Core/Resources/PaginateResource` подпроекта, помощник запроса — `Core/Database/Query/PaginatedQueryHelper`. API этих классов — по эталону: `../examples/parking_app/Core/Requests/SearchRequest.php`, `../examples/parking_app/Core/Resources/PaginateResource.php`, `../examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`.
+Форма пагинации списка выбирается пользователем на задаче и записана в разделе «Список» `design.md` (P-19, `../conventions.md` п. 2c): (1) — ниже, (2) через `Page` (`paginate…({E}FilterDto, Page)`, рекомендация; эталон `../examples/parking_app` — на ней) — `../conventions.md` п. 2c, 2a, 12c, 12d. Существующий код на (1) — не нарушение. API (1) по справочнику ядра (`reference/mps-core-v1.10.2.md`): репозиторий — `CRUDRepository::search(array $params = [], $id = null, int $perPage = 30, ?int $page = null, ?BuilderContract $query = null): LengthAwarePaginatorContract|Collection` + хук `filterSearch()`; сервис — `search(SearchDataObject $dto): array` (`SearchAwareInterface`; `SearchDataObject`: `setParams`, `setPerPage`, `setPage`); запрос — наследник `Core/Requests/SearchRequest` подпроекта (`page`, `per_page`, `sort`, сортируемые поля — `$sortAttributes`); ответ — `Core/Resources/PaginateResource` подпроекта, помощник запроса — `Core/Database/Query/PaginatedQueryHelper`; блок `pagination` в обеих формах — `Core/Resources/PaginationMeta` (формат Go SDK, `regulations/rest-api.md`), `paginator->toArray()` Laravel как есть не отдаётся. API этих классов — по эталону: `../examples/parking_app/Core/Requests/SearchRequest.php`, `../examples/parking_app/Core/Resources/PaginateResource.php`, `../examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`.
 
 ```php
 // Request: фильтры + page/per_page/sort от App\ParkingApp\Core\Requests\SearchRequest
@@ -34,19 +34,21 @@ class IndexRequest extends SearchRequest
     public function filterRules(): array
     {
         return [
-            'id' => ['nullable', 'integer'],
-            'name' => ['nullable', 'string'],
+            'id' => ['nullable', 'integer', 'gt:0', 'max:' . Request::ID_MAX],   // предел bigint (Core/Requests/Request): больше — 422, не 500
+            'name' => ['nullable', 'string', 'max:255'],
         ];
     }
 }
 
-// контроллер: контекст из middleware — в params (../conventions.md п. 19a)
+// контроллер: скоуп из middleware — обязательным ключом params, после полей запроса (клиент его не подменит, ../conventions.md п. 19a)
 $search = SearchDataObject::make()
     ->setParams([...$request->validated(), 'parking_ids' => RequestHelper::getParkingIds($request)])
-    ->setPerPage((int) $request->validated('per_page', 30))
+    ->setPerPage((int) $request->validated('per_page', Page::DEFAULT_PER_PAGE))
     ->setPage($request->validated('page'));
 
-return response()->json(PaginateResource::make($this->service->search($search)));
+$paginated = $this->service->search($search);
+
+return response()->json(PaginateResource::make($paginated));
 ```
 
 ```php
@@ -54,53 +56,89 @@ namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Repositor
 
 use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
 use Illuminate\Contracts\Database\Query\Builder as BuilderContract;
+use Illuminate\Support\Collection;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
+use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Utils\Components\QueryFilters\V2\IntFilter;
 use MPS\Utils\Components\QueryFilters\V2\StringFilter;
 
 class YourRepository extends CRUDRepository implements YourRepositoryInterface
 {
+    /**
+     * @throws InvalidConfigurationAppException
+     */
     public function __construct(YourModel $model)
     {
         $this->model = $model;
+
+        parent::__construct();
     }
 
+    /**
+     * Скоуп parking_ids обязателен: нет ключа — запрос собран без контекста middleware, а не «все парковки».
+     *
+     * @throws InvalidConfigurationAppException
+     */
     protected function filterSearch(BuilderContract $query, array &$params = []): void
     {
         $tableName = $this->getTableName();
 
-        $query->select([
-            "{$tableName}.id",
-            "{$tableName}.status",
-            "{$tableName}.name",
-            "{$tableName}.created_at",
-            "{$tableName}.updated_at",
-        ]);
+        if (! array_key_exists('parking_ids', $params)) {
+            throw new InvalidConfigurationAppException('Скоуп парковок в params поиска не выставлен: нужен parking_ids');
+        }
 
-        if ($id = $params['id'] ?? null) {
+        if ($params['parking_ids'] !== null) {
+            $query->whereIn("{$tableName}.parking_id", $params['parking_ids']);
+        }
+
+        $id = $params['id'] ?? null;
+        if ($id !== null) {
             IntFilter::make()
                 ->setColumn("{$tableName}.id")
                 ->setValue($id)
                 ->apply($query);
         }
 
-        if ($name = $params['name'] ?? null) {
+        $name = $params['name'] ?? null;
+        if ($name !== null) {
             StringFilter::make()
                 ->setColumn("{$tableName}.name")
                 ->setValue($name)
                 ->apply($query);
         }
+
+        // select — после условий (../conventions.md п. 2a); сортировку по $sortAttributes и пагинацию добавляет search() ядра
+        $query->select([
+            "{$tableName}.id",
+            "{$tableName}.parking_id",
+            "{$tableName}.status",
+            "{$tableName}.name",
+            "{$tableName}.created_at",
+            "{$tableName}.updated_at",
+        ]);
+    }
+
+    public function allByIds(array $ids): Collection
+    {
+        return $this->getQuery()
+            ->whereKey($ids)
+            ->get();
     }
 }
 ```
 
+Интерфейс репозитория формы (1) наследует `Core/Database/Query/SearchRepositoryInterface` подпроекта (`search()` с `$page`, `allByIds()`); `PaginatedQueryHelper::searchByIds()` берёт записи его методом `allByIds(array $ids)`, а не собирает условие сам (`allByCondition(fn …)`): запрос — только в репозитории (`../conventions.md` п. 2).
+
 **Правила filterSearch:**
-- Всегда явно указывать `select` — не `select *`
+- Скоуп владельца (`parking_ids` и т. п.) — обязательный ключ `params`: нет ключа — `InvalidConfigurationAppException`, не `null` — `whereIn`, `null` — без ограничения, выставленный явно; `$params['parking_ids'] ?? null` и ключ в `params`, который `filterSearch()` не применяет, — тег `scope-param-defaults-unrestricted` (`../conventions.md` п. 19a)
+- Всегда явно указывать `select` — не `select *`; `select` — после условий (`../conventions.md` п. 2a)
+- Значение фильтра проверяется `!== null` (или `array_key_exists`), не присваиванием в условии: `if ($id = …)` пропускает `0` и `'0'` (`../conventions.md` п. 11b)
 - JOIN'ы до WHERE условий
-- Фильтры только из `MPS\Utils\Components\QueryFilters\V2\` (**[ОШИБКА]**, тег `repository-reinvents-core-helper`). Исключения — только то, чего в V2 нет (AINA-2978):
+- Фильтры только из `MPS\Utils\Components\QueryFilters\V2\` (тег `repository-reinvents-core-helper`). Исключения — только то, чего в V2 нет (AINA-2978):
   - `whereExists`/`EXISTS`-подзапрос (связь «есть/нет записей») — условия **внутри** подзапроса через V2;
   - `!=` и `IS NULL OR !=` — обычный `where` с биндингом (оператора в V2 нет);
   - bool-колонка — `IntFilter` со значением `0`/`1`, не исключение.
+  - скоуп владельца — `whereIn` напрямую, как в форме (2): пустой список доступных записей обязан дать пустую выборку, а значение, которое V2 отбросит, выборку расширяет (ниже).
 - Значение, которое V2 молча отбросит (не-строка в `StringFilter`, не-число в `IntFilter`), — фильтр пропадает и выборка **расширяется**. Поэтому тип значения приводится или неподходящее отсекается в сервисе до репозитория (`ValidationAppException` по ключу фильтра), а не обходится сырым `where` в репозитории.
 
   ```php

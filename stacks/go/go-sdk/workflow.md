@@ -1,6 +1,6 @@
 # Workflow слой
 
-Путь: `internal/workflows/{domain}/{module}/` или `internal/workflows/{module}/` — зависит от ситуации.
+Путь: `internal/workflows/{domain}/{module}/` (как все слои, кроме Bootstrap — `structure.md`, «Структура директорий»; эталон — `../examples/tariff/internal/workflows/billing/tariff/`).
 
 Примеры: `internal/workflows/billing/tariff/` (эталон `stacks/go/examples/tariff`); проект без доменов — `internal/workflows/tariff/`
 
@@ -9,7 +9,7 @@
 - Workflow оркестрирует несколько доменов — если логика в рамках одного домена, использовать Command/Query в домене
 - Может содержать сложную бизнес-логику если она требует координации нескольких доменов
 - Получает через конструктор интерфейсы репозиториев (Repository/CacheRepository) и сервисов доменов напрямую — что нужно сценарию (O-7); внутри `txManager.Exec` — только репозитории из аргументов, сервис пишет мимо транзакции (O-8, `infra/postgres.md`)
-- **Самостоятелен** — не вызывает другие workflow (**[ОШИБКА]** `workflow-calls-workflow`), содержит свою логику агрегата, общая логика двух workflow — по доменам: `architecture/layers.md`, «Service, Command/Query, Workflow» → «Зависимости»; хелперы — `../review-findings.md`, «Workflow самодостаточен»
+- **Самостоятелен** — не вызывает другие workflow (`workflow-calls-workflow`), содержит свою логику агрегата, общая логика двух workflow — по доменам: `architecture/layers.md`, «Service, Command/Query, Workflow» → «Зависимости»; хелперы — `../review-findings.md`, «Workflow самодостаточен»
 - Таблицы БД — всегда домену (`architecture/layers.md`, «Зависимости»); в Go тег нарушения — `service-direct-db-query` (`../review-checks.md`)
 - **Свои интерфейсы-зависимости — как у сервиса домена**, в файлах групп (`../conventions.md` п. 12): `tx_manager.go` — транзакции, `repository.go` — порт внешней системы как источник данных, `system.go` — системное и порт отправки (SMS, события) — по критерию п. 12. Условия (не дублировать домен, перенос при втором потребителе, типы порта, вызов вне транзакции, `workflow-duplicates-domain-port`) — `architecture/layers.md`, «Зависимости»; в Go: перенос — в `repository.go` или `system.go` домена по п. 12, типы — из домена или `internal/common`, не из `infrastructure/` и не из `dto.go` workflow
 - Не знает о HTTP, entrypoint и инфраструктуре: внешняя система — только через интерфейс-порт, реализация — адаптер в Infrastructure (`architecture/integrations.md`)
@@ -42,39 +42,41 @@
 package tariff
 
 type CalculateSessionDebtParams struct {
-    ParkingId    uint
-    LicensePlate string
+	ParkingID    uint
+	LicensePlate string
 }
 ```
 
 ## Шаблон workflow
 
+Тип — конкретное действие + суффикс `Workflow`, конструктор — `New{Действие}Workflow` (эталон — `CreateTariffWorkflow`, `../examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go`).
+
 ```go
 package tariff
 
-type CalculateSessionDebt struct {
-    tariffRepository       tariffdomain.Repository
-    sessionRepository      sessiondomain.Repository
-    tariffCacheRepository  tariffdomain.CacheRepository
-    sessionCacheRepository sessiondomain.CacheRepository
+type CalculateSessionDebtWorkflow struct {
+	tariffRepository       tariffdomain.Repository
+	sessionRepository      sessiondomain.Repository
+	tariffCacheRepository  tariffdomain.CacheRepository
+	sessionCacheRepository sessiondomain.CacheRepository
 }
 
-func NewCalculateSessionDebt(
-    tariffRepository tariffdomain.Repository,
-    sessionRepository sessiondomain.Repository,
-    tariffCacheRepository tariffdomain.CacheRepository,
-    sessionCacheRepository sessiondomain.CacheRepository,
-) *CalculateSessionDebt {
-    return &CalculateSessionDebt{
-        tariffRepository:       tariffRepository,
-        sessionRepository:      sessionRepository,
-        tariffCacheRepository:  tariffCacheRepository,
-        sessionCacheRepository: sessionCacheRepository,
-    }
+func NewCalculateSessionDebtWorkflow(
+	tariffRepository tariffdomain.Repository,
+	sessionRepository sessiondomain.Repository,
+	tariffCacheRepository tariffdomain.CacheRepository,
+	sessionCacheRepository sessiondomain.CacheRepository,
+) *CalculateSessionDebtWorkflow {
+	return &CalculateSessionDebtWorkflow{
+		tariffRepository:       tariffRepository,
+		sessionRepository:      sessionRepository,
+		tariffCacheRepository:  tariffCacheRepository,
+		sessionCacheRepository: sessionCacheRepository,
+	}
 }
 
-func (w *CalculateSessionDebt) Exec(ctx context.Context, params *CalculateSessionDebtParams) (*int, error) {
-    // координация между доменами
+func (w *CalculateSessionDebtWorkflow) Exec(ctx context.Context, params *CalculateSessionDebtParams) (*int, error) {
+	// координация между доменами
 }
 ```
 

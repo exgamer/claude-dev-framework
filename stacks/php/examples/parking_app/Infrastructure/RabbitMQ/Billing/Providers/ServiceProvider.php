@@ -7,7 +7,7 @@ namespace App\ParkingApp\Infrastructure\RabbitMQ\Billing\Providers;
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Провайдер RabbitMQ-инфраструктуры домена Billing.
+ * Подключает definitions.php: публикатор outbox-событий о тарифах в RabbitMQ (или его мок) за интерфейсом домена.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

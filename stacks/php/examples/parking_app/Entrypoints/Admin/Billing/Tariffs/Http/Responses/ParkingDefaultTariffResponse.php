@@ -24,10 +24,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'tariff', ref: '#/components/schemas/TariffResponse'),
         new OA\Property(
             property: 'last_event_status',
+            ref: '#/components/schemas/OutboxTariffEventStatusEnum',
             description: 'Статус доставки последнего события о тарифе; null — событий не было',
-            type: 'string',
-            enum: ['pending', 'published', 'failed', 'awaiting_retry'],
-            example: 'published',
             nullable: true
         ),
     ],

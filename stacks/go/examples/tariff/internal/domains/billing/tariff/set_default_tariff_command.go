@@ -21,7 +21,7 @@ type SetDefaultTariffCommand struct {
 	txManager       DefaultTariffTxManager
 }
 
-// Exec Чужой тариф — 404.
+// Exec Чужой или удалённый тариф — 404.
 // Поиск прежнего и снятие его флага — для обычного случая; от параллельной смены защищает уникальный индекс: ErrDefaultTariffTaken → 422, транзакция откатывается
 func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope ParkingScope) error {
 	var changedIDs []uint
@@ -46,7 +46,8 @@ func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope Parki
 		}
 
 		if previous != nil {
-			if err := repository.SetDefault(ctx, previous.ID, false); err != nil {
+			// Прежний удалён параллельно — снимать нечего
+			if err := repository.SetDefault(ctx, previous.ID, false); err != nil && !errors.Is(err, ErrTariffNotFound) {
 				return err
 			}
 
@@ -61,19 +62,18 @@ func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope Parki
 		return exception.NewValidationException(map[string]any{"is_default": "тариф по умолчанию этой парковки только что изменён другим запросом, обновите данные и повторите"}, false)
 	}
 
+	// Тариф удалён между чтением и записью флага — 404, как не найденный
+	if errors.Is(err, ErrTariffNotFound) {
+		return exception.NewNotFoundException(errors.New("тариф не найден"), false)
+	}
+
 	if err != nil {
 		return err
 	}
 
-	for _, changedID := range changedIDs {
-		c.invalidate(ctx, changedID)
+	if err := c.cacheRepository.Invalidate(ctx, changedIDs...); err != nil {
+		errorreporter.CaptureSoft(ctx, err, map[string]string{"component": "tariff_cache"})
 	}
 
 	return nil
-}
-
-func (c *SetDefaultTariffCommand) invalidate(ctx context.Context, id uint) {
-	if err := c.cacheRepository.Invalidate(ctx, id); err != nil {
-		errorreporter.CaptureSoft(ctx, err, nil)
-	}
 }

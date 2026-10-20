@@ -16,12 +16,10 @@ import (
 
 	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 	admindomain "example.com/parking-service/internal/domains/identity/admin"
+	"example.com/parking-service/pkg/requestbody"
 )
 
-const (
-	parkingIDParam = "parking_id"
-	maxBodyBytes   = 1 << 20
-)
+const parkingIDParam = "parking_id"
 
 type parkingScopeContextKey struct{}
 
@@ -31,12 +29,8 @@ var (
 	errBodyTooLarge  = errors.New("тело запроса больше 1 МБ")
 )
 
-// ResolveAdminParkingsMiddleware Кладёт в контекст парковки, доступные администратору,
-// и отклоняет parking_id из query или JSON-тела, которого нет среди доступных, — 403.
-// Непустое тело не в JSON — 415; больше 1 МБ — 413; не ровно один JSON-объект или parking_id в нём повторён
-// (в любом регистре) — 400: иначе хендлер может забиндить не то значение, что проверено здесь.
-// Ставится после JWTAuthMiddleware: без администратора в контексте — 500, маршрут собран неверно.
-// Маршруты с телом ставят и RequireJSONMiddleware, чтобы хендлер биндил тело как JSON
+// ResolveAdminParkingsMiddleware Скоуп парковок администратора в контекст; чужой parking_id — 403, тело не JSON — 415, больше 1 МБ — 413, не один объект или повтор parking_id — 400.
+// Ставится после JWTAuthMiddleware: без администратора в контексте — 500, маршрут собран неверно
 func ResolveAdminParkingsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		admin := admindomain.FromContext(c.Request.Context())
@@ -120,22 +114,14 @@ func requestedParkingIDs(c *gin.Context) ([]uint, error) {
 		}
 	}
 
-	if c.Request.Body == nil || c.Request.Body == http.NoBody {
-		return ids, nil
-	}
-
-	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, maxBodyBytes))
-
-	var tooLarge *http.MaxBytesError
-	if errors.As(err, &tooLarge) {
+	body, err := requestbody.ReadLimited(c.Writer, c.Request, requestbody.DefaultLimit)
+	if errors.Is(err, requestbody.ErrTooLarge) {
 		return nil, errBodyTooLarge
 	}
 
 	if err != nil {
 		return nil, err
 	}
-
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 	if len(body) == 0 {
 		return ids, nil

@@ -4,10 +4,8 @@ import "time"
 
 // parking Парковка
 type parking struct {
-	ID uint `gorm:"column:id;primaryKey"`
-	// LPMHost Хост ЛПМ для доставки изменений; NULL — у парковки нет ЛПМ
-	LPMHost  *string `gorm:"column:lpm_host"`
-	IsActive bool    `gorm:"column:is_active"`
+	ID       uint `gorm:"column:id;primaryKey"`
+	IsActive bool `gorm:"column:is_active"`
 	// Currency Валюта расчётов (ISO 4217)
 	Currency string `gorm:"column:currency"`
 	// DeletedAt Мягкое удаление; удалённая парковка не читается

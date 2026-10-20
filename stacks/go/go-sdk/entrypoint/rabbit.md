@@ -2,20 +2,20 @@
 
 Путь: `internal/entrypoints/consumer/rabbit/{domain}/{module}/` — контекст `consumer` для событий брокера (`stacks/go/structure.md`, «Entrypoint Layer»; эталон — `examples/tariff/internal/entrypoints/consumer/rabbit/billing/tariff/`).
 
-Пакет: `github.com/exgamer/gosdk-rabbit-core`
+Пакет: `git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core` (как в `go.mod` эталона; GitHub — `github.com/exgamer/gosdk-rabbit-core`)
 
 ## Правила
 
-- **Структура директорий обязана** содержать корень `internal/entrypoints/` и сегмент `rabbit/`; отсутствие любого из них — **[ОШИБКА]**:
+- **Структура директорий обязана** содержать корень `internal/entrypoints/` и сегмент `rabbit/`; отсутствие любого из них — тег `file-wrong-location`:
   - неверный корень (например `entrypoint/consumer/` вместо `internal/entrypoints/{context}/rabbit/`)
   - отсутствие сегмента `rabbit/` в пути
   - плоская структура `consumer/{module}/` без `rabbit/` и `{context}/`
 - Общие правила consumer (тонкий, идемпотентный, payload через DTO, временная ошибка — повтор, постоянная — фиксация, топология при старте) — `approaches/patterns/async.md`, «Consumer». Ниже — как это выглядит в Go SDK
 - Работа с RabbitMQ только через `gosdk-rabbit-core`; прямое использование клиента запрещено
-- Каждый consumer — отдельная структура со своим файлом `{module}_consumer.go`; файл с именем просто `consumer.go` (без префикса модуля) — **[ОШИБКА]**
+- Каждый consumer — отдельная структура со своим файлом `{module}_consumer.go`; файл с именем просто `consumer.go` (без префикса модуля) — тег `file-wrong-location`
 - Регистрация consumers обязательно через `consumer_registry.go` с функцией `GetConsumers`
 - `nil` = ACK, `error` = NACK (повтор); явные `msg.Ack()` / `msg.Nack()` запрещены
-- Ошибка десериализации payload — постоянная: вернуть `nil` (ACK), не `error`; иначе сообщение будет повторяться бесконечно
+- Ошибка десериализации payload и пустое обязательное поле — постоянные: в трекер (`errorreporter.CaptureError` с ID сообщения) и `nil` (ACK), не `error` — иначе сообщение будет повторяться бесконечно; молчаливый ACK без трекера — сообщение теряется бесследно (`approaches/patterns/async.md`, «Consumer»; `../../conventions.md` п. 19)
 - Модель payload — unexported структура внутри пакета
 
 ## Consumer
@@ -23,28 +23,46 @@
 `nil` = ACK, `error` = NACK (повтор). Явные `msg.Ack()` / `msg.Nack()` не использовать.
 
 ```go
+// parkingDeactivatedMessage Событие справочника handbook.parking.deactivated
 type parkingDeactivatedMessage struct {
-    ParkingID uint `json:"parking_id"`
+	ParkingID uint `json:"parking_id"`
+}
+
+func NewConsumer(tariffService *tariffdomain.Service) *Consumer {
+	return &Consumer{
+		tariffService: tariffService,
+	}
 }
 
 type Consumer struct {
-    service *domain.Service
+	tariffService *tariffdomain.Service
 }
 
-func NewConsumer(service *domain.Service) *Consumer {
-    return &Consumer{service: service}
-}
-
+// Consume Битый payload повтором не исправить — в трекер и ACK; временная ошибка — NACK
 func (c *Consumer) Consume(ctx context.Context, msg *message.Message) error {
-    var payload parkingDeactivatedMessage
-    if err := json.Unmarshal(msg.Payload, &payload); err != nil {
-        // невалидный payload — ACK чтобы не повторять бесконечно
-        return nil
-    }
+	var payload parkingDeactivatedMessage
 
-    return c.service.DeactivateByParkingID(ctx, payload.ParkingID)
+	tags := map[string]string{"component": "tariff_consumer"}
+
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		decodeErr := fmt.Errorf("decode handbook.parking.deactivated failed (message_uuid=%s): %w", msg.UUID, err)
+		errorreporter.CaptureError(ctx, decodeErr, tags)
+
+		return nil
+	}
+
+	if payload.ParkingID == 0 {
+		payloadErr := fmt.Errorf("handbook.parking.deactivated without parking_id (message_uuid=%s)", msg.UUID)
+		errorreporter.CaptureError(ctx, payloadErr, tags)
+
+		return nil
+	}
+
+	return c.tariffService.DeactivateByParkingID(ctx, payload.ParkingID)
 }
 ```
+
+Эталон — `examples/tariff/internal/entrypoints/consumer/rabbit/billing/tariff/tariff_consumer.go` (там же — предел попыток: на последней — в трекер и ACK).
 
 ## consumer_registry.go
 
@@ -52,18 +70,18 @@ func (c *Consumer) Consume(ctx context.Context, msg *message.Message) error {
 
 ```go
 func GetConsumers(consumer *Consumer) []config.HandlerRegister {
-    return []config.HandlerRegister{
-        {
-            Handler: consumer.Consume,
-            Config: config.NewConsumerTopicDurableConfig(
-                "catalog-product-consumer", // consumer tag, уникальное имя
-                "catalog.product.*",        // routing key, wildcards поддерживаются
-                "catalog-exchange",         // exchange издателя
-                "catalog-product-queue",    // своя очередь сервиса
-                10,                         // prefetch
-            ),
-        },
-    }
+	return []config.HandlerRegister{
+		{
+			Handler: consumer.Consume,
+			Config: config.NewConsumerTopicDurableConfig(
+				"catalog-product-consumer", // consumer tag, уникальное имя
+				"catalog.product.*",        // routing key, wildcards поддерживаются
+				"catalog-exchange",         // exchange издателя
+				"catalog-product-queue",    // своя очередь сервиса
+				10,                         // prefetch
+			),
+		},
+	}
 }
 ```
 
@@ -72,7 +90,7 @@ func GetConsumers(consumer *Consumer) []config.HandlerRegister {
 ```go
 reg, err := rabbitDI.GetRabbitConsumersRegistry(a.Container)
 if err != nil {
-    return err
+	return err
 }
 
 reg.RegisterMultipleHandler(consumer.GetConsumers(consumersFactory.ProductConsumer))
@@ -84,16 +102,20 @@ reg.RegisterMultipleHandler(consumer.GetConsumers(consumersFactory.ProductConsum
 // bootstrap модуля: издатель — по определению из infrastructure/rabbit/{domain}/{module}/publisher_definition.go
 publishersRegistry, err := rabbitDI.GetRabbitPublishersRegistry(a.Container)
 if err != nil {
-    return err
+	return err
 }
-if err := publishersRegistry.Register(outboxrabbit.NewPublisherDefinition()); err != nil {   // config.NewPublisherDefinition(name, config.NewPublisherTopicDurableConfig(exchange)...)
-    return err
+
+// определение — config.NewPublisherDefinition(name, config.NewPublisherTopicDurableConfig(exchange)...)
+if err := publishersRegistry.Register(outboxrabbit.NewPublisherDefinition()); err != nil {
+	return err
 }
-publisher, err := publishersRegistry.Get(outboxrabbit.PublisherName)   // *rabbitmq.Publisher
+
+publisher, err := publishersRegistry.Get(outboxrabbit.PublisherName) // *rabbitmq.Publisher
 if err != nil {
-    return err
+	return err
 }
-rabbitPublisher := outboxrabbit.NewRabbitPublisher(publisher)          // адаптер, реализует порт домена
+
+rabbitPublisher := outboxrabbit.NewRabbitPublisher(publisher) // адаптер, реализует порт домена
 
 // адаптер: первый аргумент — routing key (topic), payload — any (маршалер SDK)
 err = p.publisher.PublishWithMetaData(event.RoutingKey, metadata, entityToMessage(event))
@@ -101,12 +123,13 @@ err = p.publisher.PublishWithMetaData(event.RoutingKey, metadata, entityToMessag
 
 API — `go-sdk/reference/{gitlab,github}/gosdk-rabbit-core.md` (`PublisherRegistry.Register`/`Get`, `Publisher.Publish(topic string, payload any)`, `PublishWithMetaData`); `GetPublisher()` в SDK нет. Эталон — `examples/tariff/internal/infrastructure/rabbit/billing/outbox_tariff_event/{publisher,publisher_definition}.go`, регистрация — `examples/tariff/internal/app/bootstrap/billing/outbox_tariff_event/module.go`.
 
-- **Тип-обёртка над `*rabbitmq.Publisher` не называется `Publisher`** — если инфра-адаптер конкретного домена (`internal/infrastructure/rabbit/{domain}/{module}/publisher.go`) реализует доменный интерфейс `Publisher` через встроенный `*rabbitmq.Publisher`, называть сам адаптер тоже `Publisher` — **[ВНИМАНИЕ]**: получается три сущности с одним именем (доменный интерфейс `Publisher`, инфра-структура `Publisher`, SDK-тип `rabbitmq.Publisher` как поле) — путаница при переходе по определению/грепе. Называть адаптер иначе (`RabbitPublisher` или с префиксом домена)
-- **Обёртка ради обёртки** — если инфра-тип (`RetryScheduler`, `XxxPublisher` и т.п.) не добавляет никакой логики поверх `*rabbitmq.Publisher.Publish(...)`, кроме фиксированного routing key — это нормальный Adapter (домен не должен знать routing key). Но если поверх уже есть один такой адаптер и создаётся ещё один слой обёртки без новой логики — **[ВНИМАНИЕ]**, пересмотреть структуру
+- **Публикация с таймаутом** — ожидание подтверждения брокера в SDK (watermill `ConfirmDelivery`) ничем не ограничено: адаптер ограничивает его сам (`context.WithTimeout` + `select`, эталон — `publisher.go`, `publishTimeout` 5 с), иначе зависший брокер держит HTTP-запрос и прогон повтора (`approaches/patterns/performance.md`, `external-call-without-timeout`). Таймаут освобождает вызывающего, но не горутину с вызовом SDK: она ждёт ответа брокера дальше, и при зависшем брокере такие горутины копятся до его ответа или разрыва соединения.
+- **Тип-обёртка над `*rabbitmq.Publisher` не называется `Publisher`** — если инфра-адаптер конкретного домена (`internal/infrastructure/rabbit/{domain}/{module}/publisher.go`) реализует доменный интерфейс `Publisher` через встроенный `*rabbitmq.Publisher`, называть сам адаптер тоже `Publisher` — тег `rabbit-adapter-same-name`: получается три сущности с одним именем (доменный интерфейс `Publisher`, инфра-структура `Publisher`, SDK-тип `rabbitmq.Publisher` как поле) — путаница при переходе по определению/грепе. Называть адаптер иначе (`RabbitPublisher` или с префиксом домена)
+- **Обёртка ради обёртки** — если инфра-тип (`RetryScheduler`, `XxxPublisher` и т.п.) не добавляет никакой логики поверх `*rabbitmq.Publisher.Publish(...)`, кроме фиксированного routing key — это нормальный Adapter (домен не должен знать routing key). Но если поверх уже есть один такой адаптер и создаётся ещё один слой обёртки без новой логики — тег `rabbit-wrapper-over-adapter`, пересмотреть структуру
 
 ## Декларация топологии без consumer-а
 
-Для очередей, у которых намеренно нет читателя в этом сервисе (TTL/DLX retry-очередь, dead-letter buffer и т.п.) — **не поднимать своё `amqp.Dial`-соединение**. Это отдельный TCP/AMQP-коннект в обход kernel-а, который живёт дольше, чем нужно, дублирует сборку connection string и не виден в общем графе соединений приложения — **[ОШИБКА]**.
+Для очередей, у которых намеренно нет читателя в этом сервисе (TTL/DLX retry-очередь, dead-letter buffer и т.п.) — **не поднимать своё `amqp.Dial`-соединение**. Это отдельный TCP/AMQP-коннект в обход kernel-а, который живёт дольше, чем нужно, дублирует сборку connection string и не виден в общем графе соединений приложения — тег `rabbit-own-connection`.
 
 ```go
 // плохо — своё соединение в обход SDK
@@ -118,19 +141,21 @@ ch, err := conn.Channel()
 // хорошо — переиспользуем соединение kernel-а (gosdk-rabbit-core >= v1.0.5)
 conn, err := rabbitDI.GetRabbitConnection(a.Container)
 if err != nil {
-    return err
+	return err
 }
 
 err = rabbitmq.DeclareTopology(conn, func(ch *amqp091.Channel) error {
-    if err := ch.ExchangeDeclare(...); err != nil {
-        return err
-    }
-    _, err := ch.QueueDeclare(...)
-    return err
+	if err := ch.ExchangeDeclare(...); err != nil {
+		return err
+	}
+
+	_, declareErr := ch.QueueDeclare(...)
+
+	return declareErr
 })
 ```
 
-Такая декларация топологии (exchange/queue/binding без собственного consumer-а) — это одноразовая настройка приложения при старте, а не repository-операция; вызывающий код и сама функция декларации относятся к **Bootstrap**, а не к Infrastructure, даже если рядом лежат другие rabbit-related инфра-файлы (`publisher.go`, `retry_scheduler.go`). Расположение такого кода в `internal/infrastructure/rabbit/{domain}/{module}/` — **[ВНИМАНИЕ]**, разместить рядом с единственным вызывающим `Setup`/`module.go` в `internal/app/bootstrap/{module}/`.
+Такая декларация топологии (exchange/queue/binding без собственного consumer-а) — это одноразовая настройка приложения при старте, а не repository-операция; вызывающий код и сама функция декларации относятся к **Bootstrap**, а не к Infrastructure, даже если рядом лежат другие rabbit-related инфра-файлы (`publisher.go`, `retry_scheduler.go`). Расположение такого кода в `internal/infrastructure/rabbit/{domain}/{module}/` — тег `rabbit-topology-in-infrastructure`, разместить рядом с единственным вызывающим `Setup`/`module.go` в `internal/app/bootstrap/{module}/`.
 
 ## Кастомный Marshaler
 
@@ -140,4 +165,4 @@ err = rabbitmq.DeclareTopology(conn, func(ch *amqp091.Channel) error {
 cfg = append(cfg, rabbitconfig.WithCustomMarshaler(marshaler.DeathTolerantMarshaler{}))
 ```
 
-Если в разных consumer-ах (разных доменов) уже есть две независимые реализации, решающие одну и ту же транспортную проблему (например, обработка `x-death`) разными способами — **[ОШИБКА]**: это не доменная логика, а общая инфраструктурная проблема AMQP/watermill, которая должна решаться один раз и переиспользоваться (в SDK, если затрагивает не только этот сервис) — заменить обе копии на общую реализацию. Частный случай общего правила «не-бизнесовая функциональность не дублируется» — см. `../../conventions.md`, п. 22.
+Если в разных consumer-ах (разных доменов) уже есть две независимые реализации, решающие одну и ту же транспортную проблему (например, обработка `x-death`) разными способами — тег `infra-logic-duplicated`: это не доменная логика, а общая инфраструктурная проблема AMQP/watermill, которая должна решаться один раз и переиспользоваться (в SDK, если затрагивает не только этот сервис) — заменить обе копии на общую реализацию. Частный случай общего правила «не-бизнесовая функциональность не дублируется» — см. `../../conventions.md`, п. 22.

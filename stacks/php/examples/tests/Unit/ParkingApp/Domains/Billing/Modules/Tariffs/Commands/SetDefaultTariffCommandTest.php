@@ -11,6 +11,7 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepository
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
@@ -24,6 +25,8 @@ use PHPUnit\Framework\TestCase;
  */
 class SetDefaultTariffCommandTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const PARKING_ID = 15;
 
     private const TARIFF_ID = 10;
@@ -51,12 +54,6 @@ class SetDefaultTariffCommandTest extends TestCase
             $this->cacheRepository,
             $this->exceptionHandler,
         );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
     public function test_previous_default_loses_flag_and_tariff_becomes_default(): void

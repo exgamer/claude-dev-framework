@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/exception"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/response"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/validators"
 	"github.com/gin-gonic/gin"
@@ -39,15 +40,18 @@ type Handler struct {
 // @Tags			admin-tariff
 // @Produce		json
 // @Param			parking_id	query	int	false	"ID парковки"
-// @Param			page		query	int	false	"Страница"
+// @Param			page		query	int	false	"Страница (до 10000)"
 // @Param			per_page	query	int	false	"Записей на странице (до 100)"
 // @Security		BearerAuth
 // @Success		200	{object}	tariffListResponse
+// @Failure		400	{object}	structures.BadRequestErrorResponse
 // @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
+// @Failure		413	{object}	structures.BadRequestErrorResponse
+// @Failure		415	{object}	structures.BadRequestErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
-// @Router			/api/v1/admin/tariffs [get]
+// @Router			/api/admin/v1/billing/tariffs [get]
 func (h *Handler) Index() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		request := indexRequest{}
@@ -84,13 +88,16 @@ func (h *Handler) Index() gin.HandlerFunc {
 // @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
+// @Failure		413	{object}	structures.BadRequestErrorResponse
+// @Failure		415	{object}	structures.BadRequestErrorResponse
+// @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
-// @Router			/api/v1/admin/tariffs/{id} [get]
+// @Router			/api/admin/v1/billing/tariffs/{id} [get]
 func (h *Handler) View() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := validators.GetIntQueryParam(c, "id")
 		if err != nil {
-			response.BadRequest(c, err, nil)
+			response.ErrorResponse(c, exception.NewValidationException(map[string]any{"id": "id должен быть положительным целым числом"}, false))
 
 			return
 		}
@@ -120,12 +127,15 @@ func (h *Handler) View() gin.HandlerFunc {
 // @Param			parking_id	query	int	true	"ID парковки"
 // @Security		BearerAuth
 // @Success		200	{object}	tariffResponse
+// @Failure		400	{object}	structures.BadRequestErrorResponse
 // @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
+// @Failure		413	{object}	structures.BadRequestErrorResponse
+// @Failure		415	{object}	structures.BadRequestErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
-// @Router			/api/v1/admin/tariffs/default [get]
+// @Router			/api/admin/v1/billing/tariffs/default [get]
 func (h *Handler) Default() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		request := defaultRequest{}
@@ -152,7 +162,7 @@ func (h *Handler) Default() gin.HandlerFunc {
 }
 
 // @Summary		Создать тариф
-// @Description	Тариф создаётся не дефолтным; дефолт назначается отдельным запросом. Валюта — валюта парковки, цена — не выше лимита парковки в реестре парковок, иначе 422; parking_id недоступной парковки — 403
+// @Description	Тариф создаётся не дефолтным; дефолт назначается отдельным запросом. Парковка не найдена или отключена — 422; валюта — валюта парковки, цена — не выше лимита парковки в реестре парковок, иначе 422; parking_id недоступной парковки — 403
 // @Tags			admin-tariff
 // @Accept			json
 // @Produce		json
@@ -166,7 +176,7 @@ func (h *Handler) Default() gin.HandlerFunc {
 // @Failure		415	{object}	structures.BadRequestErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
-// @Router			/api/v1/admin/tariffs [post]
+// @Router			/api/admin/v1/billing/tariffs [post]
 func (h *Handler) Create() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		request := createRequest{}
@@ -215,12 +225,12 @@ func (h *Handler) Create() gin.HandlerFunc {
 // @Failure		415	{object}	structures.BadRequestErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
-// @Router			/api/v1/admin/tariffs/{id} [patch]
+// @Router			/api/admin/v1/billing/tariffs/{id} [patch]
 func (h *Handler) Update() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := validators.GetIntQueryParam(c, "id")
 		if err != nil {
-			response.BadRequest(c, err, nil)
+			response.ErrorResponse(c, exception.NewValidationException(map[string]any{"id": "id должен быть положительным целым числом"}, false))
 
 			return
 		}
@@ -259,14 +269,16 @@ func (h *Handler) Update() gin.HandlerFunc {
 // @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		403	{object}	structures.ForbiddenErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
+// @Failure		413	{object}	structures.BadRequestErrorResponse
+// @Failure		415	{object}	structures.BadRequestErrorResponse
 // @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
-// @Router			/api/v1/admin/tariffs/{id}/set-default [post]
+// @Router			/api/admin/v1/billing/tariffs/{id}/set-default [post]
 func (h *Handler) SetDefault() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := validators.GetIntQueryParam(c, "id")
 		if err != nil {
-			response.BadRequest(c, err, nil)
+			response.ErrorResponse(c, exception.NewValidationException(map[string]any{"id": "id должен быть положительным целым числом"}, false))
 
 			return
 		}

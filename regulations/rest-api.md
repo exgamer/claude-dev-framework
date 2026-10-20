@@ -26,14 +26,18 @@ URL описывает ресурс, без глаголов. Действие �
 ## URL
 
 ```
-/api/<context>/<version?>/<domain>/<module>/<entity>/<action?>
+/api/<context>/<version>/<domain>/<module>/<entity>/<action?>
 ```
+
+Модуль, совпадающий с сущностью, не повторяется: модуль `tariff` домена `billing` с сущностью «тариф» — `/api/admin/v1/billing/tariffs`, не `/api/admin/v1/billing/tariff/tariffs`; `<module>` пишется, только когда сущность — не главная сущность модуля (`/api/admin/v1/billing/tariff/price-limits`).
+
+Новый код — по этой схеме. Существующий путь не по схеме (версия перед контекстом, без домена, без версии) — **[ВНИМАНИЕ]** «унаследовано» (`approaches/process/review.md`, «Порядок», п. 3a): это контракт клиентов, меняется только новой версией по вопросу пользователя (раздел «Версионирование»).
 
 В PHP-монолите первый сегмент после `/api` — подпроект (`/parking/admin/tariffs`, `stacks/php/conventions.md` п. 20): это контракт существующих клиентов, новый подпроект следует ему, новый сервис — схеме выше.
 
 - `context` — аудитория: `admin`, `client` (совпадает с `{context}` в `entrypoints/{context}/`).
 - `version` — `v1` для всего нового.
-- kebab-case, сущности во множественном числе для коллекций.
+- kebab-case; сущность — во множественном числе (`tariffs`, `categories`), и в пути коллекции, и в пути записи (`/tariffs/{id}`).
 
 ```
 GET    /api/admin/v1/catalog/categories
@@ -42,7 +46,8 @@ POST   /api/admin/v1/catalog/categories
 PUT    /api/admin/v1/catalog/categories/{id}
 PATCH  /api/admin/v1/catalog/categories/{id}
 DELETE /api/admin/v1/catalog/categories/{id}
-POST   /api/admin/v1/catalog/category/tree/sort
+POST   /api/admin/v1/catalog/categories/sort
+POST   /api/admin/v1/catalog/categories/{id}/publish
 ```
 
 Версия — только в пути, никогда в домене (`api-v2.domain.kz` запрещено).
@@ -51,17 +56,21 @@ POST   /api/admin/v1/catalog/category/tree/sort
 
 Только формат (O-11, `architecture/layers.md`), в валидации точки входа — без запросов к хранилищу и проверок доступа.
 
-- `id` и `*_id` — положительное целое (`gt:0`): ноль и отрицательные проходят проверку типа и дают пустой 404 или 500 вместо 422.
-- У строк, чисел **и массивов** — верхняя граница (`max:`, `between:`, лимит элементов): массив без лимита — DoS через тело запроса.
-- Допустимые значения — через enum (`Rule::enum()`, `validate:"oneof=…"`), не строкой в сравнении; новый кейс enum обновляет и валидацию, и Swagger (`enum-list-drift`).
+- `id` и `*_id` — положительное целое (`gt:0`), в том числе `id` в пути (`/{id}`): ноль и отрицательные проходят проверку типа и дают пустой 404 или 500 — поэтому `id ≤ 0` — **422** во всех стеках (Go — ошибку разбора параметра пути/запроса переводить в `ValidationException`; PHP — `id > 0` в валидации запроса). Существующий ответ 400/404 на `id ≤ 0` — **[ВНИМАНИЕ]** «унаследовано». Верхняя граница `id` — предел `bigint` БД (`9223372036854775807`): больше — 422 правилом `max:` этого предела, не переполнение; меньший произвольный лимит у `id` не ставится. Исключение — предел SDK, не свой лимит: Go `validators.GetIntQueryParam` (`gosdk-http-core` 1.0.14) пропускает в пути не больше 18 цифр, `id` ≥ 10^18 — 422 (текст ошибки SDK «Max: 2147483647» не соответствует проверке).
+- У строк — `max:` (длина), у чисел и **массивов** — верхняя граница (`max:`, `between:`, лимит элементов): массив без лимита — DoS через тело запроса.
+- Допустимые значения — через enum (`Rule::enum()`, `binding:"oneof=…"`), не строкой в сравнении; новый кейс enum обновляет и валидацию, и Swagger (`enum-list-drift`).
 - Вложенная коллекция — список объектов (`list` + `{поле}.*: array`), не «массив чего угодно»: иначе ядро молча соберёт пустую коллекцию.
 - PUT — полные данные: каждое поле обязательно к передаче (`required` / `present|nullable`), неприсланное — 422 (O-10).
-- Пагинация — `page ≥ 1`, `per_page` в границах (≤ 100, `approaches/patterns/performance.md`), сортировка — enum допустимых полей.
+- Пагинация — `page`: не передан или `0` — первая страница; отрицательный — 422; верх — 10000 (глубокий OFFSET, `approaches/patterns/performance.md`), больше — 422. `per_page`: не передан — **30** (оба стека), в границах (≤ 100, `performance.md`). Сортировка — enum допустимых полей.
+- Сортировка списка — явная и стабильная (тег `list-without-default-sort`; уровни тегов — `approaches/process/review-tags.md`): запрос списка всегда заканчивается явным `ORDER BY` — без него порядок страниц в Postgres не гарантирован; по умолчанию — ключ или дата + `id` для стабильности. Сортировка по выбору клиента — параметр-enum допустимых полей, описан в Swagger; разрешённые поля перечислены явно. Механизм — `stacks/php/conventions.md` п. 12c.
+- Поле запроса списка = поле фильтра = условие (тег `request-filter-not-applied`): каждое поле запроса списка попадает в фильтр (DTO/параметры поиска) и применяется условием в запросе репозитория, и наоборот; поле, которое валидируется, но не фильтрует, — убрать (а не переносить из легаси «как было»). Механизм — `stacks/php/conventions.md` п. 12d.
 - Нормализация формата (телефон, номер) — на границе вызовом хелпера, дальше по цепочке — уже нормализованное значение (`core/principles.md`, «Повторяющаяся обработка — один хелпер»).
 
 ## Статусы
 
-200 успех · 201 создано · 204 без содержимого · 400 некорректный запрос · 401 не авторизован · 403 нет прав · 404 не найдено · 422 валидация · 5xx сервер.
+200 успех · 201 создано · 204 без содержимого · 400 некорректный запрос (тело не разбирается) · 401 не авторизован · 403 нет прав · 404 не найдено · 413 тело больше лимита · 415 неподдерживаемый `Content-Type` · 422 валидация · 500 ошибка сервера · 503 сервис не готов (readiness, зависимость недоступна).
+
+Коды, которые эндпойнт может отдать (в том числе от middleware группы: 400/413/415 по телу, 401/403), — в его Swagger.
 
 ## Формат ответа
 
@@ -71,17 +80,26 @@ POST   /api/admin/v1/catalog/category/tree/sort
 { "success": true, "data": { } }
 ```
 
-Пагинация:
+Пагинация — формат Go SDK (`gosdk-db-core`, `pagination.Paginated`/`pagination.Pagination`), эталонный для всех стеков (решение пользователя 2026-10-20). Первоисточник `REST-API-STANDARDS.md` пишет другие ключи (`page`, `items_per_page`, `total_items`, `params`) — фактически применяется этот формат:
 
 ```json
-{ "success": true, "data": { "items": [], "pagination": { "page": 1, "last_page": 1, "from": 1, "to": 2, "items_per_page": 30, "total_items": 2 }, "params": [] } }
+{ "success": true, "data": { "items": [], "pagination": { "total": 42, "last_page": 2, "offset": 30, "from": 30, "to": 0, "per_page": 30, "current_page": 2, "prev_page": 1, "next_page": 2 } } }
 ```
 
-Ошибка:
+- Go — `pagination.Paginated` из SDK как есть; PHP — `Core/Resources/PaginationMeta` подпроекта, считает значения тем же алгоритмом (обе формы списка — `stacks/php/conventions.md` п. 2c, ответ списка — п. 19). Свой набор ключей — тег `pagination-format`.
+- Значения — как считает SDK (`pagination.Pages`): `last_page` — 0 при пустом списке; `from` равен `offset` (не номер первой записи); `to` не заполняется (0); `prev_page` на первой странице непустого списка — 1 (пустой список — 0, ниже); `next_page` не больше `last_page`. Это поведение SDK, клиенты на него опираются — не «исправлять» в одном стеке.
+- Пустой список (`total` 0): `last_page` 0, `from` 0, `to` 0, `prev_page` 0, `next_page` 0, `current_page` — запрошенная страница, `offset` — `(page − 1) × per_page` (на первой — 0).
+- Страница за последней (`current_page` > `last_page` ≥ 1): `items` пустой, `offset` и `from` — `(page − 1) × per_page`, `next_page` = `last_page`, `prev_page` = `last_page − 1`; не 404.
+- Сверено с исходником `gosdk-db-core` 1.0.10 (`pkg/query/pagination/paginator.go`, `Pages`); PHP — `PaginationMeta` эталона и его тест (`stacks/php/examples/`).
+
+Ошибка — фактический формат ответа SDK/ядра (описывается в Swagger как есть):
 
 ```json
-{ "success": false, "data": { "status": 422, "error": "VALIDATION_ERROR", "message": "Входные данные не действительны.", "details": { "field": ["..."] } } }
+{ "success": false, "data": { "status": 422, "error": "VALIDATION_ERROR", "message": "Входные данные не действительны.", "request_id": "…", "hostname": "<имя сервиса>", "app_error_code": 0, "details": { "field": ["..."] } } }
 ```
+
+- `status`, `error`, `message`, `hostname`, `details` — оба стека; `request_id` — Go SDK (`gosdk-http-core`, `response.Formatted`, из `RequestMiddleware`); `app_error_code` — PHP (`mps/core`, `AppException`).
+- `file` и `trace` — только в отладочном режиме (PHP `app.debug = true`); на окружениях отладка выключена.
 
 ## Версионирование
 

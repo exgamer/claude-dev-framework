@@ -10,7 +10,7 @@ use MPS\Core\DataObjects\DataObject;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Фильтр списка тарифов.
+ * Условия списка тарифов: парковка, скоуп парковок администратора (обязателен явно), статус и сортировка.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -24,7 +24,7 @@ class TariffFilterDto extends DataObject
     private ?array $parkingIds = null;
 
     /**
-     * Скоуп выставлен явно: null в $parkingIds без вызова setParkingIds — не «без ограничения» (scope-param-defaults-unrestricted).
+     * Скоуп выставлен явно: null в $parkingIds без вызова setParkingIds — не «без ограничения».
      */
     private bool $parkingIdsSet = false;
 

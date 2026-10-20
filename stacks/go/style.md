@@ -16,13 +16,13 @@
 
 ```go
 import (
-    "context"
-    "errors"
+	"context"
+	"errors"
 
-    "gorm.io/gorm"
-    "github.com/exgamer/gosdk-core/pkg/exception"
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/exception"
+	"gorm.io/gorm"
 
-    tariffdomain "git.example.com/.../internal/domains/billing/tariff"
+	tariffdomain "example.com/parking-service/internal/domains/billing/tariff"
 )
 ```
 
@@ -79,7 +79,7 @@ import (
       SetRequestTimeout(timeout).
       SetThrowUnmarshalError(false)
   ```
-- Читается сверху вниз (`core/style.md`, «Форма кода»; **[ВНИМАНИЕ]**): вызов не вкладывается в вызов и не индексируется на месте, замыкание не передаёт поведение в свою функцию, функция-литерал — короткая, без затенения внешних переменных, глубина блоков ≤ 2. Один уровень с коротким аргументом допустим.
+- Читается сверху вниз (`core/style.md`, «Форма кода»; `nested-call-chain`): вызов не вкладывается в вызов и не индексируется на месте, замыкание не передаёт поведение в свою функцию, функция-литерал — короткая, без затенения значимых внешних имён (переменная с данными, которую код ниже ещё читает: `tariff`, `scope`, `result`), глубина блоков ≤ 2. Один уровень с коротким аргументом допустим. Затенением не считаются идиомы: `if err := …; err != nil` при внешнем `err` и параметр `ctx` у `fn` транзакции SDK (`txManager.Exec(ctx, func(ctx context.Context, …) error {…})`) — внутри `fn` нужен именно его `ctx`.
 
   ```go
   // допустимо: аргумент — один вызов маппера от входных данных

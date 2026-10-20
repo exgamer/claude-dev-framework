@@ -14,13 +14,14 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Validators\TariffDtoValidator
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Core\Exceptions\ValidationAppException;
 use MPS\Core\Services\Service;
 
 /**
- * CRUD-сервис тарифов.
+ * Тариф по ID — кеш, затем БД со скоупом парковок; запись — после доменных инвариантов, со сбросом кеша; недоступный кеш запрос не роняет.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -68,6 +69,9 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
         return $tariff;
     }
 
+    /**
+     * @throws InvalidConfigurationAppException
+     */
     public function paginate(TariffFilterDto $filter, Page $page): LengthAwarePaginator
     {
         return $this->repository->paginateTariffs($filter, $page);
@@ -120,7 +124,7 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
 
-        if (! $this->repository->updateFromDto($tariff, $dto)) {
+        if (! $this->repository->updateFromDto($tariff->id, $dto)) {
             throw new ValidationAppException('VALIDATION ERROR', [
                 'parking_id' => ['У этой парковки уже есть тариф по умолчанию — сначала назначьте его другому тарифу'],
             ]);
@@ -128,7 +132,13 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
 
         $this->forgetCached($tariff->id);
 
-        return $tariff;
+        $updated = $this->repository->getByIdInParkings($id, $parkingIds);
+
+        if (! $updated) {
+            throw new NotFoundAppException('Тариф не найден');
+        }
+
+        return $updated;
     }
 
     /**

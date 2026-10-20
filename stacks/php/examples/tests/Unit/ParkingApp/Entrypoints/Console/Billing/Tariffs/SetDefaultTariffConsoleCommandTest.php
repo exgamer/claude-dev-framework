@@ -6,9 +6,11 @@ namespace Tests\Unit\ParkingApp\Entrypoints\Console\Billing\Tariffs;
 
 use App\ParkingApp\Core\Database\Managers\NoopTransactionManager;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Commands\SetDefaultTariffCommand;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Entrypoints\Console\Billing\Tariffs\SetDefaultTariffConsoleCommand;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Mockery;
 use Mockery\MockInterface;
 use MPS\Core\Exceptions\NotFoundAppException;
@@ -32,16 +34,16 @@ class SetDefaultTariffConsoleCommandTest extends TestCase
         parent::setUp();
 
         $this->repository = Mockery::mock(TariffRepositoryInterface::class);
-        $this->app->instance(
-            SetDefaultTariffCommand::class,
-            new SetDefaultTariffCommand($this->repository, new NoopTransactionManager()),
-        );
-    }
+        $cacheRepository = Mockery::mock(TariffCacheRepositoryInterface::class);
+        $cacheRepository->shouldNotReceive('forget');
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
+        $command = new SetDefaultTariffCommand(
+            $this->repository,
+            new NoopTransactionManager(),
+            $cacheRepository,
+            Mockery::mock(ExceptionHandler::class),
+        );
+        $this->app->instance(SetDefaultTariffCommand::class, $command);
     }
 
     public function test_tariff_becomes_default_without_parking_scope(): void

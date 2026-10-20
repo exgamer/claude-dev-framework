@@ -136,3 +136,16 @@ func TestService_Update_InvalidPatchIs422(t *testing.T) {
 	assert.Contains(t, appException.Context, "name")
 	assert.Equal(t, "свой", tariffs.Items[1].Name, "тариф не изменён")
 }
+
+// TestService_Update_DeletedBetweenReadAndWriteIsNotFound Тариф прочитан (здесь — из кеша), но запись изменила 0 строк — 404
+func TestService_Update_DeletedBetweenReadAndWriteIsNotFound(t *testing.T) {
+	tariffs := billingfakes.NewTariffRepository()
+	cache := billingfakes.NewTariffCacheRepository()
+	cache.Items[5] = tariffdomain.Tariff{ID: 5, ParkingID: 7, Name: "удалён"}
+	service := tariffdomain.NewService(tariffs, cache)
+	name := "переименован"
+
+	_, err := service.Update(context.Background(), 5, tariffdomain.ParkingScope{All: true}, &tariffdomain.Patch{Name: &name})
+
+	requireNotFound(t, err)
+}

@@ -7,7 +7,7 @@ namespace App\ParkingApp\Core\Providers;
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Базовый провайдер модулей подпроекта.
+ * Предок провайдеров доменов подпроекта: ресурсы модуля рядом с провайдером подключает автозагрузка ModuleServiceProvider ядра.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

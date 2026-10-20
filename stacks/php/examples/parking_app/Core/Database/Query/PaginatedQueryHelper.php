@@ -4,45 +4,35 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Core\Database\Query;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
+use App\ParkingApp\Core\Resources\PaginationMeta;
+use Illuminate\Pagination\LengthAwarePaginator;
 use MPS\Core\Components\CRUD\DataObjects\SearchDataObject;
-use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterface;
 use MPS\Core\Exceptions\BadRequestAppException;
 
 /**
- * Поиск формы (1) пагинации (P-19): search() CRUD-репозитория ядра → ['items', 'pagination', 'params'].
+ * Поиск формы (1) пагинации: search() CRUD-репозитория ядра → ['items', 'pagination'] — формат ответа списка Go SDK.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
 final class PaginatedQueryHelper
 {
-    private int $defaultPerPage = 30;
-
-    private string $dataKey = 'items';
+    private int $defaultPerPage = Page::DEFAULT_PER_PAGE;
 
     private bool $asArray = true;
 
-    public static function instance(CRUDRepositoryInterface $repo): self
+    public static function instance(SearchRepositoryInterface $repo): self
     {
         return new self($repo);
     }
 
     public function __construct(
-        private readonly CRUDRepositoryInterface $repo,
+        private readonly SearchRepositoryInterface $repo,
     ) {
     }
 
     public function setDefaultPerPage(int $value): self
     {
         $this->defaultPerPage = $value;
-
-        return $this;
-    }
-
-    public function setDataKey(string $value): self
-    {
-        $this->dataKey = $value;
 
         return $this;
     }
@@ -55,8 +45,10 @@ final class PaginatedQueryHelper
     }
 
     /**
-     * С id — один элемент; expanded строкой через запятую — массивом.
-     * search() ядра принимает perPage только int, «без пагинации» в нём не выражается: весь набор по id — searchByIds().
+     * С id — один элемент. Ключи ответа фиксированы — items и pagination; expanded не разбирается —
+     * параметра нет: состав ответа фиксирован эндпойнтом. Номер страницы — из SearchDataObject::getPage(),
+     * null — ?page= текущего HTTP-запроса (Paginator ядра). search() ядра принимает perPage только int,
+     * «без пагинации» в нём не выражается: весь набор по id — searchByIds().
      *
      * @return array<int|string, mixed>
      *
@@ -72,19 +64,15 @@ final class PaginatedQueryHelper
             throw new BadRequestAppException('perPage — целое не меньше 1; весь набор по id — searchByIds()');
         }
 
-        if (! empty($params['expanded']) && is_string($params['expanded'])) {
-            $expanded = explode(',', $params['expanded']);
-            $params['expanded'] = array_map('trim', $expanded);
-        }
-
         $searchResult = $this->repo->search(
             params: $params,
             id: $id,
             perPage: $perPage,
+            page: $dto->getPage(),
         );
 
         if ($searchResult instanceof LengthAwarePaginator) {
-            return $this->fromPaginator($searchResult, $id, $params);
+            return $this->fromPaginator($searchResult, $id);
         }
 
         $items = $this->asArray ? $searchResult->toArray() : $searchResult->all();
@@ -94,8 +82,7 @@ final class PaginatedQueryHelper
         }
 
         return [
-            $this->dataKey => $items,
-            'params' => $params,
+            'items' => $items,
         ];
     }
 
@@ -111,8 +98,9 @@ final class PaginatedQueryHelper
 
     /**
      * Список без keyBy (у searchByIds() ядра он по умолчанию): карту по ключу собирает потребитель, не хелпер запросов.
+     * Условие по id — в репозитории (allByIds()), хелпер запрос не собирает.
      *
-     * @param array<int, int|string> $ids
+     * @param list<int|string> $ids
      *
      * @return list<mixed>
      */
@@ -122,22 +110,18 @@ final class PaginatedQueryHelper
             return [];
         }
 
-        $primaryKey = $this->repo->getPrimaryKeyName();
-
-        $models = $this->repo->allByCondition(
-            static fn (Builder $query) => $query->whereIn($primaryKey, $ids),
-        );
+        $models = $this->repo->allByIds($ids);
         $result = $this->asArray ? $models->toArray() : $models->all();
 
         return array_values($result);
     }
 
     /**
-     * @param array<string, mixed> $params
+     * @param LengthAwarePaginator<int, mixed> $paginator
      *
      * @return array<int|string, mixed>
      */
-    private function fromPaginator(LengthAwarePaginator $paginator, mixed $id, array $params): array
+    private function fromPaginator(LengthAwarePaginator $paginator, mixed $id): array
     {
         $collection = $paginator->getCollection();
         $items = $this->asArray ? $collection->toArray() : $collection->all();
@@ -146,13 +130,9 @@ final class PaginatedQueryHelper
             return array_shift($items) ?? [];
         }
 
-        $pagination = $paginator->toArray();
-        unset($pagination['data']);
-
         return [
-            $this->dataKey => $items,
-            'pagination' => $pagination,
-            'params' => $params,
+            'items' => $items,
+            'pagination' => PaginationMeta::fromPaginator($paginator),
         ];
     }
 }

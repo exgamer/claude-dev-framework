@@ -14,3 +14,9 @@ tmp/
 
 # Граф правил (tools/graph): корпус — копия, собирается заново
 tools/graph/corpus/
+
+# Стенд PHP-эталона: путь к auth.json с токеном — локальный
+tools/php-check/.auth-path
+
+# Локальные настройки Claude Code
+.claude/settings.local.json

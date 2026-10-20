@@ -66,7 +66,13 @@ func (s *Service) Update(ctx context.Context, id uint, scope ParkingScope, patch
 		return nil, err
 	}
 
-	if err := s.repository.Update(ctx, id, patch); err != nil {
+	// Тариф удалён между чтением и записью — 404, как не найденный
+	err := s.repository.Update(ctx, id, patch)
+	if errors.Is(err, ErrTariffNotFound) {
+		return nil, exception.NewNotFoundException(errors.New("тариф не найден"), false)
+	}
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -93,10 +99,8 @@ func (s *Service) DeactivateByParkingID(ctx context.Context, parkingID uint) err
 		return err
 	}
 
-	for _, id := range ids {
-		if err := s.cacheRepository.Invalidate(ctx, id); err != nil {
-			errorreporter.CaptureSoft(ctx, err, map[string]string{"component": "tariff_cache"})
-		}
+	if err := s.cacheRepository.Invalidate(ctx, ids...); err != nil {
+		errorreporter.CaptureSoft(ctx, err, map[string]string{"component": "tariff_cache"})
 	}
 
 	return nil

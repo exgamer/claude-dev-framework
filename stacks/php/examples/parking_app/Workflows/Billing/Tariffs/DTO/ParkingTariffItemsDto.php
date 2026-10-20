@@ -7,7 +7,7 @@ namespace App\ParkingApp\Workflows\Billing\Tariffs\DTO;
 use MPS\Core\DataObjects\DataObjectCollection;
 
 /**
- * Действующие тарифы парковки.
+ * Коллекция строк списка для партнёра в порядке выдачи репозитория.
  *
  * @extends DataObjectCollection<ParkingTariffDto>
  *

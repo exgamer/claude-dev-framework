@@ -11,11 +11,12 @@ use App\ParkingApp\Workflows\Billing\Tariffs\DTO\ParkingTariffDto;
 use App\ParkingApp\Workflows\Billing\Tariffs\ListParkingTariffsWorkflow;
 use Illuminate\Database\Eloquent\Collection;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Models\Model;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Тарифы парковки с данными парковки: строки тарифов → ParkingTariffItemsDto, нет парковки — 404 без чтения тарифов.
@@ -24,6 +25,8 @@ use Tests\TestCase;
  */
 class ListParkingTariffsWorkflowTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const PARKING_ID = 15;
 
     private ParkingRepositoryInterface&MockInterface $parkingRepository;
@@ -41,15 +44,10 @@ class ListParkingTariffsWorkflowTest extends TestCase
         $this->workflow = new ListParkingTariffsWorkflow($this->parkingRepository, $this->tariffRepository);
     }
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     public function test_tariffs_of_parking_are_returned_with_parking_data(): void
     {
-        $parking = new Model();
+        $parking = new class () extends Model {
+        };
         $parking->name = 'Центральная';
 
         $this->parkingRepository->shouldReceive('oneById')->once()->with(self::PARKING_ID)->andReturn($parking);

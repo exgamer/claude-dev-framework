@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\ParkingApp\Infrastructure\Http\CityParking\PriceLimits;
 
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\PriceLimitRepositoryInterface;
+use App\ParkingApp\Infrastructure\Http\CityParking\DTO\PriceLimitResponseDto;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
@@ -85,12 +86,24 @@ class CityParkingPriceLimitsRepository implements PriceLimitRepositoryInterface
             ]);
         }
 
+        $limit = $this->toPriceLimit($response, $parkingId);
+
+        return $limit->getMaxPrice();
+    }
+
+    /**
+     * Ответ → DTO интеграции: тип проверяется строго до сеттера (fromArray ядра привёл бы "100" и true к int).
+     *
+     * @throws OperationFailedAppException
+     */
+    private function toPriceLimit(Response $response, int $parkingId): PriceLimitResponseDto
+    {
         $maxPrice = $response->json('max_price');
 
         if (! is_int($maxPrice)) {
             throw new OperationFailedAppException('Реестр парковок вернул лимит без max_price', ['parking_id' => $parkingId]);
         }
 
-        return $maxPrice;
+        return PriceLimitResponseDto::make()->setMaxPrice($maxPrice);
     }
 }

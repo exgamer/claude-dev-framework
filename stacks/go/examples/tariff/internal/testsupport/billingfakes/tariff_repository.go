@@ -79,7 +79,7 @@ func (r *TariffRepository) Create(_ context.Context, tariff *tariffdomain.Tariff
 func (r *TariffRepository) Update(_ context.Context, id uint, patch *tariffdomain.Patch) error {
 	item, ok := r.Items[id]
 	if !ok {
-		return nil
+		return tariffdomain.ErrTariffNotFound
 	}
 
 	if patch.Name != nil {
@@ -98,9 +98,12 @@ func (r *TariffRepository) SetDefault(_ context.Context, id uint, isDefault bool
 		return r.SetDefaultErr
 	}
 
-	if item, ok := r.Items[id]; ok {
-		item.IsDefault = isDefault
+	item, ok := r.Items[id]
+	if !ok {
+		return tariffdomain.ErrTariffNotFound
 	}
+
+	item.IsDefault = isDefault
 
 	return nil
 }
@@ -142,8 +145,10 @@ func (r *TariffCacheRepository) Set(_ context.Context, tariff *tariffdomain.Tari
 	return nil
 }
 
-func (r *TariffCacheRepository) Invalidate(_ context.Context, id uint) error {
-	delete(r.Items, id)
+func (r *TariffCacheRepository) Invalidate(_ context.Context, ids ...uint) error {
+	for _, id := range ids {
+		delete(r.Items, id)
+	}
 
 	return nil
 }

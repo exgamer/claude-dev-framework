@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	gosdkmiddleware "git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/middleware"
@@ -61,5 +62,36 @@ func TestHandler_Probes(t *testing.T) {
 		if w.Code != tc.want {
 			t.Fatalf("%s: got %d, want %d", tc.name, w.Code, tc.want)
 		}
+	}
+}
+
+// TestHandler_ReadyHidesCause Причина сбоя — в лог, в ответ пробы — общий текст без адресов и текста драйвера
+func TestHandler_ReadyHidesCause(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewHandler(Dependency{Name: "postgres", Probe: unavailable})
+
+	r := gin.New()
+	r.Use(gosdkmiddleware.FormattedResponseMiddleware())
+	r.GET("/readiness", handler.Ready())
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/readiness", nil))
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("got %d, want 503", w.Code)
+	}
+
+	if body := w.Body.String(); strings.Contains(body, "connection refused") || strings.Contains(body, "postgres") {
+		t.Fatalf("response leaks cause: %s", body)
+	}
+}
+
+// TestProbe_WrapsCause Причина сбоя не теряется: обёрнута с именем зависимости
+func TestProbe_WrapsCause(t *testing.T) {
+	err := probe(context.Background(), Dependency{Name: "postgres", Probe: unavailable})
+
+	if err == nil || !strings.Contains(err.Error(), "postgres unavailable: connection refused") {
+		t.Fatalf("got %v", err)
 	}
 }

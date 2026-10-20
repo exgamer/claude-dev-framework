@@ -14,14 +14,15 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Queries\GetParkingDefaultTari
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs\CreateRequest;
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs\IndexRequest;
+use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs\SetDefaultRequest;
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs\UpdateRequest;
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs\ViewDefaultRequest;
+use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Requests\Tariffs\ViewRequest;
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Responses\ParkingDefaultTariffResponse;
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Responses\TariffPaginatedResponse;
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Responses\TariffResponse;
 use App\ParkingApp\Workflows\Billing\Tariffs\CreateTariffWorkflow;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
@@ -31,7 +32,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 /**
- * Тарифы парковок в админке.
+ * HTTP админки: список, карточка, тариф по умолчанию, создание, правка, назначение по умолчанию; скоуп парковок — из middleware, права — на маршрутах.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -71,7 +72,7 @@ class TariffController extends Controller
                     new OA\Property(property: 'data', ref: '#/components/schemas/TariffPaginatedResponse'),
                 ])
             ),
-            new OA\Response(response: 401, description: 'Не аутентифицирован'),
+            new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
             new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
             new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
             new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
@@ -95,11 +96,11 @@ class TariffController extends Controller
     #[OA\Get(
         path: '/parking/admin/tariffs/{id}',
         summary: 'Тариф по ID',
-        description: 'Тариф парковки, недоступной администратору, — 404',
+        description: 'Тариф парковки, недоступной администратору, — 404; id не положительный — 422',
         security: [['Authorization' => []]],
         tags: ['Admin Parking: Тарифы'],
         parameters: [
-            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
         ],
         responses: [
             new OA\Response(
@@ -110,12 +111,14 @@ class TariffController extends Controller
                     new OA\Property(property: 'data', ref: '#/components/schemas/TariffResponse'),
                 ])
             ),
-            new OA\Response(response: 401, description: 'Не аутентифицирован'),
+            new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
+            new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
             new OA\Response(ref: '#/components/responses/NotFound404', response: 404),
+            new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
             new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
         ]
     )]
-    public function view(int $id, Request $request): JsonResponse
+    public function view(int $id, ViewRequest $request): JsonResponse
     {
         $tariff = $this->tariffCrudService->findById($id, RequestHelper::getParkingIds($request));
 
@@ -147,7 +150,7 @@ class TariffController extends Controller
                     new OA\Property(property: 'data', ref: '#/components/schemas/ParkingDefaultTariffResponse'),
                 ])
             ),
-            new OA\Response(response: 401, description: 'Не аутентифицирован'),
+            new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
             new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
             new OA\Response(ref: '#/components/responses/NotFound404', response: 404),
             new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
@@ -187,7 +190,7 @@ class TariffController extends Controller
                     new OA\Property(property: 'data', ref: '#/components/schemas/TariffResponse'),
                 ])
             ),
-            new OA\Response(response: 401, description: 'Не аутентифицирован'),
+            new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
             new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
             new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
             new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
@@ -214,7 +217,7 @@ class TariffController extends Controller
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/TariffUpdateRequest')),
         tags: ['Admin Parking: Тарифы'],
         parameters: [
-            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
         ],
         responses: [
             new OA\Response(
@@ -225,7 +228,7 @@ class TariffController extends Controller
                     new OA\Property(property: 'data', ref: '#/components/schemas/TariffResponse'),
                 ])
             ),
-            new OA\Response(response: 401, description: 'Не аутентифицирован'),
+            new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
             new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
             new OA\Response(ref: '#/components/responses/NotFound404', response: 404),
             new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
@@ -249,11 +252,11 @@ class TariffController extends Controller
     #[OA\Post(
         path: '/parking/admin/tariffs/{id}/set-default',
         summary: 'Сделать тариф тарифом по умолчанию',
-        description: 'Снимает флаг с прежнего тарифа парковки и ставит этому в одной транзакции; тариф парковки, недоступной администратору, — 404; параллельная смена тарифа по умолчанию той же парковки — 422',
+        description: 'Снимает флаг с прежнего тарифа парковки и ставит этому в одной транзакции; тариф парковки, недоступной администратору, — 404; параллельная смена тарифа по умолчанию той же парковки или id не положительный — 422',
         security: [['Authorization' => []]],
         tags: ['Admin Parking: Тарифы'],
         parameters: [
-            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
         ],
         responses: [
             new OA\Response(
@@ -264,13 +267,14 @@ class TariffController extends Controller
                     new OA\Property(property: 'data', ref: '#/components/schemas/TariffResponse'),
                 ])
             ),
-            new OA\Response(response: 401, description: 'Не аутентифицирован'),
+            new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
+            new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
             new OA\Response(ref: '#/components/responses/NotFound404', response: 404),
             new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
             new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
         ]
     )]
-    public function setDefault(int $id, Request $request): JsonResponse
+    public function setDefault(int $id, SetDefaultRequest $request): JsonResponse
     {
         $tariff = $this->setDefaultTariffCommand->execute($id, RequestHelper::getParkingIds($request));
 

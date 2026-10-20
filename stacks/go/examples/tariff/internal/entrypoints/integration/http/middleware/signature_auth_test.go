@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"example.com/parking-service/pkg/requestbody"
 	"example.com/parking-service/pkg/signature"
 )
 
@@ -66,6 +67,29 @@ func serve(r *gin.Engine, req *http.Request) int {
 	r.ServeHTTP(w, req)
 
 	return w.Code
+}
+
+func TestSignatureAuthMiddleware_GetWithoutBodyKeepsNoBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	keptNoBody := false
+	r := gin.New()
+	r.Use(gosdkmiddleware.FormattedResponseMiddleware())
+	r.GET("/tariffs/:id", SignatureAuthMiddleware(newPartnerService(false), testSignatureSettings), func(c *gin.Context) {
+		keptNoBody = c.Request.Body == http.NoBody
+		c.Status(http.StatusOK)
+	})
+
+	header := signature.HeaderValue(testSecret, signature.Request{
+		Timestamp: time.Now().Unix(),
+		Nonce:     "nonce-get-0001",
+		Message:   signature.Message{Method: http.MethodGet, Path: signedPath},
+	})
+	req := httptest.NewRequest(http.MethodGet, signedPath, nil)
+	req.Header.Set(signature.HeaderName, header)
+
+	require.Equal(t, http.StatusOK, serve(r, req))
+	assert.True(t, keptNoBody, "GET без тела: хендлер получает http.NoBody, а не подменённое пустое тело")
 }
 
 func TestSignatureAuthMiddleware_ValidSignatureKeepsBody(t *testing.T) {
@@ -122,7 +146,7 @@ func TestSignatureAuthMiddleware_Rejects(t *testing.T) {
 		{name: "expired", sign: signing{testSecret, now - 600, "nonce-0006", body}, path: signedPath, body: body, want: http.StatusUnauthorized},
 		{name: "from the future", sign: signing{testSecret, now + 120, "nonce-0009", body}, path: signedPath, body: body, want: http.StatusUnauthorized},
 		{name: "malformed header", header: "t=abc,n=nonce-0010,v1=00", path: signedPath, body: body, want: http.StatusUnauthorized},
-		{name: "body too large", sign: signing{secret: testSecret, timestamp: now, nonce: "nonce-0007"}, path: signedPath, body: strings.Repeat("x", maxSignedBodyBytes+1), want: http.StatusRequestEntityTooLarge},
+		{name: "body too large", sign: signing{secret: testSecret, timestamp: now, nonce: "nonce-0007"}, path: signedPath, body: strings.Repeat("x", requestbody.DefaultLimit+1), want: http.StatusRequestEntityTooLarge},
 		{name: "nonce storage error", sign: signing{testSecret, now, "nonce-0008", body}, path: signedPath, body: body, storageFails: true, want: http.StatusInternalServerError},
 	}
 

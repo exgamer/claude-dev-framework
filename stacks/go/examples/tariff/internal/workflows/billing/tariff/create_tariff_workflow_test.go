@@ -21,9 +21,12 @@ import (
 // fakePriceLimitRepository In-memory tariffdomain.PriceLimitRepository: лимиты по ID парковки
 type fakePriceLimitRepository struct {
 	limits map[uint]*tariffdomain.PriceLimit
+	steps  *steps
 }
 
 func (r *fakePriceLimitRepository) GetByParkingID(_ context.Context, parkingID uint) (*tariffdomain.PriceLimit, error) {
+	r.steps.add("pricelimit:get")
+
 	return r.limits[parkingID], nil
 }
 
@@ -136,7 +139,7 @@ func newFixture(parkings *handbookfakes.ParkingRepository, limits ...*tariffdoma
 	tariffs := billingfakes.NewTariffRepository()
 	outbox := billingfakes.NewOutboxTariffEventRepository()
 	publisher := &billingfakes.OutboxTariffEventPublisher{}
-	priceLimits := &fakePriceLimitRepository{limits: map[uint]*tariffdomain.PriceLimit{}}
+	priceLimits := &fakePriceLimitRepository{limits: map[uint]*tariffdomain.PriceLimit{}, steps: log}
 	notifier := &fakeTariffNotifier{tariffs: tariffs, steps: log}
 
 	for _, limit := range limits {
@@ -182,19 +185,26 @@ func TestCreateTariffWorkflow_ParkingNotFound(t *testing.T) {
 
 	_, err := f.workflow.Exec(context.Background(), &CreateTariffParams{ParkingID: 42, Name: "Стандарт", Currency: common.CurrencyKZT, Price: 100})
 
-	require.Error(t, err)
+	var appException *exception.AppException
+	require.ErrorAs(t, err, &appException)
+	assert.Equal(t, exception.ErrorKindValidation, appException.Kind)
+	assert.Contains(t, appException.Context, "parking_id")
 	assert.Zero(t, f.txManager.Calls, "транзакция не открывается")
 	assert.Empty(t, f.tariffs.Items)
 	assert.Empty(t, f.notifier.sent)
 }
 
+// TestCreateTariffWorkflow_ParkingDisabled Отключённая парковка — 422 по parking_id (состояние данных, не доступ), реестр цен не вызывается
 func TestCreateTariffWorkflow_ParkingDisabled(t *testing.T) {
 	f := newFixture(handbookfakes.NewParkingRepository(&parkingdomain.Parking{ID: 1, IsActive: false, Currency: common.CurrencyKZT}))
 
 	_, err := f.workflow.Exec(context.Background(), &CreateTariffParams{ParkingID: 1, Name: "Стандарт", Currency: common.CurrencyKZT, Price: 100})
 
-	require.Error(t, err)
-	assert.Equal(t, []string{"parking:get"}, f.steps.items, "транзакция не открывается")
+	var appException *exception.AppException
+	require.ErrorAs(t, err, &appException)
+	assert.Equal(t, exception.ErrorKindValidation, appException.Kind)
+	assert.Contains(t, appException.Context, "parking_id")
+	assert.Equal(t, []string{"parking:get"}, f.steps.items, "ни реестр цен, ни транзакция не тронуты")
 	assert.Empty(t, f.tariffs.Items)
 	assert.Empty(t, f.notifier.sent)
 }
@@ -311,7 +321,7 @@ func TestCreateTariffWorkflow_RejectedWritesNoOutboxEvent(t *testing.T) {
 	assert.Zero(t, f.publisher.Calls)
 }
 
-// TestCreateTariffWorkflow_StepsOrder Проверка парковки — до транзакции; в транзакции тариф и outbox; партнёр и брокер — после коммита
+// TestCreateTariffWorkflow_StepsOrder Проверка парковки (своя БД) — до внешнего реестра цен, оба — до транзакции; в транзакции тариф и outbox; партнёр и брокер — после коммита
 func TestCreateTariffWorkflow_StepsOrder(t *testing.T) {
 	f := newFixture(activeParking())
 
@@ -320,6 +330,7 @@ func TestCreateTariffWorkflow_StepsOrder(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"parking:get",
+		"pricelimit:get",
 		"tx:begin",
 		"tariff:create",
 		"outbox:create",

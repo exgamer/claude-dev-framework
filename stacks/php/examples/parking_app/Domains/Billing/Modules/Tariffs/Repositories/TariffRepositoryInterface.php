@@ -15,7 +15,7 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterf
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Интерфейс репозитория тарифов.
+ * Запросы к тарифам для домена Billing: чтение со скоупом парковок, список по TariffFilterDto и Page, смена статуса и флага по умолчанию.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -57,7 +57,7 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
      * Пишет колонки из DTO. false — тариф по умолчанию переносится на парковку, где тариф по умолчанию уже есть
      * (уникальный индекс): запись не сделана, вызывающий только бросает исключение.
      */
-    public function updateFromDto(Tariff $tariff, TariffDto $dto): bool;
+    public function updateFromDto(int $id, TariffDto $dto): bool;
 
     /**
      * Пишет флаг. false — у парковки уже есть другой тариф по умолчанию (уникальный индекс, параллельная смена):

@@ -17,13 +17,13 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterf
 interface OutboxTariffEventRepositoryInterface extends CRUDRepositoryInterface
 {
     /**
-     * Новое событие в статусе PENDING, попыток 0. Вызывается в транзакции сценария, который пишет тариф.
-     */
-    /**
      * Последнее событие тарифа по ID; событий нет — null.
      */
     public function getLatestByTariffId(int $tariffId): ?OutboxTariffEvent;
 
+    /**
+     * Новое событие в статусе PENDING, попыток 0. Вызывается в транзакции сценария, который пишет тариф.
+     */
     public function createPending(OutboxTariffEventDto $dto, OutboxTariffEventRoutingKeyEnum $routingKey): OutboxTariffEvent;
 
     /**

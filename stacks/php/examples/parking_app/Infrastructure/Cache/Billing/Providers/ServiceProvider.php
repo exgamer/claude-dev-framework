@@ -7,7 +7,7 @@ namespace App\ParkingApp\Infrastructure\Cache\Billing\Providers;
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Провайдер кеш-репозиториев домена Billing.
+ * Подключает definitions.php: кеш тарифов по ID за интерфейсом домена.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

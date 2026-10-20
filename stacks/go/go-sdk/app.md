@@ -2,12 +2,13 @@
 
 Файл лежит в: `internal/app/app.go`
 
-Содержит три вещи:
+Содержит:
 1. Объявление типа `App` с эмбедом `*app.App`
 2. `RegisterAndInitKernels(...)` — подключение инфраструктурных ядер
 3. `RegisterAndInitModules(...)` — регистрация бизнес-модулей
+4. Проверки обязательных флагов окружения ядер на старте (fail-fast, `regulations/service-requirements.md`, «Конфиг») — между ядрами и модулями; без флага сервис не стартует. Как `requireRedisContextTimeout` эталона (`../examples/tariff/internal/app/app.go`: без `REDIS_CONTEXT_TIMEOUT_ENABLED=true` — ошибка).
 
-Никакой бизнес-логики, никакой конфигурации — только сборка.
+Никакой бизнес-логики, никакой конфигурации — только сборка и стартовые проверки; конфигурация — в `config.go` модулей.
 
 ## Доступные Kernels
 
@@ -29,46 +30,49 @@
 
 ## Шаблон
 
+Эталон — `../examples/tariff/internal/app/app.go`.
+
 ```go
 package app
 
 import (
-    "git.example.com/.../internal/app/bootstrap/billing/tariff"
-    "github.com/exgamer/gosdk-core/pkg/app"
-    http "github.com/exgamer/gosdk-http-core/pkg/app"
-    postgresCore "github.com/exgamer/gosdk-postgres-core/pkg/app"
-    rediscore "github.com/exgamer/gosdk-redis-core/pkg/app"
-	rabbitcore "github.com/exgamer/gosdk-rabbit-core/pkg/app"
-    sentrycore "github.com/exgamer/gosdk-sentry-core/pkg/app"
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"
+	httpapp "git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/app"
+	postgresapp "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/app"
+	rabbitapp "git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/app"
+	redisapp "git.mpinnovations.kz/mps/go-packages/gosdk-redis-core/pkg/app"
+	sentryapp "git.mpinnovations.kz/mps/go-packages/gosdk-sentry-core/pkg/app"
+
+	"example.com/parking-service/internal/app/bootstrap/billing/tariff"
 )
 
 type App struct {
-    *app.App
+	*app.App
 }
 
 func NewApp() (*App, error) {
-    appInstance := &App{
-        App: app.NewApp(),
-    }
+	appInstance := &App{
+		App: app.NewApp(),
+	}
 
-    err := appInstance.RegisterAndInitKernels(
-        &sentrycore.SentryKernel{},
-        &postgresCore.PostgresKernel{},
-        &http.HttpKernel{},
-        &rediscore.RedisKernel{},
-		rabbitcore.NewRabbitKernel().EnableConsumer().EnablePublisher(), // просто для примера работы с несколькими ядрами которые запускаются
-    )
-    if err != nil {
-        return nil, err
-    }
+	err := appInstance.RegisterAndInitKernels(
+		&sentryapp.SentryKernel{},
+		&postgresapp.PostgresKernel{},
+		&httpapp.HttpKernel{},
+		&redisapp.RedisKernel{},
+		rabbitapp.NewRabbitKernel().EnableConsumer().EnablePublisher(),
+	)
+	if err != nil {
+		return nil, err
+	}
 
-    err = appInstance.RegisterAndInitModules(
-        &tariff.Module{}, // регистрирует модуль 
-    )
-    if err != nil {
-        return nil, err
-    }
+	err = appInstance.RegisterAndInitModules(
+		&tariff.Module{},
+	)
+	if err != nil {
+		return nil, err
+	}
 
-    return appInstance, nil
+	return appInstance, nil
 }
 ```

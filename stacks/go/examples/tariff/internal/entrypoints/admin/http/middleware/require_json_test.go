@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"example.com/parking-service/pkg/requestbody"
 )
 
 // scopedBody Тело с parking_id, как у запроса создания тарифа
@@ -65,7 +67,7 @@ func multipartBody(t *testing.T, field, value string) (string, []byte) {
 
 func TestScopedCreate_OtherParkingCannotBypassScope(t *testing.T) {
 	multipartType, multipartPayload := multipartBody(t, "ParkingID", "99")
-	oversized := []byte(`{"parking_id":7,"name":"` + strings.Repeat("a", maxBodyBytes) + `"}`)
+	oversized := []byte(`{"parking_id":7,"name":"` + strings.Repeat("a", requestbody.DefaultLimit) + `"}`)
 
 	cases := []struct {
 		name        string

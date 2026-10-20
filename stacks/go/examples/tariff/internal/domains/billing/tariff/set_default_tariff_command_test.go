@@ -109,3 +109,19 @@ func TestSetDefaultTariffCommand_DefaultIndexViolationIs422(t *testing.T) {
 	assert.False(t, tariffs.Items[2].IsDefault)
 	assert.Len(t, cache.Items, 2, "транзакция не прошла — кеш не сбрасывается")
 }
+
+// TestSetDefaultTariffCommand_DeletedBeforeWriteIsNotFound Запись флага изменила 0 строк (тариф удалён после чтения) — 404, кеш не сбрасывается
+func TestSetDefaultTariffCommand_DeletedBeforeWriteIsNotFound(t *testing.T) {
+	tariffs := billingfakes.NewTariffRepository(&tariffdomain.Tariff{ID: 2, ParkingID: 7})
+	tariffs.SetDefaultErr = fmt.Errorf("set default tariff failed (tariff_id=2): %w", tariffdomain.ErrTariffNotFound)
+	cache := billingfakes.NewTariffCacheRepository()
+	cache.Items[2] = *tariffs.Items[2]
+	command, _ := newSetDefaultCommand(tariffs, cache)
+
+	err := command.Exec(context.Background(), 2, tariffdomain.ParkingScope{All: true})
+
+	var appException *exception.AppException
+	require.ErrorAs(t, err, &appException)
+	assert.Equal(t, exception.ErrorKindNotFound, appException.Kind)
+	assert.Len(t, cache.Items, 1, "транзакция не прошла — кеш не сбрасывается")
+}

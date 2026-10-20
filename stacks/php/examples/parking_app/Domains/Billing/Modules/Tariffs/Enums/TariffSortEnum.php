@@ -13,7 +13,12 @@ use OpenApi\Attributes as OA;
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
-#[OA\Schema(schema: 'TariffSortEnum', type: 'string', enum: ['name', '-name', 'created_at', '-created_at'])]
+#[OA\Schema(schema: 'TariffSortEnum', type: 'string', enum: [
+    TariffSortEnum::NAME_ASC->value,
+    TariffSortEnum::NAME_DESC->value,
+    TariffSortEnum::CREATED_AT_ASC->value,
+    TariffSortEnum::CREATED_AT_DESC->value,
+])]
 enum TariffSortEnum: string implements Enumerable
 {
     use EnumerableTrait;

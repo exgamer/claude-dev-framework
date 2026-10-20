@@ -14,6 +14,9 @@
   usage.py [--project PATH]                 — список задач с итогами
   usage.py [--project PATH] --task KEY      — лог задачи в stdout
   usage.py [--project PATH] --task KEY --write
+  usage.py [--project PATH] --session ID [--since ISO] [--match REGEX] [--out FILE]
+                                            — агенты одной сессии без ключа задачи (проверки /dev-rule,
+                                              полная сверка): по агентам, по этапам (описание до «:»), итог
 """
 import argparse
 import json
@@ -119,6 +122,12 @@ def add(acc, t):
         acc[k] += t[k]
 
 
+def stage(description: str) -> str:
+    """Этап — часть описания агента до «:» (`Wave1: …`, `Step 3a: …`), иначе первые два слова."""
+    head = description.split(":", 1)[0] if ":" in description else " ".join(description.split()[:2])
+    return head.strip() or "—"
+
+
 def render(key, agents, orchestrators):
     agents = sorted(agents, key=lambda a: a["start"] or datetime.min)
     lines = [f"# Учёт агентов и токенов — {key}", ""]
@@ -149,6 +158,19 @@ def render(key, agents, orchestrators):
         lines.append(f"| {role} | {r['n']} | {fmt(r['t']['output_tokens'])} | {fmt(total(r['t']))} | {total(r['t']) * 100 // gt}% |")
     lines.append(f"| **все агенты** | {len(agents)} | {fmt(grand['output_tokens'])} | **{fmt(total(grand))}** | 100% |")
 
+    by_stage = defaultdict(lambda: {"n": 0, "t": dict.fromkeys(FIELDS, 0), "calls": 0})
+    for a in agents:
+        st = by_stage[stage(a["description"])]
+        st["n"] += 1
+        st["calls"] += a["calls"]
+        add(st["t"], a["tokens"])
+    if len(by_stage) > 1:
+        lines += ["", "## По этапам", "", "Этап — часть описания агента до «:». Для оптимизации: где дороже всего и сколько стоит один агент этапа.", ""]
+        lines += ["| Этап | Агентов | Вызовов | Итого | На агента | Доля |", "|---|---|---|---|---|---|"]
+        for name, st in sorted(by_stage.items(), key=lambda x: -total(x[1]["t"])):
+            tt = total(st["t"])
+            lines.append(f"| {name} | {st['n']} | {st['calls']} | {fmt(tt)} | {fmt(tt // st['n'])} | {tt * 100 // gt}% |")
+
     if orchestrators:
         lines += ["", "## Оркестратор", "", "Основная сессия `/dev` целиком, включая работу в ней не по этой задаче.", ""]
         lines.append("| Сессия | Модель | Старт | Длит. | Вызовов | Выход ≥ | Итого |")
@@ -169,6 +191,10 @@ def main():
     p.add_argument("--project", default=".", help="корень проекта (по умолчанию текущий каталог)")
     p.add_argument("--task", help="ключ задачи (docs/tasks/<ключ>)")
     p.add_argument("--write", action="store_true", help="записать docs/tasks/<ключ>/usage.md")
+    p.add_argument("--session", help="ID сессии (имя .jsonl в ~/.claude/projects/<проект>/): все её агенты, без ключа задачи")
+    p.add_argument("--since", help="только агенты, начавшиеся не раньше (ISO, например 2026-10-20T13:00)")
+    p.add_argument("--match", help="только агенты, у которых описание совпадает с регулярным выражением")
+    p.add_argument("--out", help="записать отчёт в файл (для --session)")
     args = p.parse_args()
 
     project = Path(args.project).expanduser()
@@ -176,6 +202,26 @@ def main():
     if not pdir.is_dir():
         sys.exit(f"нет транскриптов для {project.resolve()} ({pdir})")
     agents = collect(pdir)
+
+    if args.session:
+        mine = [a for a in agents if a["session"].startswith(args.session)]
+        if args.since:
+            since = ts(args.since).astimezone() if "+" in args.since or args.since.endswith("Z") else datetime.fromisoformat(args.since).astimezone()
+            mine = [a for a in mine if a["start"] and a["start"] >= since]
+        if args.match:
+            mine = [a for a in mine if re.search(args.match, a["description"])]
+        if not mine:
+            sys.exit(f"агентов сессии {args.session} не найдено")
+        sid = mine[0]["session"]
+        main_jsonl = pdir / f"{sid}.jsonl"
+        orchestrators = [(sid, read_transcript(main_jsonl))] if main_jsonl.exists() and not (args.since or args.match) else []
+        out = render(f"сессия {sid[:8]}", mine, orchestrators)
+        if args.out:
+            Path(args.out).write_text(out, encoding="utf-8")
+            print(f"записано: {args.out}")
+        else:
+            print(out)
+        return
 
     if not args.task:
         tasks = defaultdict(lambda: [0, 0])

@@ -14,8 +14,7 @@ type AuthMiddlewares struct {
 	Signature gin.HandlerFunc
 }
 
-// SetRoutes Машинный вызов партнёра: сначала ключ API, затем подпись.
-// LoggerMiddleware в группе нет: на DEBUG он пишет заголовки, а маскирует только Authorization и Cookie — Api-Key попал бы в лог
+// SetRoutes Машинный вызов партнёра: сначала ключ API, затем подпись
 func SetRoutes(a *app.App, handler *Handler, auth AuthMiddlewares) error {
 	router, err := di.GetRouter(a.Container)
 	if err != nil {
@@ -24,18 +23,21 @@ func SetRoutes(a *app.App, handler *Handler, auth AuthMiddlewares) error {
 
 	service := router.Group("/api")
 	{
+		// LoggerMiddleware нет: на DEBUG он пишет заголовки и не маскирует Api-Key
 		service.Use(middleware.RequestInfoMiddleware(a))
 		service.Use(middleware.DebugMiddleware())
 		service.Use(middleware.SentryMiddleware())
 
-		v1 := service.Group("/v1/integration")
+		// /api/<context>/<version>/<domain>/<entity>
+		billing := service.Group("/integration/v1/billing")
 		{
-			v1.Use(middleware.FormattedResponseMiddleware())
-			v1.Use(middleware.MetricsMiddleware(a))
-			v1.Use(auth.APIKey)
-			v1.Use(auth.Signature)
+			billing.Use(middleware.FormattedResponseMiddleware())
+			billing.Use(middleware.MetricsMiddleware(a))
+			// Отказы auth-middleware оборачивает FormattedResponseMiddleware — они ставятся после неё
+			billing.Use(auth.APIKey)
+			billing.Use(auth.Signature)
 
-			v1.GET("/tariffs/:id", handler.View())
+			billing.GET("/tariffs/:id", handler.View())
 		}
 	}
 

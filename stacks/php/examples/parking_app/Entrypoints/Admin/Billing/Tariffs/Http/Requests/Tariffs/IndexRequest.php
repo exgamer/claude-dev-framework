@@ -19,10 +19,10 @@ use OpenApi\Attributes as OA;
 #[OA\Parameter(
     parameter: 'TariffsIndexRequestPage',
     name: 'page',
-    description: 'Номер страницы',
+    description: 'Номер страницы; 0 — первая',
     in: 'query',
     required: false,
-    schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)
+    schema: new OA\Schema(type: 'integer', default: 1, maximum: Page::MAX_PAGE, minimum: 0)
 )]
 #[OA\Parameter(
     parameter: 'TariffsIndexRequestPerPage',
@@ -66,9 +66,9 @@ class IndexRequest extends Request
     public function rules(): array
     {
         return [
-            'page' => ['sometimes', 'integer', 'gt:0'],
+            'page' => ['sometimes', 'integer', 'min:0', 'max:' . Page::MAX_PAGE],
             'per_page' => ['sometimes', 'integer', 'between:1,' . Page::MAX_PER_PAGE],
-            'parking_id' => ['nullable', 'integer', 'gt:0'],
+            'parking_id' => ['nullable', 'integer', 'gt:0', 'max:' . self::ID_MAX],
             'status' => ['nullable', 'string', Rule::enum(TariffStatusEnum::class)],
             'sort' => ['sometimes', 'string', Rule::enum(TariffSortEnum::class)],
         ];

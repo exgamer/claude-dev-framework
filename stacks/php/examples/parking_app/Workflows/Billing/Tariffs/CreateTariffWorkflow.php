@@ -65,9 +65,9 @@ final class CreateTariffWorkflow
             ]);
         }
 
-        $this->assertGraceShorterThanMaxStay($dto);
+        $this->checkGraceShorterThanMaxStay($dto);
 
-        // Проверка парковки — до транзакции. Конкурентность: consumer handbook.parking.deactivated деактивирует тарифы при событии; событие обработано до коммита нового тарифа — тариф останется активным (решение «Конкурентность» эталона — принять риск; в задаче это вопрос пользователю, approaches/patterns/concurrency.md, «Принятие риска»; другой вариант — FOR SHARE на парковку в транзакции)
+        // Парковку отключили до коммита — тариф останется активным: риск принят
         /** @var array{Tariff, OutboxTariffEvent} $written */
         $written = $this->transactionManager->run(function () use ($dto): array {
             $tariff = $this->tariffCrudService->create($dto);
@@ -115,7 +115,7 @@ final class CreateTariffWorkflow
      *
      * @throws ValidationAppException
      */
-    private function assertGraceShorterThanMaxStay(TariffDto $dto): void
+    private function checkGraceShorterThanMaxStay(TariffDto $dto): void
     {
         $graceMinutes = $dto->getGraceMinutes();
 

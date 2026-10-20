@@ -9,7 +9,7 @@ use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariff
 use MPS\Core\Exceptions\OperationFailedAppException;
 
 /**
- * Порт публикации события о тарифе в брокер; имя — по действию, без технологии (`architecture/integrations.md`).
+ * Порт публикации события о тарифе в брокер.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

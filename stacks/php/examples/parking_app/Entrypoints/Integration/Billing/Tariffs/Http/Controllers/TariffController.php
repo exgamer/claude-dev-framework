@@ -6,13 +6,14 @@ namespace App\ParkingApp\Entrypoints\Integration\Billing\Tariffs\Http\Controller
 
 use App\Http\Controllers\Controller;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
+use App\ParkingApp\Entrypoints\Integration\Billing\Tariffs\Http\Requests\Tariffs\ViewRequest;
 use App\ParkingApp\Entrypoints\Integration\Billing\Tariffs\Http\Responses\TariffResponse;
 use Illuminate\Http\JsonResponse;
 use MPS\Core\Exceptions\NotFoundAppException;
 use OpenApi\Attributes as OA;
 
 /**
- * Тарифы для машинного вызова партнёра.
+ * Чтение тарифа партнёром по подписи запроса: без скоупа администратора, ответ без служебных полей.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -34,7 +35,7 @@ class TariffController extends Controller
         security: [['Signature' => []]],
         tags: ['Integration Parking: Тарифы'],
         parameters: [
-            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'id', description: 'ID тарифа', in: 'path', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
         ],
         responses: [
             new OA\Response(
@@ -45,12 +46,13 @@ class TariffController extends Controller
                     new OA\Property(property: 'data', ref: '#/components/schemas/IntegrationTariffResponse'),
                 ])
             ),
-            new OA\Response(response: 401, description: 'Подпись недействительна'),
+            new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
             new OA\Response(ref: '#/components/responses/NotFound404', response: 404),
+            new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
             new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
         ]
     )]
-    public function view(int $id): JsonResponse
+    public function view(int $id, ViewRequest $request): JsonResponse
     {
         // Машинный вызов без пользователя: скоупа нет, null передаётся явно — без ограничения по парковкам
         $tariff = $this->tariffCrudService->findById($id, null);

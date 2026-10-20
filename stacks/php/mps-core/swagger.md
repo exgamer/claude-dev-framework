@@ -8,7 +8,7 @@
 
 | Что | Где |
 |---|---|
-| `#[OA\Info]`, общие параметры (`Authorization`, `Accept-Language`), общие ответы (`ValidationError422`, `NotFound404`), схемы ошибок | `Core/OpenApi/` подпроекта (`../structure.md`) |
+| `#[OA\Info]`, общие параметры (`Authorization`, `Accept-Language`), общие ответы — `Unauthorized401`, `AccessDenied403`, `NotFound404`, `ValidationError422`, `ServerError500` (каждый — классом, как `ValidationErrorResponse`), схемы ошибок, схемы enum ядра (`CurrencyEnum`) | `Core/OpenApi/` подпроекта (`../structure.md`); общий ответ не описывается inline в контроллере и не берётся «из хоста» |
 | `#[OA\Tag]` на классе, `#[OA\Get|Post|Put|Delete]` на методах | Controller в `Entrypoints/{Context}/{Domain}/{Module}/Http/Controllers/` |
 | `#[OA\Schema]` полей тела запроса | Request (`Create`/`Update`) |
 | `#[OA\Parameter]` query-параметров | `IndexRequest` (ссылки из контроллера — `ref: '#/components/parameters/…'`) |
@@ -35,6 +35,8 @@
                 new OA\Property(property: 'data', ref: '#/components/schemas/TariffResponse'),
             ])
         ),
+        new OA\Response(ref: '#/components/responses/Unauthorized401', response: 401),
+        new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
         new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
         new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
     ]
@@ -42,7 +44,7 @@
 public function create(CreateRequest $request): JsonResponse { … }
 ```
 
-- У каждого метода — `500`; `404` — только у эндпойнтов, ищущих запись по ID (`view`/`update`/`delete` и действия над записью), не у `index`/`create` (`../checklist.md` п. 24).
+- У каждого метода — `500`; маршрут под `auth`/подписью — `401`, под `permission:`/скоупом — `403` (`regulations/rest-api.md`: все коды ответа); общие ответы — ссылкой на `Core/OpenApi`; `404` — по `../conventions.md` п. 18 (только у поиска записи по ID).
 - Обёртка `success`/`data` в ответе описывается: её даёт `ApiResponseMiddleware`, и это фактический формат (`../conventions.md` п. 19); сам код обёртку не собирает.
 
 ## Request — схема
@@ -69,7 +71,7 @@ Query-параметры списка — на `IndexRequest`:
 class IndexRequest extends Request { … }
 ```
 
-Выше — форма (2) списка (P-19, `../conventions.md` п. 2a). В форме (1) (`IndexRequest extends SearchRequest`, раздел «Список» `design.md`) так же описываются `page`, `per_page` (с максимумом) и `sort` — строкой, допустимые значения из `$sortAttributes` (`name,-id`) в `description`; ответ — схема `PaginateResource` подпроекта.
+Выше — форма (2) списка (P-19, `../conventions.md` п. 2c). В форме (1) (`IndexRequest extends SearchRequest`, раздел «Список» `design.md`) так же описываются `page`, `per_page` (с максимумом) и `sort` — строкой, допустимые значения из `$sortAttributes` (`name,-id`) в `description`. Ответ списка в обеих формах — `items` (схема элемента — Response модуля) + `pagination` (`ref: '#/components/schemas/PaginationMeta'`, `Core/Resources/PaginationMeta`); описывается на ответе метода контроллера внутри `data`, своей схемы у `PaginateResource` нет.
 
 ## Response — схема
 
@@ -84,11 +86,17 @@ class TariffResponse extends JsonResource {}
 ## Enum — схема
 
 ```php
-#[OA\Schema(schema: 'TariffStatusEnum', type: 'string', enum: ['active', 'archived'])]
+#[OA\Schema(schema: 'TariffStatusEnum', type: 'string', enum: [
+    TariffStatusEnum::ACTIVE->value,
+    TariffStatusEnum::SCHEDULED->value,
+    TariffStatusEnum::ARCHIVED->value,
+])]
 enum TariffStatusEnum: string implements Enumerable { … }
 ```
 
-Ссылка в свойстве: `ref: '#/components/schemas/TariffStatusEnum'`. Новый кейс enum → обновить `enum:` здесь и во всех местах, где перечислен набор (`enum-list-drift`).
+Enum ядра (`MPS\Core\Enums\CurrencyEnum`) атрибут не получит — его схема заводится в `Core/OpenApi/` подпроекта тем же способом (`#[OA\Schema(schema: 'CurrencyEnum', type: 'string', enum: [CurrencyEnum::KZT->value, …])]` на классе-носителе), поля ссылаются на неё `ref`; `type: 'string'` с примером вместо `ref` — `enum-list-drift`.
+
+Значения — `Enum::CASE->value` (константное выражение, PHP 8.2+), не строковые литералы: опечатка — ошибка при генерации, а не расхождение схемы. Вызов метода (`values()`) в атрибуте невозможен — кейсы перечисляются. Ссылка в свойстве: `ref: '#/components/schemas/TariffStatusEnum'`, не `enum:` литералом в Request/Response. Новый кейс enum → обновить `enum:` здесь и во всех местах, где перечислен набор (`enum-list-drift`).
 
 ## Генерация
 

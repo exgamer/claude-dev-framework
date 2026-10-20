@@ -1,50 +1,58 @@
 # Граф правил — сводка
 
-Узлов 1116, связей 4259, групп 13. Кандидаты ниже — подсказки, проверять по файлам.
+Узлов 1037, связей 4169, групп 12. Кандидаты ниже — подсказки, проверять по файлам.
 
 ## Сироты (на файл нет ссылок)
+- agents/df-analyst.md
+- agents/df-architect.md
+- agents/df-go.md
+- agents/df-php.md
+- agents/df-qa.md
+- agents/df-review.md
+- agents/df-security.md
 - skills/dev-mr/SKILL.md
-- stacks/go/go-sdk/entrypoint.md
-- stacks/go/go-sdk/infra/redis.md
-- stacks/php/README.md
 - stacks/vanilla-js/README.md
 
 ## Темы в большем числе файлов
-- репозиторий — 28
-- Транзакции — 24
-- DI-контейнер — 22
-- Внешние интеграции — 20
-- Исключения и ошибки — 19
-- Конкурентность — 19
-- Лог отклонений rules-log — 19
+- транзакции — 24
+- Ошибки и исключения — 23
+- репозиторий — 22
+- возможности SDK/ядра — 21
+- Конкурентность — 21
 - RabbitMQ — 18
-- Подтверждение коммита и пуша — 18
-- Unit-тесты — 18
-- Слои — 17
-- миграции БД — 17
-- Swagger — 17
-- возможности SDK — 17
-- Субагенты — 16
-- Ревью MR — 16
-- Сервисный слой — 16
-- Авторизация и права — 16
-- enum — 16
-- Хелперы и переиспользование — 16
+- Авторизация и права — 18
+- теги находок — 17
+- HTTP точка входа — 17
+- Внешние интеграции — 17
+- enum — 17
+- DI — 17
+- unit-тесты — 16
+- Swagger — 16
+- субагенты — 15
+- хелперы/переиспользование — 15
+- подтверждение действий с БД — 14
+- миграции БД — 14
+- Подтверждение коммита/пуша — 14
+- именование — 14
 
 ## Кандидаты в противоречия (conflicts_with)
-C1. [approaches/process/security.md § Режим audit C] «Аудит: 4–8 параллельных агентов Explore без isolation, только чтение, запущенных одним сообщением» VS [approaches/process/security.md § финал] «Агентов-разработчиков не больше 3 (в рефакторе 5) по planning.md, против 4–8 у аудита» (0.2)
-C2. [architecture/layers.md § Принадлежность записи скоупу] «Внутренние точки входа читают без ограничения: скоуп передаётся явно — nil (Go) / null (PHP); null у super-admin» VS [stacks/go/conventions.md § п. 7a] «п. 7a: скоуп ParkingScope{All;IDs}: «без ограничения» — явный All: true (super-admin, consumer, консоль, integration); [ОШИБКА] scope-param-defaults-unrestricted» (0.75)
-C3. [regulations/git.md § Ветки] «Рабочая ветка от release; hotfix — от production; поток ветка → MR → stage → release → production» VS [approaches/process/review.md § --mr п. 7] «База ревью MR — Target Branch MR, не дефолт (фичи в stage)» (0.15)
-C4. [stacks/go/conventions.md § п. 6] «п. 6: вся бизнес-логика — только в сервисах и workflow» VS [stacks/go/checklist.md § п. 14] «п. 14: >1 модифицирующего запроса — один txManager.Exec; один — без транзакции (needless-transaction)» (0.2)
-C5. [stacks/go/go-sdk/infra/postgres.md § Правила] «Каждый DB-запрос — timeout 10s (кроме NewGormPaginatedHelper)» VS [stacks/go/go-sdk/infra/http.md § Конфигурация] «SetRequestTimeout на каждый запрос (default 30s)» (0.1)
-C6. [stacks/go/go-sdk/workflow.md § Именование файлов] «Собирается в internal/app/bootstrap/{module}/workflows_factory.go, не services_factory.go» VS [stacks/go/examples/tariff/README.md § шапка] «Проверено 2026-10-20 против gosdk-core v1.0.9, gosdk-db-core v1.0.10, http-request-builder v1.0.2 и др. (Go 1.26+)» (0.15)
-C7. [stacks/php/conventions.md § п. 11b] «Элемент внешнего массива (в т.ч. keyBy()-карта из репозитория) — только после проверки ключа ([ОШИБКА] array-key-unchecked)» VS [stacks/php/review-findings.md § Repository] «Репозиторий: нет keyBy/map/сборки структур — маппинг в Service» (0.3)
-C8. [stacks/php/mps-core/cli.md § Соглашения] «Signature: {domain}:{module}:{action} через двоеточие» VS [stacks/go/structure.md § Консоль] «Консольная команда: Use "{module-kebab}:{action}", тонкая — один вызов Command домена» (0.2)
-C9. [stacks/php/mps-core/migrations.md § «ALTER TABLE с заполнением»] «Data-миграция пишет через типизированный метод репозитория (один UPDATE … WHERE, P-20); зависимость — app(Interface::class)» VS [architecture/layers.md § Правила слоёв] «DI — только в Bootstrap; resolve в бизнес-коде — [ОШИБКА]; PHP ServiceInterface всегда, Go — по необходимости» (0.25)
-C10. [stacks/php/mps-core/transactions.md § По умолчанию] «CRUDService сам оборачивает create/update/delete в транзакцию через getRepository()->transaction()» VS [stacks/php/mps-core/transactions.md § Как использовать] «$this->repository->transaction() / $service->transaction() — антипаттерн на уровне Service/Command» (0.2)
-C11. [stacks/php/mps-core/transactions.md § Как использовать] «DB::transaction() — только в реализации менеджера транзакций (Infrastructure), при PostgreSQL-специфике» VS [stacks/php/checklist.md § п. 20] «Транзакция — только run(); не DB::transaction, не $repo->transaction» (0.15)
-C12. [stacks/php/review-checks.md § 5.2] «Бизнес-исключение в Repository, кроме NotFoundAppException, — [ОШИБКА]» VS [stacks/php/mps-core/repository.md § Контракт репозитория] «Репозиторий не бросает бизнес-исключения и «не найдено» — возвращает null; не делает keyBy» (0.7)
-C13. [stacks/php/review-checks.md § 5.2] «Бизнес-исключение в Repository, кроме NotFoundAppException, — [ОШИБКА]» VS [stacks/php/mps-core/repository.md § ЗАПРЕЩЕНО] «Своих *OrFail в репозитории нет; get…/oneBy… → ?Model, NotFoundAppException бросает вызывающий» (0.65)
-C14. [stacks/php/review-checks.md § 5.2] «$cache->getOrCreate(...) вместо SmartCache/getOrSet — [ОШИБКА] (с поправкой по версии utils)» VS [stacks/php/conventions.md § п. 22] «getOrCreate устаревший только с utils ≥ 2.6.4; при utils < 2.6.4 — не находка» (0.6)
-C15. [stacks/php/review-checks.md § 5.2] «$cache->getOrCreate(...) вместо SmartCache/getOrSet — [ОШИБКА] (с поправкой по версии utils)» VS [stacks/php/mps-core/capabilities.md § Кеш и Redis] «utils ≥ 2.6.4: getOrSet вместо deprecated getOrCreate; SmartCache — utils ≥ 2.8» (0.3)
-C16. [stacks/php/review-checks.md § 5.5 п. 3] «Тесты в проекте локально не запускаются (битый RefreshDatabase) — сказать об этом» VS [stacks/php/checklist.md § п. 39] «Прогнаны csfix-validate, phpstan, test:run; вывод показан; не запускал — так и написано» (0.25)
+C1. [agents/df-review.md § п. 2] «Круг N: памятка, security.md и каталоги тегов — всегда; прочие правила — по слоям изменённых файлов» VS [approaches/process/review.md § Независимость] «В цепочке /dev ревью — отдельный субагент без контекста разработки, только чтение; ревьюятся код и тесты» (0.1)
+C2. [approaches/patterns/cache.md § список] «Инвалидация — при записи, в том же сценарии, что меняет данные» VS [approaches/patterns/transactions.md § «Общее»] «Внутри транзакции нет побочных эффектов: HTTP, брокер, файлы, dispatch, инвалидация кэша — после коммита» (0.15)
+C3. [architecture/layers.md § Направление зависимостей] «Common → ни от чего, кроме языка и библиотек дат» VS [architecture/layers.md § Общий бизнес-словарь] «Common без зависимостей, кроме языка, библиотеки дат и базового трейта enum ядра» (0.25)
+C4. [architecture/layers.md § Зависимости] «Таблицы БД — всегда домену: нужен запрос — метод в репозитории того домена, чья таблица» VS [architecture/cross-domain.md § Правила] «Read-only подзапрос (EXISTS/JOIN) к таблице чужого домена в своём репозитории допустим с комментарием, чья таблица» (0.25)
+C5. [core/principles.md § Повторяющаяся обработка — один хелпер] «Преобразование формата — один хелпер: SDK → проект → новый хелпер сразу, даже при одном вызове» VS [approaches/process/review-tags.md § Стиль и текст] «duplicated-format-logic: есть в SDK/хелпере — [ОШИБКА]; вторая копия — [ВНИМАНИЕ]; одно вхождение без хелпера — [ИНФО]» (0.2)
+C6. [core/style.md § Комментарии] «Doc-комментарий на публичных типах/методах — только если есть что сказать сверх имени (comment-restates-name)» VS [stacks/go/conventions.md § Предупреждения] «Отсутствие doc-комментария на доменной сущности/модели или неочевидном поле — предупреждение» (0.3)
+C7. [regulations/contracts.md § Моки в тестах] «Бизнес-сервисы: в Go не мокаем (конкретный тип, фейки репозиториев); в PHP — допустимо через ServiceInterface» VS [architecture/layers.md § Правила слоёв] «DI-контейнер — только в Bootstrap; резолв в бизнес-коде — di-resolve-in-business-code; PHP ServiceInterface — всегда, Go — конкретный тип» (0.2)
+C8. [skills/dev-rule/SKILL.md § Шаг 3а, п. 2] «Граф и кэш правил коммитятся вместе с правкой» VS [core/decisions.md § O-22] «O-22 (открыт): граф кода проекта не введён; в варианте б/в граф не коммитится, обновляет координатор» (0.15)
+C9. [stacks/go/checklist.md § п. 29] «Новый роут без auth-middleware — только осознанно, с причиной в MR (О)» VS [approaches/process/security.md § Каталог тегов безопасности] «missing-auth-middleware — [БЕЗОПАСНОСТЬ]; межсервисный роут без auth исторически — вопрос «осознанно?» в MR» (0.25)
+C10. [stacks/go/checklist.md § п. 46] «Преобразование формата — один раз: SDK → pkg/; вторая копия — вынести (В); inline при готовом — О» VS [approaches/process/review-tags.md § Стиль и текст] «duplicated-format-logic: есть в SDK/хелпере — [ОШИБКА]; вторая копия — [ВНИМАНИЕ]; одно вхождение без хелпера — [ИНФО]» (0.2)
+C11. [stacks/go/checklist.md § п. 23a] «Consumer тонкий и идемпотентный; ошибка десериализации — ACK, временная — NACK; топология — при старте через SDK» VS [approaches/patterns/async.md § Consumer] «Ручные ack/nack, где результат обработчика их уже выражает, не пишутся» (0.15)
+C12. [stacks/go/go-sdk/entrypoint/http.md § routes.go] «URL — /api/<context>/<version>/<domain>/<module>/<entity> (модуль, совпадающий с сущностью, не повторяется)» VS [stacks/go/examples/tariff/README.md § entrypoints/admin/http/billing/tariff] «URL группы — /api/<context>/<version>/<domain>/<entity> (модуль, совпадающий с сущностью, не повторяется)» (0.6)
+C13. [stacks/go/review-findings.md § Контекст, таймауты, ошибки] «В репозиториях — context.WithTimeout(ctx, 10*time.Second) или аналог» VS [stacks/go/go-sdk/infra/redis.md § Пример репозитория] «Каждый вызов Redis — свой короткий таймаут (2 с); действует только при REDIS_CONTEXT_TIMEOUT_ENABLED=true» (0.15)
+C14. [stacks/php/checklist.md § п. 37] «Модель: @property по-русски, $table со схемой, $fillable, $casts [О]» VS [stacks/php/style.md § Классы] «Модели: @property на каждое поле, описание по-русски — у неочевидных; $table со схемой, public — без префикса» (0.2)
+C15. [stacks/php/mps-core/capabilities.md § вводная] «При расхождении с этим файлом верна официальная дока нужной версии; метода нет в справочнике версии проекта — его нет» VS [stacks/php/conventions.md § Пакеты ядра] «Версия ядра — из composer.lock, у пользователя не спрашивать (O-4); API сверять с vendor/mps проекта, а не с примерами mps-core/*.md» (0.25)
+C16. [approaches/process/review.md § За пределами дифа, абзац уровней] «Уровень находки с тегом — только по каталогу тегов (O-24); нет тега — завести тег в каталоге + строка в rules-log» VS [stacks/php/review-checks.md § Архитектурные нарушения] «Строка таблицы без тега — [ОШИБКА] (временно, до заведения тега, O-24); с тегом — по каталогу» (0.3)
+C17. [approaches/process/review.md § За пределами дифа — общее для стеков] «При --all из проверок за пределами дифа — только механические grep (запросы вне репозитория, формат, индекс массива, константы вместо enum, копии enum/импорт чужого домена)» VS [stacks/php/review-checks.md § п. 0b] «0b индекс массива без проверки (array-key-unchecked) — по файлам дифа; phpstan его не заменяет» (0.25)
+C18. [stacks/php/review-checks.md § Архитектурные нарушения] «Новый HTTP-класс (Controller/Request/Response/Middleware) в Domains/ вместо Entrypoint/ — нарушение (поправка: путь Entrypoints/{Context}/{Domain}/{Module}, P-9)» VS [stacks/php/structure.md § Контексты] «Contexts/ регламента = Entrypoints/ (P-9); контексты Admin, Mobile, Integration, Lpm, Console, Queue; if ($isAdmin) запрещён — разные контроллеры» (0.2)
+C19. [stacks/php/review-findings.md § Controller] «per_page задаётся явно (в IndexRequest/SearchRequest и в аннотации), не «по умолчанию где-то в ядре»» VS [stacks/php/mps-core/http.md § Requests] «IndexRequest: page min:0 max Page::MAX_PAGE, per_page sometimes between:1,MAX_PER_PAGE, id max ID_MAX» (0.2)
+C20. [stacks/php/review-checks.md § Архитектурные нарушения] «Репозиторий без бизнес-логики и бизнес-исключений, в т.ч. NotFoundAppException — возвращает null, «не найдено» решает вызывающий» VS [stacks/php/structure.md § Go SDK ↔ Laravel] «Доменная модель в PHP — Eloquent-модель из Infrastructure (решение P-4); маппера нет, DTO → колонки явным списком в репозитории» (0.15)

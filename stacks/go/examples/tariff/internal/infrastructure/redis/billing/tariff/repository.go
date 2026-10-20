@@ -51,12 +51,23 @@ func (r *RedisRepository) Set(ctx context.Context, tariff *tariffdomain.Tariff) 
 	return nil
 }
 
-func (r *RedisRepository) Invalidate(ctx context.Context, id uint) error {
+// Invalidate Один UNLINK на все ключи, а не вызов на тариф
+func (r *RedisRepository) Invalidate(ctx context.Context, ids ...uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(ids))
+
+	for _, id := range ids {
+		keys = append(keys, key(id))
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if err := r.client.Unlink(ctx, key(id)).Err(); err != nil {
-		return fmt.Errorf("invalidate tariff cache failed (tariff_id=%d): %w", id, err)
+	if err := r.client.Unlink(ctx, keys...).Err(); err != nil {
+		return fmt.Errorf("invalidate tariff cache failed (tariff_ids=%v): %w", ids, err)
 	}
 
 	return nil

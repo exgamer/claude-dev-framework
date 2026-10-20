@@ -14,8 +14,7 @@ import (
 
 const bearerScheme = "bearer"
 
-// JWTAuthMiddleware Проверяет Bearer JWT сервиса авторизации и кладёт администратора в контекст запроса; ставится после FormattedResponseMiddleware.
-// Токен не принят — 401 без отправки в Sentry и без деталей проверки в ответе; сбой хранилища — 500
+// JWTAuthMiddleware Bearer JWT сервиса авторизации → администратор в контексте; токен не принят — 401 без деталей и Sentry, сбой хранилища — 500
 func JWTAuthMiddleware(service *admindomain.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, ok := bearerToken(c.GetHeader(constants.AuthorizationHeaderName))

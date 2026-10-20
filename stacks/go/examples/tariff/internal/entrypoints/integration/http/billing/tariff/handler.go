@@ -1,6 +1,7 @@
 package tariff
 
 import (
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/exception"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/response"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/validators"
 	"github.com/gin-gonic/gin"
@@ -30,13 +31,14 @@ type Handler struct {
 // @Failure		401	{object}	structures.BadRequestErrorResponse
 // @Failure		404	{object}	structures.NotFoundErrorResponse
 // @Failure		413	{object}	structures.BadRequestErrorResponse
+// @Failure		422	{object}	structures.ValidationErrorResponse
 // @Failure		500	{object}	structures.InternalServerResponse
-// @Router			/api/v1/integration/tariffs/{id} [get]
+// @Router			/api/integration/v1/billing/tariffs/{id} [get]
 func (h *Handler) View() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := validators.GetIntQueryParam(c, "id")
 		if err != nil {
-			response.BadRequest(c, err, nil)
+			response.ErrorResponse(c, exception.NewValidationException(map[string]any{"id": "id должен быть положительным целым числом"}, false))
 
 			return
 		}

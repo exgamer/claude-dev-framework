@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Фрагмент config/queue.php хоста: обработчики RabbitMQ эталона — в connections.rabbitmq.handler_map
+// Фрагмент config/queue.php хоста: обработчики RabbitMQ — в connections.rabbitmq.handler_map
 
 use App\ParkingApp\Entrypoints\Queue\Billing\Tariffs\ParkingDeactivatedHandler;
 

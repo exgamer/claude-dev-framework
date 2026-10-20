@@ -13,6 +13,7 @@ use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Carbon\Carbon;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
@@ -26,6 +27,8 @@ use PHPUnit\Framework\TestCase;
  */
 class TariffCrudServiceTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const TARIFF_ID = 10;
 
     private const PARKING_IDS = [15, 16];
@@ -47,12 +50,6 @@ class TariffCrudServiceTest extends TestCase
         $this->cacheRepository = Mockery::mock(TariffCacheRepositoryInterface::class)->shouldIgnoreMissing();
         $this->exceptionHandler = Mockery::mock(ExceptionHandler::class);
         $this->service = new TariffCrudService($this->repository, $this->cacheRepository, $this->exceptionHandler);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
     public function test_created_tariff_is_active_and_not_default(): void
@@ -237,11 +234,19 @@ class TariffCrudServiceTest extends TestCase
         $tariff = $this->tariff(parkingId: 15);
         $dto = $this->dto(name: 'Стандарт');
 
-        $this->repository->shouldReceive('getByIdInParkings')->once()->andReturn($tariff);
-        $this->repository->shouldReceive('updateFromDto')->once()->with($tariff, $dto)->andReturnTrue();
+        $updated = $this->tariff(parkingId: 15);
+
+        $this->repository
+            ->shouldReceive('getByIdInParkings')
+            ->twice()
+            ->with(self::TARIFF_ID, null)
+            ->andReturn($tariff, $updated);
+        $this->repository->shouldReceive('updateFromDto')->once()->with(self::TARIFF_ID, $dto)->andReturnTrue();
         $this->cacheRepository->shouldReceive('forget')->once()->with(self::TARIFF_ID);
 
-        $this->assertSame($tariff, $this->service->update(self::TARIFF_ID, null, $dto));
+        $result = $this->service->update(self::TARIFF_ID, null, $dto);
+
+        $this->assertSame($updated, $result);
     }
 
     public function test_moving_default_tariff_to_parking_with_default_is_validation_error(): void
@@ -251,7 +256,7 @@ class TariffCrudServiceTest extends TestCase
 
         $this->repository->shouldReceive('getByIdInParkings')->once()->andReturn($tariff);
         // Уникальный индекс тарифа по умолчанию: репозиторий вернул false — 422, не 500
-        $this->repository->shouldReceive('updateFromDto')->once()->with($tariff, $dto)->andReturnFalse();
+        $this->repository->shouldReceive('updateFromDto')->once()->with(self::TARIFF_ID, $dto)->andReturnFalse();
         $this->cacheRepository->shouldNotReceive('forget');
 
         try {

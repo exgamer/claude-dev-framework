@@ -1,0 +1,28 @@
+# Теги находок (Go): дополнение к общему каталогу
+
+Общий каталог и правила уровней — `approaches/process/review-tags.md` (уровень находки — только в каталогах, O-24); теги безопасности — `approaches/process/security.md`, «Каталог тегов безопасности». Здесь — теги, у которых механизм есть только в Go.
+
+| Тег | Уровень | Суть | Источник правила |
+|---|---|---|---|
+| `interface-file-group` | [ВНИМАНИЕ] | В модуле домена или workflow интерфейс группы лежит не в файле своей группы (`repository.go`, `tx_manager.go`, `modules.go`, `system.go`) или в файле по имени одного интерфейса; файл с общим термином в имени (`ports.go`…) — `interface-file-generic-name` | `conventions.md` п. 12 |
+| `interface-file-generic-name` | [ОШИБКА] | Файл интерфейсов назван общим hexagonal-термином (`ports.go`, `interfaces.go`, `dependencies.go`) — не отражает, что объявлено; в модуле домена и workflow — вместо файла группы | `conventions.md` п. 12, 13 |
+| `file-named-by-abstraction` | [ВНИМАНИЕ] | Файл общих объявлений назван по абстракции (`types.go`, `const.go`, `utils.go`), а не по смыслу (`{name}_enum.go`, `dto.go`, `entity.go`) | `conventions.md` п. 13; `core/style.md`, «Имена» |
+| `nil-dependency-injected` | [ОШИБКА] | В конструктор тихо передан `nil` вместо зависимости, вместо явной опциональности (nil-check с деградацией) или разделения сервиса | `conventions.md` п. 21 |
+| `sdk-not-in-design` | [ВНИМАНИЕ] | Код на SDK, а источник и версия SDK не записаны в `design.md` (раздел «SDK») | `conventions.md` п. 23 |
+| `integration-test-without-build-tag` | [ВНИМАНИЕ] | Интеграционный тест без build tag — `go test ./...` падает без поднятой инфраструктуры | `structure.md`, «Тесты» |
+| `tx-bypassed-by-service` | [ОШИБКА] | Внутри `fn` транзакции SDK — сервис, Command домена или репозиторий из поля структуры: они на пуле, запись уходит мимо транзакции | `approaches/patterns/transactions.md`, «Общее»; `go-sdk/infra/postgres.md`, «Транзакции» |
+| `paginator-timeout-units` | [ОШИБКА] | `NewGormPaginatedHelper.SetTimeout` с `time.Duration` (`10*time.Second`) вместо числа секунд: хелпер умножает на `time.Second` сам, int64 переполняется, список всегда 500 | `go-sdk/infra/postgres.md`, «Правила» |
+| `sdk-reimplemented` | [ОШИБКА] | Своя реализация (хелпер, обёртка, клиент, middleware) того, что есть в SDK | `go-sdk/capabilities.md`; `conventions.md` п. 22 |
+| `infra-logic-duplicated` | [ОШИБКА] | Не-бизнесовая проблема (транспорт, сериализация, ретраи, `x-death`, проверка `httpInfo`) решена второй независимой реализацией вместо общей | `conventions.md` п. 22; `go-sdk/infra/http.md`; `go-sdk/entrypoint/rabbit.md` |
+| `response-middleware-missing` | [ОШИБКА] | Группа маршрутов, хендлеры которой вызывают `response.*`, без `FormattedResponseMiddleware` — ответ пустой | `go-sdk/entrypoint/http.md` |
+| `rabbit-own-connection` | [ОШИБКА] | Своё `amqp.Dial`-соединение в обход kernel-а (для очереди без читателя и т.п.) | `go-sdk/entrypoint/rabbit.md` |
+| `rabbit-adapter-same-name` | [ВНИМАНИЕ] | Инфра-адаптер над `*rabbitmq.Publisher` назван `Publisher`, как доменный интерфейс и тип SDK | `go-sdk/entrypoint/rabbit.md` |
+| `rabbit-wrapper-over-adapter` | [ВНИМАНИЕ] | Второй слой обёртки над адаптером публикации без новой логики | `go-sdk/entrypoint/rabbit.md` |
+| `rabbit-topology-in-infrastructure` | [ВНИМАНИЕ] | Декларация топологии без своего consumer-а лежит в `internal/infrastructure/rabbit/…`, а не в Bootstrap рядом с вызывающим | `go-sdk/entrypoint/rabbit.md` |
+| `gorm-tablename-missing` | [ИНФО] | У GORM-модели нет `TableName()` — GORM выводит имя сам; не нарушение, уточнить имя таблицы | `go-sdk/infra/postgres.md`, «Правила» |
+| `http-status-unchecked` | [ОШИБКА] | `resp.Result` используется без проверки статуса ответа (`IsSuccess`/`IsClientError`/`IsServerError`) | `go-sdk/infra/http.md` |
+| `data-race` | [ОШИБКА] | Общая изменяемая память между горутинами без `sync.Mutex`/`atomic`/владения одной горутиной; гонка, найденная `-race` | `approaches/patterns/concurrency.md`, «Data race — Go» |
+| `goroutine-loop-capture` | [ОШИБКА] | Горутина захватывает изменяемую переменную цикла вместо параметра | `approaches/patterns/concurrency.md`, «Data race — Go» |
+| `shared-mutable-state` | [ОШИБКА] | Изменяемое состояние после конструктора в структурах, разделяемых между запросами | `approaches/patterns/concurrency.md`, «Data race — Go» |
+| `unbounded-goroutines` | [ОШИБКА] | Горутина без ожидания, остановки по `ctx`, обработки ошибки и паники; `go` в цикле по входным данным без ограничения параллелизма | `approaches/patterns/concurrency.md`, «Data race — Go»; `performance.md`, «Go» |
+| `channel-misuse` | [ОШИБКА] | Канал закрывает не отправитель или дважды, отправка в закрытый, вечная блокировка без `ctx.Done()` | `approaches/patterns/concurrency.md`, «Data race — Go» |

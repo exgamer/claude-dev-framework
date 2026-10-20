@@ -4,8 +4,12 @@
 
 ## Простой сервис (наследование CRUDService)
 
+Только для чтения справочника (поиск/показ ядра). Запись — не `create()`/`update()` ядра с массивом, а свои методы репозитория с DTO (`createFromDto`/`updateFromDto`, `../conventions.md` п. 11a, P-18, тег `write-array-instead-of-dto`); хуки `beforeCreate`/`afterUpdate` ядра для записи автора не используются.
+
+Зависимости — `private readonly` (`../conventions.md` п. 6). Исключение — сам `$repository`: это `protected ?CRUDRepositoryInterface` из `CRUDRepositoryAwareTrait` ядра, переобъявить его `private readonly` нельзя (PHP: фатальная ошибка), поэтому он присваивается в конструкторе.
+
 ```php
-namespace App\Domains\YourDomain\Modules\YourModule\Services;
+namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Services;
 
 use MPS\Core\Components\CRUD\Services\Database\Eloquent\CRUDService;
 
@@ -13,8 +17,9 @@ class YourService extends CRUDService implements YourServiceInterface
 {
     public function __construct(
         YourRepositoryInterface $repository,
+        private readonly OtherServiceInterface $otherService,
     ) {
-        $this->repository = $repository;
+        $this->repository = $repository;   // свойство ядра, не private readonly — см. выше
     }
 
     public function getRepository(): YourRepositoryInterface
@@ -37,7 +42,6 @@ class YourService extends CrudServiceDecorator implements YourServiceInterface
 {
     public function __construct(
         YourRepositoryInterface $repository,
-        private readonly TransactionManagerInterface $transactionManager,
         private readonly OtherServiceInterface $otherService,
     ) {
         parent::__construct();
@@ -47,7 +51,7 @@ class YourService extends CrudServiceDecorator implements YourServiceInterface
     // Кастомная сигнатура — не ограничена CreateCommandDataObject
     public function createItem(YourDto $dto): YourModel
     {
-        $model = $this->transactionManager->run(fn () => $this->repository->createFromDto($dto));
+        $model = $this->repository->createFromDto($dto);   // один модифицирующий запрос — без своей транзакции (O-8, needless-transaction)
         $this->otherService->notify($model);   // побочный эффект — после коммита (../conventions.md п. 17)
 
         return $model;
@@ -58,7 +62,7 @@ class YourService extends CrudServiceDecorator implements YourServiceInterface
 }
 ```
 
-`$this->repository->transaction(...)` здесь не используем — это жёсткая связка метода с
+Больше одного модифицирующего запроса — внедрённый `TransactionManagerInterface::run()`; `$this->repository->transaction(...)` не используем — это жёсткая связка метода с
 конкретным репозиторием ради побочного вызова `transaction()`. См. `transactions.md`.
 
 **Интерфейс сложного сервиса НЕ наследует CRUDServiceInterface.**
@@ -78,11 +82,6 @@ $periods = $this->periodRepository->allByAgreementIds($ids);   // свой до�
 
 ## Хуки CRUDService
 
-Допустимы только в **маленьких, простых сервисах**. В крупных сервисах не использовать — логика размазывается и становится непрозрачной. Если сервис растёт — выносить логику в `CrudServiceDecorator` или `Command`.
+Хуки записи (`beforeCreate`/`afterCreate`/`beforeUpdate`/`afterUpdate`) не используются: `CRUDService` — только для чтения, запись — свои методы репозитория с DTO (раздел выше, P-18). Логика вокруг записи — в методе сервиса или `Command`.
 
-```php
-protected function beforeCreate(CommandDataObject $dto): void {}
-protected function afterCreate(CommandDataObject $dto): void {}
-```
-
-`search()`, `beforeSearch`/`afterSearch(SearchDataObject)` — форма (1) списка (P-19): `repository.md`, «Форма (1)»; в форме (2) список — метод репозитория `paginate…` (`../conventions.md` п. 2a). Какая форма — раздел «Список» `design.md`.
+`search()`, `beforeSearch`/`afterSearch(SearchDataObject)` — форма (1) списка (P-19): `repository.md`, «Форма (1)»; в форме (2) список — метод репозитория `paginate…` (`../conventions.md` п. 2c). Какая форма — раздел «Список» `design.md`.

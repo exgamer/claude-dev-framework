@@ -14,25 +14,48 @@
 // Infrastructure/Postgres/{Domain}/Providers/ServiceProvider.php
 namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\Providers;
 
-use MPS\Core\Modules\ModuleServiceProvider;
+use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
-class ServiceProvider extends ModuleServiceProvider
+/**
+ * Подключает definitions.php (интерфейсы репозиториев YourDomain → Postgres) и миграции таблиц домена.
+ *
+ * @author …
+ */
+class ServiceProvider extends CoreServiceProvider
 {
-    public static function getName(): string
-    {
-        return 'infrastructure:your-domain';
-    }
 }
 ```
 
+Провайдер пустой: `definitions.php` и `database/migrations/` рядом с ним ядро подхватывает само; `getName()` ядра не переопределяется — в эталоне провайдеры без него. Так же — провайдер домена (`Domains/{Domain}/ServiceProvider.php` наследует `Core/Providers/ServiceProvider` подпроекта) и провайдеры точек входа.
+
 ### 3. Зарегистрировать в корневом ServiceProvider подпроекта
+
+Корневой провайдер держит списки провайдеров по слоям и регистрирует их `$this->app->register()`; провайдеры инфраструктуры собирает агрегатор `Infrastructure/ServiceProvider.php` той же формы. Эталон — `../examples/parking_app/ServiceProvider.php`, `../examples/parking_app/Infrastructure/ServiceProvider.php`.
 
 ```php
 // ServiceProvider.php подпроекта
-$this->registerServiceProviders([
-    \App\ParkingApp\Domains\YourDomain\ServiceProvider::class,
-    \App\ParkingApp\Infrastructure\Postgres\YourDomain\Providers\ServiceProvider::class,
-]);
+/**
+ * @var list<class-string<BaseServiceProvider>>
+ */
+private array $domainProviders = [
+    Domains\Billing\ServiceProvider::class,
+    Domains\YourDomain\ServiceProvider::class,
+];
+
+public function register(): void
+{
+    foreach ($this->domainProviders as $provider) {
+        $this->app->register($provider);
+    }
+
+    // так же — $infrastructureProviders, $entrypointProviders, $utilsProviders
+}
+
+// Infrastructure/ServiceProvider.php
+private array $providers = [
+    Postgres\Billing\Providers\ServiceProvider::class,
+    Postgres\YourDomain\Providers\ServiceProvider::class,
+];
 ```
 
 ### 4. definitions.php — два файла
@@ -77,13 +100,10 @@ return [
 ```php
 namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule;
 
-use MPS\Core\Modules\ModuleServiceProvider;
+use App\ParkingApp\Core\Providers\ServiceProvider as Base;
 
-class ServiceProvider extends ModuleServiceProvider
+class ServiceProvider extends Base
 {
-    public static function getName(): string
-    {
-        return 'your-domain:your-module';
-    }
+    // только то, что модуль регистрирует сверх definitions.php домена; getName() не переопределяется
 }
 ```

@@ -23,7 +23,7 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'id', description: 'ID тарифа', type: 'integer', example: 1),
         new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
-        new OA\Property(property: 'currency', description: 'Валюта', type: 'string', example: 'KZT'),
+        new OA\Property(property: 'currency', ref: '#/components/schemas/CurrencyEnum'),
         new OA\Property(property: 'price', description: 'Цена часа в минимальных единицах валюты', type: 'integer', example: 50000),
         new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
         new OA\Property(property: 'is_default', description: 'Тариф по умолчанию', type: 'boolean', example: true),

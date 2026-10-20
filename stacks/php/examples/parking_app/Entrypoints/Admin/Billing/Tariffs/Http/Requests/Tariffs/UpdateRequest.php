@@ -11,7 +11,7 @@ use MPS\Core\Enums\CurrencyEnum;
 use OpenApi\Attributes as OA;
 
 /**
- * Полная замена тарифа (PUT).
+ * Формат тела PUT: каждое поле обязательно к передаче (неприсланное — 422), null очищает grace_minutes.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -22,7 +22,7 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
         new OA\Property(property: 'name', description: 'Название тарифа', type: 'string', example: 'Стандарт'),
-        new OA\Property(property: 'currency', description: 'Валюта', type: 'string', example: 'KZT'),
+        new OA\Property(property: 'currency', ref: '#/components/schemas/CurrencyEnum'),
         new OA\Property(property: 'price', description: 'Цена часа в минимальных единицах валюты', type: 'integer', example: 50000),
         new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
     ],
@@ -38,7 +38,8 @@ class UpdateRequest extends Request
     public function rules(): array
     {
         return [
-            'parking_id' => ['required', 'integer', 'gt:0'],
+            'id' => ['required', 'integer', 'gt:0', 'max:' . self::ID_MAX],
+            'parking_id' => ['required', 'integer', 'gt:0', 'max:' . self::ID_MAX],
             'name' => ['required', 'string', 'max:255'],
             'currency' => ['required', 'string', Rule::enum(CurrencyEnum::class)],
             'price' => ['required', 'integer', 'min:0', 'max:100000000'],

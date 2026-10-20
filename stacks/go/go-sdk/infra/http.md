@@ -1,6 +1,6 @@
 # HTTP Infrastructure
 
-Пакет: `github.com/exgamer/gosdk-http-request-builder/pkg/builder`
+Пакет: `git.mpinnovations.kz/mps/go-packages/gosdk-http-request-builder/pkg/builder` (как в `go.mod` эталона; GitHub — `github.com/exgamer/gosdk-http-request-builder/pkg/builder`)
 
 ## Конструкторы
 
@@ -45,7 +45,7 @@ resp.IsServerError()  // 5xx
 ## Поведение ошибок
 
 - `GetResult()` / `Do()` возвращают `error` только при сбое транспорта (сеть, таймаут, отмена контекста) и — с `SetThrowUnmarshalError(true)` — при неразбираемом теле. **Статус ответа ошибкой не считается**: и 4xx, и 5xx приходят с `err == nil` (сверено по `gosdk-http-request-builder` v1.0.2).
-- Поэтому после `GetResult()` статус проверяется **всегда**: `!resp.IsSuccess()` → ошибка адаптера; 4xx (`resp.IsClientError()`) — ответ внешней системы, который сценарий может разобрать (не найдено, отказ), 5xx (`resp.IsServerError()`) — сбой внешней системы. Использовать `resp.Result` без проверки статуса — **[ОШИБКА]** `http-status-unchecked`.
+- Поэтому после `GetResult()` статус проверяется **всегда**: `!resp.IsSuccess()` → ошибка адаптера; 4xx (`resp.IsClientError()`) — ответ внешней системы, который сценарий может разобрать (не найдено, отказ), 5xx (`resp.IsServerError()`) — сбой внешней системы. Использовать `resp.Result` без проверки статуса — `http-status-unchecked` (уровень — `stacks/go/review-tags.md`).
 
 ## Проброс Request ID (обязателен) — отсутствие = ошибка ревью
 
@@ -55,25 +55,25 @@ resp.IsServerError()  // 5xx
 // pkg/requestid/requestid.go
 // Header — заголовок Request ID для исходящего запроса; вне HTTP-запроса — пустой набор.
 func Header(ctx context.Context) map[string]string {
-    if info := gin.GetHttpInfoFromContext(ctx); info != nil && info.RequestId != "" {
-        return map[string]string{constants.RequestIdHeaderName: info.RequestId}
-    }
+	if info := gin.GetHttpInfoFromContext(ctx); info != nil && info.RequestId != "" {
+		return map[string]string{constants.RequestIdHeaderName: info.RequestId}
+	}
 
-    return map[string]string{}
+	return map[string]string{}
 }
 
 builder.NewGetHttpRequestBuilder[ResponseType](ctx, url).
-    SetRequestHeaders(requestid.Header(ctx))
+	SetRequestHeaders(requestid.Header(ctx))
 ```
 
-Своя проверка `httpInfo != nil` в двух и более адаптерах — **[ОШИБКА]** (инфраструктурный workaround, `stacks/go/conventions.md` п. 22).
+Своя проверка `httpInfo != nil` в двух и более адаптерах — тег `infra-logic-duplicated` (инфраструктурный workaround, `stacks/go/conventions.md` п. 22).
 
 ## model.go
 
 ```go
 type city struct {
-    ID   uint   `json:"id"`
-    Name string `json:"name"`
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
 }
 ```
 
@@ -83,9 +83,14 @@ type city struct {
 
 ```go
 func modelToEntity(m *city) *domain.City {
-    if m == nil { return nil }
+	if m == nil {
+		return nil
+	}
 
-    return &domain.City{ID: m.ID, Name: m.Name}
+	return &domain.City{
+		ID:   m.ID,
+		Name: m.Name,
+	}
 }
 ```
 
@@ -95,18 +100,18 @@ func modelToEntity(m *city) *domain.City {
 
 ```go
 resp, err := builder.NewGetHttpRequestBuilder[builder.Response[city]](ctx, url).
-    SetRequestHeaders(requestid.Header(ctx)).
-    SetQueryParams(map[string]string{"page": "1"}).
-    GetResult()
+	SetRequestHeaders(requestid.Header(ctx)).
+	SetQueryParams(map[string]string{"page": "1"}).
+	GetResult()
 ```
 
 ### POST
 
 ```go
 resp, err := builder.NewPostHttpRequestBuilder[builder.Response[city]](ctx, url).
-    SetRequestHeaders(requestid.Header(ctx)). // до SetJSONBody — иначе Content-Type затрётся
-    SetJSONBody(payload).
-    GetResult()
+	SetRequestHeaders(requestid.Header(ctx)). // до SetJSONBody — иначе Content-Type затрётся
+	SetJSONBody(payload).
+	GetResult()
 ```
 
 PUT / PATCH — аналогично POST, только другой конструктор.
@@ -121,38 +126,38 @@ PUT / PATCH — аналогично POST, только другой конст�
 
 ```go
 func NewHTTPRepository(baseURL string, timeout time.Duration) *HTTPRepository {
-    return &HTTPRepository{
-        baseURL: baseURL,
-        timeout: timeout,
-    }
+	return &HTTPRepository{
+		baseURL: baseURL,
+		timeout: timeout,
+	}
 }
 
 type HTTPRepository struct {
-    baseURL string
-    timeout time.Duration
+	baseURL string
+	timeout time.Duration
 }
 
 func (r *HTTPRepository) GetByID(ctx context.Context, id uint) (*domain.City, error) {
-    resp, err := builder.NewGetHttpRequestBuilder[builder.Response[city]](
-        ctx,
-        fmt.Sprintf("%s/api/v1/cities/%d", r.baseURL, id),
-    ).
-        SetRequestHeaders(requestid.Header(ctx)).
-        SetRequestTimeout(r.timeout).
-        SetThrowUnmarshalError(false).
-        GetResult()
-    if err != nil {
-        return nil, fmt.Errorf("get city failed (id=%d): %w", id, err)
-    }
+	resp, err := builder.NewGetHttpRequestBuilder[builder.Response[city]](
+		ctx,
+		fmt.Sprintf("%s/api/v1/cities/%d", r.baseURL, id),
+	).
+		SetRequestHeaders(requestid.Header(ctx)).
+		SetRequestTimeout(r.timeout).
+		SetThrowUnmarshalError(false).
+		GetResult()
+	if err != nil {
+		return nil, fmt.Errorf("get city failed (id=%d): %w", id, err)
+	}
 
-    if resp.StatusCode == http.StatusNotFound {
-        return nil, nil
-    }
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
 
-    if !resp.IsSuccess() {
-        return nil, fmt.Errorf("get city failed (id=%d): status %d", id, resp.StatusCode)
-    }
+	if !resp.IsSuccess() {
+		return nil, fmt.Errorf("get city failed (id=%d): status %d", id, resp.StatusCode)
+	}
 
-    return modelToEntity(&resp.Result.Data), nil
+	return modelToEntity(&resp.Result.Data), nil
 }
 ```

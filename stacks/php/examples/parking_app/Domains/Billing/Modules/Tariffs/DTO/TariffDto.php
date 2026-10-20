@@ -9,7 +9,7 @@ use MPS\Core\DataObjects\DataObject;
 use MPS\Core\Enums\CurrencyEnum;
 
 /**
- * DTO тарифа.
+ * Данные тарифа на запись — от запроса до репозитория (создание и полная замена); цена — в минимальных единицах валюты.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

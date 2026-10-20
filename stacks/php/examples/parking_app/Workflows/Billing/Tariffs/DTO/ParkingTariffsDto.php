@@ -7,7 +7,7 @@ namespace App\ParkingApp\Workflows\Billing\Tariffs\DTO;
 use MPS\Core\DataObjects\DataObject;
 
 /**
- * Парковка и её действующие тарифы.
+ * Результат сценария двух доменов: данные парковки (Catalog) вместе с её действующими тарифами (Billing).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

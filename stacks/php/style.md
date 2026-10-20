@@ -7,10 +7,16 @@
 ## Шапка класса
 
 - `declare(strict_types=1);` в каждом файле.
-- Docblock класса: одна строка по-русски, что это, + `@author` автора:
+- Docblock класса: одна строка по-русски, что это, + `@author` автора; строка говорит больше имени — правило, границу или участников, а не пересказ (`comment-restates-name`); эталон — `examples/parking_app/Domains/Billing/Modules/Tariffs/Commands/SetDefaultTariffCommand.php`:
   ```php
+  // плохо: пересказ имени SetDefaultTariffCommand
   /**
-   * CRUD Сервис тарифов. (Только CRUD)
+   * Команда установки тарифа по умолчанию.
+   */
+
+  // хорошо
+  /**
+   * Назначение тарифа по умолчанию: у парковки он один, флаг прежнего снимается.
    *
    * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
    */
@@ -23,9 +29,9 @@
    * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
    */
   ```
-- Шаблонные docblock-и вида `@package App\…`, «Реализует бизнес-логику управления…», «Обеспечивает типобезопасность…» (встречается в существующем коде) — **[ВНИМАНИЕ]**, это пересказ, а не смысл.
+- Шаблонные docblock-и вида `@package App\…`, «Реализует бизнес-логику управления…», «Обеспечивает типобезопасность…» (встречается в существующем коде) — `comment-restates-name` / `ai-style-comment`, это пересказ, а не смысл.
 - `@param`/`@return` в docblock — только если добавляют информацию сверх сигнатуры (`array<int, string[]>`, generic, `@throws`). Дублировать `@param int $id` при типизированной сигнатуре не нужно.
-- Что писать в комментариях и docblock, чего не писать, уровни и теги — `core/style.md`, «Комментарии». PHP-пример про описание, повторяющее имя (**[ИНФО]**, `comment-restates-name`):
+- Что писать в комментариях и docblock, чего не писать, уровни и теги — `core/style.md`, «Комментарии». PHP-пример про описание, повторяющее имя (`comment-restates-name`):
 
     ```php
     // плохо
@@ -82,7 +88,7 @@
 
   return $session;
   ```
-- Читается сверху вниз (`core/style.md`, «Форма кода»; `nested-call-chain`, **[ВНИМАНИЕ]**): замыкание не передаёт поведение в свой метод, вызов не вкладывается в вызов, лямбда — одна строка только там, где её требует библиотека, параметр замыкания не затеняет внешнюю переменную.
+- Читается сверху вниз (`core/style.md`, «Форма кода»; `nested-call-chain`): замыкание не передаёт поведение в свой метод, вызов не вкладывается в вызов, лямбда — одна строка только там, где её требует библиотека, параметр замыкания не затеняет внешнюю переменную.
 
   ```php
   // плохо: поведение уезжает в хелпер, два уровня скобок, $query затеняет $query
@@ -160,13 +166,13 @@
 | Коллекция DTO | `{Entity}ItemsDto` (`DataObjectCollection`, `mps-core/data-objects.md`) | `PermissionItemsDto` |
 | Валидатор | `{Entity}DtoValidator` | `TariffDtoValidator` |
 | Enum | `{Entity}{Признак}Enum`, кейсы `UPPER_SNAKE` (P-16, как в ядре: `CurrencyEnum::KZT`); всегда `implements Enumerable` + `use EnumerableTrait` из `mps/core` (`mps-core/enums.md`) | `TariffStatusEnum::ACTIVE` |
-| Request | `Http/Requests/{Entity}/{Create,Update,Index}Request` | `Requests/Tariffs/CreateRequest` |
+| Request | `Http/Requests/{Entity}/{Create,Update,Index}Request`; действие над записью по id пути — `{View,{Action}}Request` (`structure.md`, дерево `Entrypoints/`) | `Requests/Tariffs/CreateRequest`, `Requests/Tariffs/SetDefaultRequest` |
 | Response | `{Entity}Response`, `{Entity}PaginatedResponse` | `TariffResponse` |
 | Job | `{Action}Job` | `ActivatePlannedTariffJob` |
 | Метод репозитория | один — `get…By…`/`oneBy…` → `?Model`; много — `all…By…` → `Collection`; список — `paginate…({E}FilterDto, Page)`/`list…` (форма (2) P-19; в форме (1) — `search()` ядра); запись — `createFromDto`/`updateFromDto`/типизированный метод (п. 11a); `*OrFail` — нет (п. 12a) | `getDefaultByParkingId`, `allByParkingId`, `paginateByFilter` |
 | Публичный метод сервиса для точки входа | `findById(int $id, ?array $scope): ?Model` — `null` переводит в 404 контроллер (п. 12a) | `findById` |
 
-Имена DTO и Request — как в эталоне `stacks/php/examples/parking_app` (решения P-5, P-7): `{Entity}Dto`, `Http/Requests/{Entity}/{Create,Update,Index}Request`. Суффикс в PHP — `Dto`, в Go — `DTO` (аббревиатуры заглавными) — различие стеков. Варианты `BuildingDataDTO`, `Requests/CreateRequest` без папки сущности в новом коде — **[ВНИМАНИЕ]**. Междоменный класс — `{Action}Workflow` с `execute()` (решение P-2); `*Command` в `Workflows/` существующего кода — старый нейминг, переименовывается только в рамках задачи.
+Имена DTO и Request — как в эталоне `stacks/php/examples/parking_app` (решения P-5, P-7): `{Entity}Dto`, `Http/Requests/{Entity}/{Create,Update,Index}Request`, по id пути — `{View,{Action}}Request`. Суффикс в PHP — `Dto`, в Go — `DTO` (аббревиатуры заглавными) — различие стеков. В новом коде суффикс `DTO` (`BuildingDataDTO`) — `dto-suffix-uppercase`; `Requests/CreateRequest` без папки сущности — `file-wrong-location`. Междоменный класс — `{Action}Workflow` с `execute()` (решение P-2); `*Command` в `Workflows/` существующего кода — старый нейминг, переименовывается только в рамках задачи.
 
 ## Язык
 

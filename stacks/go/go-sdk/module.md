@@ -4,20 +4,27 @@
 
 Структура пути: `{domain}/{module}` (например `billing/tariff`) или просто `{module}` если домен не нужен.
 
-Рядом с `module.go` лежат фабрики:
+Рядом с `module.go` лежат фабрики и конфиг (состав — `../structure.md`, «Bootstrap / Application Layer»):
+- `config.go` (если модулю нужны настройки из env — внешние системы, лимиты, таймауты)
 - `repositories_factory.go`
-- `services_factory.go`
+- `services_factory.go` (сервисы, Command и Query домена)
+- `workflows_factory.go` (если есть workflow — только сборка workflow, не в `services_factory.go`)
 - `handlers_factory.go`
 - `consumers_factory.go` (если есть очередь)
+- `commands_factory.go` (модуль консоли — cobra-команды)
+
+Эталон — `../examples/tariff/internal/app/bootstrap/billing/tariff/` (`config.go`, `workflows_factory.go`), `../examples/tariff/internal/app/bootstrap/billing/outbox_tariff_event/` (`commands_factory.go`).
 
 ## Module.Init — порядок сборки
 
 ```
-client (postgres DI)
-  → repositoryFactory
+client (postgres DI), config (load{Name}Config)
+  → repositoriesFactory
     → servicesFactory
-      → handlersFactory → SetRoutes(a, handler)
+      → workflowsFactory (repositoriesFactory, servicesFactory)
+        → handlersFactory (servicesFactory, workflowsFactory) → SetRoutes(a, handler, auth)
       → consumersFactory → GetConsumers(...) → reg.RegisterMultipleHandler(...)
+      → commandsFactory → m.Console.AddCommand(...)   (модуль консоли)
 ```
 
 ## Правила
@@ -35,59 +42,68 @@ client (postgres DI)
 package tariff
 
 import (
-    tariffhttp "git.example.com/.../internal/entrypoints/client/http/billing/tariff"
-    "github.com/exgamer/gosdk-core/pkg/app"
-    postgresDI "github.com/exgamer/gosdk-postgres-core/pkg/di"
+	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"
+	postgresDI "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/di"
+
+	tariffhttp "example.com/parking-service/internal/entrypoints/admin/http/billing/tariff"
 )
 
 type Module struct{}
 
 func (m *Module) Name() string {
-    return "tariff"
+	return "tariff"
 }
 
 func (m *Module) Init(a *app.App) error {
-    client, err := postgresDI.GetDefaultPostgresConnection(a.Container)
-    if err != nil {
-        return err
-    }
+	client, err := postgresDI.GetDefaultPostgresConnection(a.Container)
+	if err != nil {
+		return err
+	}
 
-    repositoryFactory := newRepositoriesFactory(client)
-    servicesFactory := newServicesFactory(repositoryFactory)
-    handlersFactory := newHandlersFactory(servicesFactory)
+	integrationsConfig, err := loadIntegrationsConfig()
+	if err != nil {
+		return err
+	}
 
-    return tariffhttp.SetRoutes(a, handlersFactory.TariffHandler)
+	repositoriesFactory := newRepositoriesFactory(client, integrationsConfig)
+	servicesFactory := newServicesFactory(repositoriesFactory)
+	workflowsFactory := newWorkflowsFactory(repositoriesFactory, servicesFactory)
+	handlersFactory := newHandlersFactory(servicesFactory, workflowsFactory)
+
+	return tariffhttp.SetRoutes(a, handlersFactory.TariffHandler, adminAuth)
 }
 ```
+
+`adminAuth` — auth-middleware контекста, собранная в `Init` (в эталоне — `adminmiddleware.JWTAuthMiddleware(adminService)`, сервис — `di.Resolve`).
 
 ## Шаблон с Rabbit consumers
 
 ```go
 func (m *Module) Init(a *app.App) error {
-    client, err := postgresDI.GetDefaultPostgresConnection(a.Container)
-    if err != nil {
-        return err
-    }
+	client, err := postgresDI.GetDefaultPostgresConnection(a.Container)
+	if err != nil {
+		return err
+	}
 
-    repositoryFactory := newRepositoriesFactory(client)
-    servicesFactory := newServicesFactory(repositoryFactory)
-    handlersFactory := newHandlersFactory(servicesFactory)
+	repositoriesFactory := newRepositoriesFactory(client)
+	servicesFactory := newServicesFactory(repositoriesFactory)
+	handlersFactory := newHandlersFactory(servicesFactory)
 
-    err = cityhttp.SetRoutes(a, handlersFactory.CityHandler)
-    if err != nil {
-        return err
-    }
+	err = cityhttp.SetRoutes(a, handlersFactory.CityHandler, adminAuth)
+	if err != nil {
+		return err
+	}
 
-    consumersFactory := newConsumersFactory()
-    consumers := cityconsumer.GetConsumers(consumersFactory.CityConsumer)
+	consumersFactory := newConsumersFactory(servicesFactory)
+	consumers := cityconsumer.GetConsumers(consumersFactory.CityConsumer)
 
-    reg, err := rabbitDI.GetRabbitConsumersRegistry(a.Container)
-    if err != nil {
-        return err
-    }
+	reg, err := rabbitDI.GetRabbitConsumersRegistry(a.Container)
+	if err != nil {
+		return err
+	}
 
-    reg.RegisterMultipleHandler(consumers)
+	reg.RegisterMultipleHandler(consumers)
 
-    return nil
+	return nil
 }
 ```

@@ -15,12 +15,14 @@ use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\Outbo
 use App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Models\OutboxTariffEvent;
 use Illuminate\Config\Repository as Config;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Database\QueryException;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Exceptions\OperationFailedAppException;
+use PDOException;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 /**
  * Повтор зависших событий: пачки, сбой одного события — в трекер и дальше, ошибка выборки — наверх.
@@ -29,6 +31,8 @@ use RuntimeException;
  */
 class RetryOutboxTariffEventsCommandTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const BATCH_SIZE = 2;
 
     private const STALE_AFTER_SECONDS = 300;
@@ -46,12 +50,6 @@ class RetryOutboxTariffEventsCommandTest extends TestCase
 
         $this->repository = Mockery::mock(OutboxTariffEventRepositoryInterface::class);
         $this->exceptionHandler = Mockery::mock(ExceptionHandler::class);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
     public function test_batches_are_claimed_until_partial_and_one_failure_does_not_stop_run(): void
@@ -75,7 +73,8 @@ class RetryOutboxTariffEventsCommandTest extends TestCase
             ->once()
             ->with(Mockery::type(OperationFailedAppException::class));
 
-        $result = $this->command()->execute();
+        $command = $this->command();
+        $result = $command->execute();
 
         $this->assertSame(2, $result->getPublished());
         $this->assertSame(1, $result->getFailed());
@@ -90,7 +89,8 @@ class RetryOutboxTariffEventsCommandTest extends TestCase
         $this->repository->shouldNotReceive('oneById');
         $this->exceptionHandler->shouldNotReceive('report');
 
-        $result = $this->command()->execute();
+        $command = $this->command();
+        $result = $command->execute();
 
         $this->assertSame(0, $result->getPublished());
         $this->assertSame(0, $result->getFailed());
@@ -101,12 +101,13 @@ class RetryOutboxTariffEventsCommandTest extends TestCase
         $this->repository
             ->shouldReceive('claimForRetry')
             ->once()
-            ->andThrow(new RuntimeException('Postgres недоступен'));
+            ->andThrow(new QueryException('pgsql', 'select', [], new PDOException('Postgres недоступен')));
         $this->exceptionHandler->shouldNotReceive('report');
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(QueryException::class);
 
-        $this->command()->execute();
+        $command = $this->command();
+        $command->execute();
     }
 
     private function command(): RetryOutboxTariffEventsCommand

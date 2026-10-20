@@ -16,7 +16,7 @@ Command — **большая операция одного домена** (из�
 - **Логирование** — только если операции есть что логировать; `LoggerAwareInterface` + `LoggerAwareTrait` (`capabilities.md`) тогда подключаются, обязательными для Command/Query они не являются.
 - Workflow — тоже `execute()` (P-2), но это другой слой: 2+ доменов (`../structure.md`). Консольная команда Artisan (`*ConsoleCommand extends Illuminate\Console\Command`) и Job — Laravel-метод `handle()` со своей сигнатурой (`cli.md`, `jobs.md`); Command домена они получают параметром `handle()` и вызывают его `execute()`.
 
-**[ВНИМАНИЕ]** Command/Query с базовым классом ядра, `prepare()`/`get()` или точкой входа не `execute(...)` с типизированными аргументами — тег `command-query-form`.
+Command/Query с базовым классом ядра, `prepare()`/`get()` или точкой входа не `execute(...)` с типизированными аргументами — тег `command-query-form` (уровень — `stacks/php/review-tags.md`).
 
 ## Command одного домена
 
@@ -25,9 +25,11 @@ Command — **большая операция одного домена** (из�
 ```php
 namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands;
 
-use MPS\Core\Components\Database\Transaction\TransactionManagerInterface;
+// core < 1.10 (эталон, 1.6.0) — интерфейс подпроекта; core ≥ 1.10 — MPS\Core\Components\Database\Transaction\TransactionManagerInterface (transactions.md)
+use App\ParkingApp\Core\Database\Managers\TransactionManagerInterface;
+use MPS\Core\Exceptions\NotFoundAppException;
 
-final class SaveYourEntityCommand
+final class ReplaceYourEntityCommand
 {
     public function __construct(
         private readonly TransactionManagerInterface $transactionManager,
@@ -36,15 +38,19 @@ final class SaveYourEntityCommand
     ) {
     }
 
-    public function execute(YourDto $dto): YourModel
+    /**
+     * @throws NotFoundAppException
+     */
+    public function execute(int $id, YourDto $dto): YourModel
     {
-        $model = $this->transactionManager->run(function () use ($dto) {
-            $existing = $this->repository->getByExternalId($dto->getExternalId());
-            if ($existing) {
-                $this->repository->updateFromDto($existing, $dto);
+        $current = $this->repository->oneById($id);   // проверка — до run(), гонку закрывает concurrency.md
+        if (! $current) {
+            throw new NotFoundAppException('Запись не найдена');
+        }
 
-                return $existing;
-            }
+        // два модифицирующих запроса — одна транзакция (O-8); записи — на месте, не в отдельном методе
+        $model = $this->transactionManager->run(function () use ($current, $dto): YourModel {
+            $this->repository->archive($current->id);
 
             return $this->repository->createFromDto($dto);
         });
@@ -56,11 +62,15 @@ final class SaveYourEntityCommand
 }
 ```
 
+Один модифицирующий запрос («найти → один `update` или один `create`») — без `run()` (тег `needless-transaction`, `approaches/patterns/transactions.md`): гонку «найти или создать» закрывает уникальный индекс (`approaches/patterns/concurrency.md`), не транзакция.
+
 Эталоны — `../examples/parking_app/Domains/Billing/Modules/Tariffs/Commands/SetDefaultTariffCommand.php`, `ActivatePlannedTariffCommand.php`, `.../OutboxTariffEvents/Commands/{Publish,Retry}OutboxTariffEvent*Command.php`.
 
 ## Сценарий над несколькими доменами — Workflow, не Command
 
-«Оркестрирующего Command» нет: координация сервисов разных доменов (заказ + корзина + бонусы + уведомление) — `Workflows/{D}/{M}/{Action}Workflow::execute()`; транзакция — если больше одного модифицирующего запроса (O-8, `approaches/patterns/transactions.md`). Workflow берёт репозитории и сервисы любых доменов напрямую (O-7), Command/Query/Service домена чужой домен не берут — **[ОШИБКА]**, тег `domain-cross-domain-access`. Эталон — `../examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php`.
+«Оркестрирующего Command» нет: координация сервисов разных доменов (заказ + корзина + бонусы + уведомление) — `Workflows/{D}/{M}/{Action}Workflow::execute()`; транзакция — если больше одного модифицирующего запроса (O-8, `approaches/patterns/transactions.md`). Workflow берёт репозитории и сервисы любых доменов напрямую (O-7), Command/Query/Service домена чужой домен не берут — тег `domain-cross-domain-access`. Эталон — `../examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php`.
+
+`TransactionManagerInterface` в примере ниже — по версии ядра, как в Command выше.
 
 ```php
 final class CreateOrderWorkflow

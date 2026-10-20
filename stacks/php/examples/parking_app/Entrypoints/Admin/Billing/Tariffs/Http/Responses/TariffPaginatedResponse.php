@@ -8,7 +8,7 @@ use App\ParkingApp\Core\Resources\PaginatedResource;
 use OpenApi\Attributes as OA;
 
 /**
- * Страница списка тарифов.
+ * Список тарифов: items — TariffResponse, блок pagination — из PaginatedResource.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

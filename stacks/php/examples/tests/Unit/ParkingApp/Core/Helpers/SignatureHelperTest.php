@@ -10,24 +10,24 @@ use App\ParkingApp\Core\Http\Signature\SignedRequest;
 use PHPUnit\Framework\TestCase;
 
 /**
- * HMAC-подпись машинного вызова: вектор Go-эталона, отказ на битый формат и на смену секрета, метода, пути или тела.
+ * HMAC-подпись машинного вызова: общий с Go-сервисом вектор, отказ на битый формат и на смену секрета, метода, пути или тела.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
 class SignatureHelperTest extends TestCase
 {
-    // Вектор посчитан независимо: printf '...' | openssl dgst -sha256 -hmac vector-secret; тот же — в Go-эталоне
+    // Вектор посчитан независимо: printf '...' | openssl dgst -sha256 -hmac vector-secret; входы и вектор те же, что в Go-сервисе (pkg/signature)
     private const SECRET = 'vector-secret';
 
     private const TIMESTAMP = 1788150000;
 
     private const NONCE = '11111111-2222-3333-4444-555555555555';
 
-    private const TARGET = '/api/v1/integration/tariffs/42';
+    private const TARGET = '/api/integration/v1/billing/tariffs/42';
 
     private const BODY = '{"a":1}';
 
-    private const VECTOR = 'aef0607db22c169c20df74d33bf170e8ff20b1cdc9238e35391e1a3dfcf9925e';
+    private const VECTOR = 'dd308087b520b5821cf5f1269857c8f9746f5d18463bb2c856d8244ac3bbc512';
 
     public function test_signature_matches_independent_vector(): void
     {
@@ -89,7 +89,7 @@ class SignatureHelperTest extends TestCase
         $cases = [
             'чужой секрет' => ['other', $this->message()],
             'другой метод' => [self::SECRET, $this->message(method: 'GET')],
-            'другой путь' => [self::SECRET, $this->message(target: '/api/v1/integration/tariffs/43')],
+            'другой путь' => [self::SECRET, $this->message(target: '/api/integration/v1/billing/tariffs/43')],
             'другое тело' => [self::SECRET, $this->message(body: '{"a":2}')],
         ];
 

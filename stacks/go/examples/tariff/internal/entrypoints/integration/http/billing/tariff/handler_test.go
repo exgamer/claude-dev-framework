@@ -32,7 +32,9 @@ func TestHandler_View(t *testing.T) {
 	}{
 		{"any parking", "/tariffs/2", http.StatusOK},
 		{"not found", "/tariffs/3", http.StatusNotFound},
-		{"bad id", "/tariffs/abc", http.StatusBadRequest},
+		{"id not a number", "/tariffs/abc", http.StatusUnprocessableEntity},
+		{"zero id", "/tariffs/0", http.StatusUnprocessableEntity},
+		{"negative id", "/tariffs/-1", http.StatusUnprocessableEntity},
 	}
 
 	for _, tc := range cases {

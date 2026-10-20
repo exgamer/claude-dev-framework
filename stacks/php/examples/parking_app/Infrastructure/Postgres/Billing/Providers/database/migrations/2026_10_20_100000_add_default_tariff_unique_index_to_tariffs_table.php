@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use MPS\Core\Exceptions\OperationFailedAppException;
 
 /**
- * У парковки не больше одного тарифа по умолчанию (approaches/patterns/concurrency.md): частичный уникальный индекс.
+ * У парковки не больше одного тарифа по умолчанию: частичный уникальный индекс.
  */
 return new class () extends Migration {
     private string $tableName = 'parking.tariffs';

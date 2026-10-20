@@ -7,7 +7,7 @@ namespace App\ParkingApp\Entrypoints\Console\Billing;
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Провайдер консольных команд домена Billing.
+ * Подключает commands.php Billing (тариф по умолчанию, повтор outbox) автозагрузкой ModuleServiceProvider.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

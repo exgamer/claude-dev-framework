@@ -11,11 +11,11 @@ import (
 	admindomain "example.com/parking-service/internal/domains/identity/admin"
 )
 
-// RequirePermissionMiddleware Пропускает администратора с правом permission; super-admin — без проверки прав.
-// Ставится после JWTAuthMiddleware: без администратора в контексте — 500, маршрут собран неверно
+// RequirePermissionMiddleware Пропускает администратора с правом permission, super-admin — без проверки; нет права — 403
 func RequirePermissionMiddleware(permission string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		admin := admindomain.FromContext(c.Request.Context())
+		// Ставится после JWTAuthMiddleware: без администратора в контексте — 500, маршрут собран неверно
 		if admin == nil {
 			response.ErrorResponse(c, errors.New("require permission: no admin in context, JWTAuthMiddleware is missing on the route"))
 

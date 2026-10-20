@@ -47,7 +47,7 @@ glab api --paginate "projects/:fullpath/merge_requests/<iid>/discussions?per_pag
 Для каждого треда:
 
 1. **Суть** одной строкой — что ревьюер хочет изменить и почему (своими словами, без цитаты целиком).
-2. **Правило**: grep по `{DF}/stacks/<stack>/{checklist,conventions,style,security,review-findings,review-tags}.md`, `{DF}/regulations/`, `{DF}/architecture/`, `{DF}/core/decisions.md`, `.claude/dev-rules.md` проекта. Записать ссылку (файл, пункт/тег) или «правила нет».
+2. **Правило**: grep по `{DF}/stacks/<stack>/{checklist,conventions,style,security,review-findings,review-tags}.md`, каталогам тегов `{DF}/approaches/process/{review-tags,security}.md`, `{DF}/approaches/`, `{DF}/regulations/`, `{DF}/architecture/`, `{DF}/core/decisions.md`, `.claude/dev-rules.md` проекта. Записать ссылку (файл, пункт/тег) или «правила нет».
 3. **Отношение к правилам** — одно из:
    - **по правилу** — замечание совпадает с правилом фреймворка/проекта (значит, код правило нарушил; если код писали мы — это ещё и строка в `rules-log.md`: почему пропустили — пробел в памятке, ревью не поймало);
    - **верно, правила нет** — баг, безопасность, потеря данных, читаемость по существу; исправлять, кандидат в правила (`review-findings.md` стека или регламент);
@@ -112,7 +112,7 @@ glab api --paginate "projects/:fullpath/merge_requests/<iid>/discussions?per_pag
 
 ## Шаг 6 — Выполнение
 
-- Правки — по правилам разработчика стека: `skills/dev-<stack>/SKILL.md`, Шаги 1, 3–5 (памятка, `capabilities.md`, эталон, unit-тесты вместе с кодом). Только файлы из плана. Соседний код с тем же нарушением вне тредов — не править молча: отметить в «Итог» как находку.
+- Правки — по правилам разработчика стека: `skills/dev-<stack>/SKILL.md`, Шаги «Правила», «Что уже есть в SDK» / «Что уже есть в ядре», «Образец», «Код» (памятка, версия SDK/ядра и `capabilities.md`, эталон, код с unit-тестами). Только файлы из плана. Соседний код с тем же нарушением вне тредов — не править молча: отметить в «Итог» как находку.
 - После каждой правки — тесты задетого пакета; в конце — полный прогон тестов и линтера стека.
 - **Ответы в треды** — текст на каждый тред в разделе «Ответы в треды», по правилам «Как писать ответ» ниже. Публикация: `glab api -X POST "projects/:fullpath/merge_requests/<iid>/discussions/<discussion_id>/notes" -f body=…`.
   - Сразу после «да» на план: отказы, ответы на вопросы, «уже сделано в HEAD».

@@ -136,5 +136,4 @@ throw (new BadRequestAppException('...'))
 | Controller | Только перевод результата сервиса в HTTP: `NotFoundAppException`, если сервис вернул `null` (решение об ответе — у точки входа; из консоли/очереди «нет записи» обрабатывается по-своему). Бизнес-исключений (`BadRequestAppException`, `ValidationAppException` по инвариантам, проверки статусов) не бросает — это логика сервиса |
 | Request | `ValidationAppException` — через `failedValidation()` |
 
-`InvalidConfigurationAppException` — только в инфраструктурном и системном коде
-(Aware-трейты, провайдеры, адаптеры). **Никогда** в бизнес-логике.
+`InvalidConfigurationAppException` — ошибка сборки или конфигурации, не бизнес-правило: инфраструктурный и системный код (Aware-трейты, провайдеры, адаптеры — нет обязательной настройки) и домен, когда объект собран неправильно — не выставлен скоуп DTO (`TariffFilterDto::getParkingIds()`, `../conventions.md` п. 19a), нет обязательной настройки Command (конструкторы Command outbox эталона). Для бизнес-правил (статус, лимит, существование) — **никогда**: там `ValidationAppException`/`NotFoundAppException`/`BadRequestAppException`.

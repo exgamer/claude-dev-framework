@@ -4,23 +4,12 @@ package outbox_tariff_event
 type Status uint
 
 const (
+	// StatusPending Ожидает первой отправки
 	StatusPending Status = iota + 1
+	// StatusPublished Брокер подтвердил публикацию
 	StatusPublished
+	// StatusFailed Попытки исчерпаны — ручной разбор (чем выражается разбор — README)
 	StatusFailed
+	// StatusAwaitingRetry Отправка не удалась; повторит консольная команда по расписанию
 	StatusAwaitingRetry
 )
-
-func (s Status) Label() string {
-	switch s {
-	case StatusPending:
-		return "Ожидает отправки"
-	case StatusPublished:
-		return "Опубликовано в RabbitMQ"
-	case StatusFailed:
-		return "Попытки исчерпаны — ручной разбор"
-	case StatusAwaitingRetry:
-		return "Отправка не удалась; повторит консольная команда по расписанию"
-	default:
-		return "Неизвестный статус"
-	}
-}

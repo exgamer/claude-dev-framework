@@ -12,8 +12,9 @@ type Repository interface {
 	GetDefaultByParkingID(ctx context.Context, parkingID uint) (*Tariff, error)
 	Paginated(ctx context.Context, search *Search) (*pagination.Paginated[Tariff], error)
 	Create(ctx context.Context, tariff *Tariff) (*Tariff, error)
+	// Update Тариф удалён или не существует — ErrTariffNotFound
 	Update(ctx context.Context, id uint, patch *Patch) error
-	// SetDefault Пишет флаг; второй тариф по умолчанию у парковки (уникальный индекс, параллельная смена) — ErrDefaultTariffTaken
+	// SetDefault Пишет флаг; второй тариф по умолчанию у парковки (уникальный индекс, параллельная смена) — ErrDefaultTariffTaken, тариф удалён — ErrTariffNotFound
 	SetDefault(ctx context.Context, id uint, isDefault bool) error
 	// DeactivateByParkingID Снимает активность с активных тарифов парковки; возвращает ID изменённых, уже неактивные не трогает
 	DeactivateByParkingID(ctx context.Context, parkingID uint) ([]uint, error)
@@ -23,7 +24,8 @@ type Repository interface {
 type CacheRepository interface {
 	GetByID(ctx context.Context, id uint) (*Tariff, error)
 	Set(ctx context.Context, tariff *Tariff) error
-	Invalidate(ctx context.Context, id uint) error
+	// Invalidate Сбрасывает тарифы одним вызовом; без ID — ничего
+	Invalidate(ctx context.Context, ids ...uint) error
 }
 
 // PriceLimitRepository Лимиты цен из внешнего реестра парковок; лимит не задан — nil, nil

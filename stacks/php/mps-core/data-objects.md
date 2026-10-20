@@ -4,40 +4,62 @@
 
 ## DataObject
 
-Базовый класс для доменных DTO. Свойства `private/protected`, fluent-сеттеры, геттеры.
+Базовый класс для доменных DTO. Свойства `private` (`../conventions.md` п. 11), fluent-сеттеры, геттеры.
 
 ```php
-namespace App\Domains\YourDomain\Modules\YourModule\DataObjects;
+namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\DTO;
 
+use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Enums\YourStatusEnum;
 use MPS\Core\DataObjects\DataObject;
 
 class YourDto extends DataObject
 {
-    private ?string $name = null;
-    private ?int $status = null;
-    private ?Price $price = null;      // вложенный DataObject
+    private string $name;
 
-    public function getName(): ?string { return $this->name; }
+    private YourStatusEnum $status = YourStatusEnum::ACTIVE;   // фиксированный набор — сразу enum
 
-    public function setName(?string $name): self
+    private ?PriceDto $price = null;                           // вложенный DataObject: fromArray() соберёт его сам
+
+    public function getName(): string
     {
-        $this->name = $name;
+        return $this->name;
+    }
+
+    public function setName(string $value): self
+    {
+        $this->name = $value;
 
         return $this;
     }
 
-    public function setPrice(array|Price|null $price): self
+    public function getStatus(): YourStatusEnum
     {
-        if (is_array($price)) {
-            $price = Price::make()->fromArray($price);
-        }
+        return $this->status;
+    }
 
-        $this->price = $price;
+    public function setStatus(YourStatusEnum $value): self
+    {
+        $this->status = $value;
+
+        return $this;
+    }
+
+    public function getPrice(): ?PriceDto
+    {
+        return $this->price;
+    }
+
+    // тип аргумента = тип свойства, без array|… и сборки в сеттере (тег dto-setter-widened-type)
+    public function setPrice(?PriceDto $value): self
+    {
+        $this->price = $value;
 
         return $this;
     }
 }
 ```
+
+Эталон — `../examples/parking_app/Domains/Billing/Modules/Tariffs/DTO/TariffDto.php`: namespace `App\ParkingApp\Domains\{D}\Modules\{M}\DTO`, аргумент сеттера — `$value`.
 
 **Методы из коробки:**
 

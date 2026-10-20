@@ -13,6 +13,7 @@
   - Go-код с горутинами или общим состоянием — `go test -race ./...`.
   - Уязвимости зависимостей, если инструмент есть: Go — `govulncheck ./...`, PHP — `composer audit`.
   - Go: `go build ./... && go vet ./... && go test ./... && gofmt -l .` (с `vendor/` — `gofmt -l main.go cmd internal pkg`)
+  - CI проекта без гейтов (pipeline — только containerize + deploy, ни lint, ни test stage) — локальный прогон единственный гейт; его результат — в отчёт явно.
   - PHP: `composer csfix-validate`, `composer phpstan`, `composer test:run` (или их аналоги из `composer.json`)
 - [ ] Для проверки на живой инфраструктуре — использованы уже поднятые общие контейнеры (`docker ps`), одноразовые не поднимались; тестовые данные удалены.
 - [ ] Массовые операции, очистка, создание и изменение схемы БД (миграции) — не выполнялись без явного «да» на каждую (`core/principles.md`, «Действия с БД»).

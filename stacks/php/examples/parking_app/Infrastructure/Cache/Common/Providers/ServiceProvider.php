@@ -7,7 +7,7 @@ namespace App\ParkingApp\Infrastructure\Cache\Common\Providers;
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Провайдер общих кеш-репозиториев подпроекта.
+ * Подключает definitions.php: кеш nonce подписи партнёрских запросов (защита от повтора).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

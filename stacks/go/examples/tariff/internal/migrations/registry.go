@@ -8,5 +8,6 @@ func All() []*migration.Migration {
 		migration20261020100000(),
 		migration20261020100100(),
 		migration20261020100200(),
+		migration20261020100300(),
 	}
 }

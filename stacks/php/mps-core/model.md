@@ -10,12 +10,15 @@ namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Models;
 use MPS\Core\Models\Model;
 
 /**
- * Ваша сущность
+ * Строка your_schema.your_table: <что не видно из имени — единицы, ограничения таблицы, мягкое удаление, если есть>.
  *
- * @property int $id                  PK
- * @property string $name             Название
- * @property YourStatusEnum $status   Статус
- * @property Carbon $created_at       Дата создания
+ * @property int $id
+ * @property string $name
+ * @property int $price                 Цена часа в минимальных единицах валюты
+ * @property YourStatusEnum $status
+ * @property Carbon $created_at
+ *
+ * @author …
  */
 class YourModel extends Model
 {
@@ -23,6 +26,7 @@ class YourModel extends Model
 
     protected $fillable = [
         'name',
+        'price',
         'status',
     ];
 
@@ -33,7 +37,7 @@ class YourModel extends Model
 }
 ```
 
-Связей (`hasMany`, `belongsTo`…) в модели нет — раздел «Relations» ниже. Эталон — `../examples/parking_app/Infrastructure/Postgres/Billing/Tariffs/Models/Tariff.php`.
+Описание `@property` — только у неочевидных полей, `@author` — как у любого класса (`../style.md`, «Шапка класса», «Классы»). Связей (`hasMany`, `belongsTo`…) в модели нет — раздел «Relations» ниже. Эталон — `../examples/parking_app/Infrastructure/Postgres/Billing/Tariffs/Models/Tariff.php`.
 
 ## Что допустимо
 

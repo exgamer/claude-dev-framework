@@ -5,7 +5,7 @@
 Применять **вместе** с `conventions.md`, `mps-core/rules.md` и тематическими файлами — здесь только то, чего там нет
 или что команда ловит особенно часто.
 
-Формат: `что смотреть → почему реджектят`.
+Формат: `что смотреть → почему реджектят`. Уровень находки — по тегу в каталоге (`approaches/process/review-tags.md`, `review-tags.md`; O-24), здесь — только тег.
 
 ---
 
@@ -14,16 +14,16 @@
 - Границы входа (`gt:0` для id, `max:`/`between:` для чисел и массивов, enum, `list` для коллекций) — общее правило `regulations/rest-api.md`, «Валидация входа»; ревьюеры ловят это чаще всего: `['integer', 'gt:0']`, `array|max:100`.
 - В Request нет SQL-запросов и вызовов сервисов (P-17, `conventions.md` п. 9a): ни `exists:`/`unique:`/`Rule::exists()`/`Rule::unique()`, ни своих правил и замыканий с моделью, `DB::` или репозиторием, ни запросов в `prepareForValidation()`/`withValidator()`/`after()`. Существование — в сервисе/workflow через репозиторий, уникальность — уникальный индекс + проверка в сервисе.
 - Бизнес-правила («нельзя менять статус, если оплачен») — не в Request. Но **допустимые варианты значений** (enum) — как раз в реквесте: `Rule::enum(Enum::class)` (`checklist.md` п. 12).
-- PUT — полные данные (`conventions.md`, п. 12): в `UpdateRequest` поля `required` / `present|nullable`. Необязательное поле при записи DTO целиком (`updateFromDto($tariff, $dto)`, п. 11a) затирается `null` (происхождение — AINA-2628). Тег `update-request-optional-fields`.
+- PUT — полные данные (`conventions.md`, п. 12): в `UpdateRequest` поля `required` / `present|nullable`. Необязательное поле при записи DTO целиком (`updateFromDto($tariff->id, $dto)`, п. 11a) затирается `null` (происхождение — AINA-2628). Тег `update-request-optional-fields`.
 
 ## Repository
 
-- Наследование от ядра (`CRUDRepository`), запросы через `$this->getQuery()`, не `Model::query()` / `DB::table()`.
+- Наследование от ядра (`CRUDRepository`), запросы через `$this->getQuery()`, не `Model::query()` / `DB::table()`; сырой SQL — только исключение `conventions.md` п. 2.
 - Нет своих `*OrFail`-методов (ни в репозитории, ни в сервисе — п. 12a, SRP): `get…` возвращает `?Model`, `NotFoundAppException` бросает вызывающий. Тег `service-thin-wrapper`.
 - Нет `keyBy` / `map` / сборки структур — репозиторий отдаёт сырые данные, маппинг в Service.
-- **Метод репозитория — один запрос** (происхождение — mobile-api-rewrite, пользователь: «две выборки — это бизнес-логика»). Типичные формы: `lockForUpdate()->pluck()` + `delete()`, `delete()` + `upsert()`, `save()` + `first()`, «`first()` → `fill()->save()`». Тег `repository-multi-query`, [ОШИБКА].
-- **Запрос виден целиком** (mobile-api-rewrite MR !3773, пользователь): запрос метода не собран из приватных кусков (`service(Closure)`, `activeQuery()`), колонки — явным списком в `select`, не константой; фильтры списка — в том же методе (в форме (1) P-19 — в `filterSearch()`); список не по форме из «Список» `design.md` — отдельный тег `list-form-not-as-designed` ([ВНИМАНИЕ]); слишком большой запрос — сборка из нескольких репозиториев в сервисе/workflow (`conventions.md` п. 2a). Тег `query-split-into-pieces`, [ВНИМАНИЕ].
-- **Запись массивом** (AINA-2978, пользователь: «всегда DTO, массивы плохо») — `updateById($id, $dto->toArrayWithSnakeKeys())`, `updateById($id, ['is_default' => true])`, `create($data)` из сервиса/Command; то же в контроллере: `$this->service->update($id, $request->validated())`. По всей цепочке записи — DTO или типизированные аргументы (`conventions.md` п. 11a). Тег `write-array-instead-of-dto`, [ОШИБКА].
+- **Метод репозитория — один запрос** (происхождение — mobile-api-rewrite, пользователь: «две выборки — это бизнес-логика»). Типичные формы: `lockForUpdate()->pluck()` + `delete()`, `delete()` + `upsert()`, `save()` + `first()`, «`first()` → `fill()->save()`». Тег `repository-multi-query`.
+- **Запрос виден целиком** (mobile-api-rewrite MR !3773, пользователь): запрос метода не собран из приватных кусков (`service(Closure)`, `activeQuery()`), колонки — явным списком в `select`, не константой; фильтры списка — в том же методе (в форме (1) P-19 — в `filterSearch()`); список не по форме из «Список» `design.md` — отдельный тег `list-form-not-as-designed`; слишком большой запрос — сборка из нескольких репозиториев в сервисе/workflow (`conventions.md` п. 2a). Тег `query-split-into-pieces`.
+- **Запись массивом** (AINA-2978, пользователь: «всегда DTO, массивы плохо») — `updateById($id, $dto->toArrayWithSnakeKeys())`, `updateById($id, ['is_default' => true])`, `create($data)` из сервиса/Command; то же в контроллере: `$this->service->update($id, $request->validated())`. По всей цепочке записи — DTO или типизированные аргументы (`conventions.md` п. 11a). Тег `write-array-instead-of-dto`.
 - Нет обращения к таблице чужого домена: репозиторий пишет только в свои таблицы; данные двух доменов собирает workflow. Допустим read-only подзапрос (`EXISTS`/`JOIN`) к чужой таблице с комментарием, чья она (`architecture/cross-domain.md`).
 - Локальные phpstan-обёртки над `getQuery()` (типизированные прокси ради generics) не плодить — либо в `mps/core`, либо в ignore.
 - До самописа — посмотреть `mps-core/capabilities.md` (ядро: `QueryFilters\V2\StringFilter`, `LoggerAwareTrait`, …) и `Core/` подпроекта (`Page`/`PaginatedResource` для формы (2), `PaginatedQueryHelper` для формы (1) списка). «Уже есть в core» — частый реджект.
@@ -41,27 +41,27 @@
 ## Controller
 
 - Тонкий. Имена методов — `index / view / create / update / delete`.
-- **Обёртка `success/data` в Response-классе или контроллере при `api.response`/`ApiResponseMiddleware` на маршруте** (AINA-2628: «не надо оборачивать, это делает мидлвар») — Response отдаёт только данные; в Swagger-описании метода контроллера обёртка `success`/`data` при этом описывается (это реальный формат ответа). Тег `response-double-wrap`, [ОШИБКА].
-- **Ответ через макрос фасада** (AINA-2628, blocking: «mixin для Response не юзаем») — `Response::ok($data)` / `Response::created()` / `Response::deleted()` из `Response::mixin(new JsonResponseMixin)` провайдера проекта. Grep по `use` такую зависимость не видит. Замена — `response()->json(new {E}Response(...), Response::HTTP_CREATED)` (`conventions.md`, п. 19). Тег `controller-response-macro`, [ОШИБКА].
-- Swagger на каждый эндпоинт, с `500` в ответах; `404` — только у эндпойнтов, ищущих запись по ID (см. `swagger.md`).
+- **Обёртка `success/data` в Response-классе или контроллере при `api.response`/`ApiResponseMiddleware` на маршруте** (AINA-2628: «не надо оборачивать, это делает мидлвар») — Response отдаёт только данные; в Swagger-описании метода контроллера обёртка `success`/`data` при этом описывается (это реальный формат ответа). Тег `response-double-wrap`.
+- **Ответ через макрос фасада** (AINA-2628, blocking: «mixin для Response не юзаем») — `Response::ok($data)` / `Response::created()` / `Response::deleted()` из `Response::mixin(new JsonResponseMixin)` провайдера проекта. Grep по `use` такую зависимость не видит. Замена — `response()->json(new {E}Response(...), Response::HTTP_CREATED)` (`conventions.md`, п. 19). Тег `controller-response-macro`.
+- Swagger на каждый эндпоинт, с `500` в ответах; `404` — по `conventions.md` п. 18.
 - `per_page` в пагинации задаётся явно (в `IndexRequest`/`SearchRequest` — по форме списка, и в аннотации), не «по умолчанию где-то в ядре».
 - Текущий пользователь — `request()->user` / `$request->user()`, не `Auth::id()` в глубине сервиса.
-- **Middleware в маршруте через `::class`** (AINA-2628: «давай регать как остальные мидлвары») — свой middleware подключается строковым алиасом из `bootstrap/app.php` (`$middleware->alias`), как остальные (`conventions.md`, п. 20). Тег `route-middleware-not-aliased`, [ВНИМАНИЕ] (памятка п. 26).
-- **Метод-обёртка над одной проверкой/вызовом** (AINA-2628: «`findByIdOrFail` не делай таких функций», «`assertValid` — то же самое», «какой смысл от `getById`, когда внутри вызов своей же репы») — `conventions.md`, п. 12a. Тег `service-thin-wrapper`, [ВНИМАНИЕ].
-- **Константа вместо enum / константа в интерфейсе** (AINA-2628: «зачем константы в интерфейсе репы, константы в enum»; mobile-api-rewrite, волна 9: `private const SERVICE_TYPE_COWORKING = 'COWORKING'` в репозитории при готовом `OrderServiceTypeEnum`, ревью пропустило — смотрели только ключи) — `conventions.md`, п. 12b. Тег `constant-not-enum`, [ВНИМАНИЕ]; повтор значения существующего enum и константа в интерфейсе — [ОШИБКА]. Ищется механически — `review-checks.md` 5.5, п. 0c.
-- **Контекст-фильтр отдельным аргументом поиска** (AINA-2628: «что мешает сразу DTO засетить `building_ids` в контроллере?») — `search($dto, $buildingIds)` с вписыванием в параметры внутри сервиса; фильтр выставляет контроллер полем `{E}FilterDto` (в форме (1) — параметром `SearchDataObject`) (`conventions.md`, п. 19a). Тег `search-filter-outside-dto`, [ИНФО].
-- **Список без сортировки** (AINA-2628: «не задан `orderBy()`, читать как параметр + дефолт») — `conventions.md`, п. 12c. Тег `list-without-default-sort`, [ВНИМАНИЕ].
-- **Фильтр валидируется, но не применяется** (AINA-2628: «IndexRequest валидирует `description` и `id_one_c`, но `filterSearch` их не применяет»; в форме (2) — поле `IndexRequest` не доходит до `{E}FilterDto` или метода списка) — `conventions.md`, п. 12d. Тег `request-filter-not-applied`, [ВНИМАНИЕ].
-- **Проверка доступа в FormRequest** (AINA-2628, blocking: «запрос в Request»; «валидация входных данных не место для проверки доступов») — правило вида `new AccessibleBuilding()` на `building_id`: ходит в БД за правами и дублирует middleware. Доступ к `building_id` из тела/фильтра проверяет middleware контекста (403), в Request — только `['required', 'integer', 'gt:0']`. Тег `request-access-check`, [ОШИБКА].
-- **Проверка прав в сервисе/контроллере** (AINA-2628: «проверка прав не совсем зона сервиса») — резолвер доступа в контроллере, параметр `$accessibleBuildingIds` в сервисе. Права и контекст — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр (`conventions.md`, п. 19a). Тег `access-check-outside-middleware`, [ОШИБКА].
+- **Middleware в маршруте через `::class`** (AINA-2628: «давай регать как остальные мидлвары») — свой middleware подключается строковым алиасом из `bootstrap/app.php` (`$middleware->alias`), как остальные (`conventions.md`, п. 20). Тег `route-middleware-not-aliased` (памятка п. 26).
+- **Метод-обёртка над одной проверкой/вызовом** (AINA-2628: «`findByIdOrFail` не делай таких функций», «`assertValid` — то же самое», «какой смысл от `getById`, когда внутри вызов своей же репы») — `conventions.md`, п. 12a. Тег `service-thin-wrapper`.
+- **Константа вместо enum / константа в интерфейсе** (AINA-2628: «зачем константы в интерфейсе репы, константы в enum»; mobile-api-rewrite, волна 9: `private const SERVICE_TYPE_COWORKING = 'COWORKING'` в репозитории при готовом `OrderServiceTypeEnum`, ревью пропустило — смотрели только ключи) — `conventions.md`, п. 12b. Тег `constant-not-enum` (повтор значения существующего enum и константа в интерфейсе — уровень выше, каталог). Ищется механически — `review-checks.md`, «Проверки за пределами дифа», п. 0c.
+- **Контекст-фильтр отдельным аргументом поиска** (AINA-2628: «что мешает сразу DTO засетить `building_ids` в контроллере?») — `search($dto, $buildingIds)` с вписыванием в параметры внутри сервиса; фильтр выставляет контроллер полем `{E}FilterDto` (в форме (1) — параметром `SearchDataObject`) (`conventions.md`, п. 19a). Тег `search-filter-outside-dto`.
+- **Список без сортировки** (AINA-2628: «не задан `orderBy()`, читать как параметр + дефолт») — `conventions.md`, п. 12c. Тег `list-without-default-sort`.
+- **Фильтр валидируется, но не применяется** (AINA-2628: «IndexRequest валидирует `description` и `id_one_c`, но `filterSearch` их не применяет»; в форме (2) — поле `IndexRequest` не доходит до `{E}FilterDto` или метода списка) — `conventions.md`, п. 12d. Тег `request-filter-not-applied`.
+- **Проверка доступа в FormRequest** (AINA-2628, blocking: «запрос в Request»; «валидация входных данных не место для проверки доступов») — правило вида `new AccessibleBuilding()` на `building_id`: ходит в БД за правами и дублирует middleware. Доступ к `building_id` из тела/фильтра проверяет middleware контекста (403), в Request — только `['required', 'integer', 'gt:0']`. Тег `request-access-check`.
+- **Проверка прав в сервисе/контроллере** (AINA-2628: «проверка прав не совсем зона сервиса») — резолвер доступа в контроллере, параметр `$accessibleBuildingIds` в сервисе. Права и контекст — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр (`conventions.md`, п. 19a). Тег `access-check-outside-middleware`.
 
 ## Workflows / Commands
 
-- **Читается сверху вниз** (mobile-api-rewrite MR !3773, пользователь): замыкание не передаёт поведение в свой метод, цепочки `array_values(array_unique(array_filter(array_map(…))))` → `foreach`, лямбда длиннее строки → метод или first-class callable, параметр замыкания не затеняет внешнюю переменную (`core/style.md`, «Форма кода»). Тег `nested-call-chain`, [ВНИМАНИЕ]; касается всех слоёв, не только workflow.
+- **Читается сверху вниз** (mobile-api-rewrite MR !3773, пользователь): замыкание не передаёт поведение в свой метод, цепочки `array_values(array_unique(array_filter(array_map(…))))` → `foreach`, лямбда длиннее строки → метод или first-class callable, параметр замыкания не затеняет внешнюю переменную (`core/style.md`, «Форма кода»). Тег `nested-call-chain`; касается всех слоёв, не только workflow.
 
 - **Форма Command/Query** (`command-query-form`, решение пользователя 2026-10-20): `final` без базового класса ядра — не `extends MPS\Core\Commands\Command`/`MPS\Core\Queries\Query`, без `prepare()`/`get()`/`setQueryParams()` и fluent-сеттеров с массивом; публичный `execute(...)` с нужными аргументами, зависимости — конструктором, `LoggerAware` — только если логировать есть что (`mps-core/commands.md`, «Форма Command и Query»).
 - Workflow берёт репозитории и сервисы любых доменов напрямую (O-7); Command/Query домена — только своего домена (`domain-cross-domain-access`).
-- **Workflow не вызывает другой workflow** (`workflow-calls-workflow`, [ОШИБКА]; решение пользователя 2026-10-20) — общая логика уходит в сервисы/Command/Query доменов, `architecture/layers.md`, «Зависимости».
+- **Workflow не вызывает другой workflow** (`workflow-calls-workflow`; решение пользователя 2026-10-20) — общая логика уходит в сервисы/Command/Query доменов, `architecture/layers.md`, «Зависимости».
 - **Запросов к БД в workflow нет** (`service-direct-db-query`): ни `DB::`, ни `Model::where`/`query()`/`find`. Кейс 2026-10-14: фреймворк написал запросы прямо в workflow — памятка говорила только «в сервисе», и workflow прочитали как исключение. Нужна выборка из таблицы домена — метод в репозитории этого домена, workflow его вызывает; выборка по двум таблицам — два метода двух репозиториев и сборка в workflow, либо read-only `EXISTS`/`JOIN` внутри репозитория владельца с комментарием (раздел Repository).
 - Workflow и Command не доверяют транспортному Request: доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (P-8), потому что тот же сценарий вызывается из консоли и очереди, где Request нет.
 
@@ -74,16 +74,16 @@
 ## DataObjects
 
 - Наследование `DataObject`, аргумент сеттера — `$value`, сборка через `fromArray()`, даты — `Carbon`, без логики.
-- **Enum-поле DTO строкой** (AINA-2628, question: «а почему бы в DTO сразу не сложить `OneCDictionaryTypeEnum`?») — `private ?string $type` + `getType() === TypeEnum::FIXED->value`. Свойство и сеттер — enum, ядро приводит строку само (`mps-core/data-objects.md`). Тег `dto-enum-as-string`, [ВНИМАНИЕ].
-- **Тип сеттера шире свойства** (AINA-2628, blocking: «эти все типы прям нужны?») — `setQuantity(int|float|string|null $value)` с ручным `(float)` при свойстве `?float`. Строки из формы `fromArray()` приводит сам (`mps-core/data-objects.md`), сеттер — `float|null`. Тег `dto-setter-widened-type`, [ВНИМАНИЕ].
+- **Enum-поле DTO строкой** (AINA-2628, question: «а почему бы в DTO сразу не сложить `OneCDictionaryTypeEnum`?») — `private ?string $type` + `getType() === TypeEnum::FIXED->value`. Свойство и сеттер — enum, ядро приводит строку само (`mps-core/data-objects.md`). Тег `dto-enum-as-string`.
+- **Тип сеттера шире свойства** (AINA-2628, blocking: «эти все типы прям нужны?») — `setQuantity(int|float|string|null $value)` с ручным `(float)` при свойстве `?float`. Строки из формы `fromArray()` приводит сам (`mps-core/data-objects.md`), сеттер — `float|null`. Тег `dto-setter-widened-type`.
 - Сложная сборка DTO (из нескольких источников) — в фабрику, не в конструктор DTO и не в контроллер. Вложенная коллекция — `{E}ItemsDto` (`DataObjectCollection`), сеттер без сборки элементов; Request — `list` + `{поле}.*: array` (`mps-core/data-objects.md`, AINA-2978).
-- Суффикс — `Dto` (`{Entity}Dto`, P-5/P-7); `DTO` в новом PHP-коде — [ВНИМАНИЕ]. В Go — `DTO` по конвенции аббревиатур языка (`stacks/go/checklist.md` п. 34): различие стеков, не ошибка.
+- Суффикс — `Dto` (`{Entity}Dto`, P-5/P-7); `DTO` в новом PHP-коде — `dto-suffix-uppercase`. В Go — `DTO` по конвенции аббревиатур языка (`stacks/go/checklist.md` п. 34): различие стеков, не ошибка.
 
 ## Enums / Models
 
 - Docblock класса и `@property` на каждое поле модели обязательны; описание поля — у неочевидных (`style.md`, «Классы»).
 - Логика внутри enum (`match` с бизнес-решениями, обращения к сервисам) — реджект; допустимы только `labels()`/`values()`-подобные вещи. Сюда же предикаты-классификаторы легаси (`RentTypeEnum::addressOnlyRent()`, `isCoworking()`): при переносе в enum не идут — нужны, когда появится потребитель, — в сервис/workflow (AINA-2978, тег `enum-contains-business-logic`).
-- **Enum без `Enumerable`** (AINA-2628, nit: «Имплементить Enumerable из mps/core») — каждый enum: `implements \MPS\Core\Enums\Enumerable` и `use EnumerableTrait;` первой строкой тела (`mps-core/enums.md`). Тег `enum-not-enumerable`, [ИНФО].
+- **Enum без `Enumerable`** (AINA-2628, nit: «Имплементить Enumerable из mps/core») — каждый enum: `implements \MPS\Core\Enums\Enumerable` и `use EnumerableTrait;` первой строкой тела (`mps-core/enums.md`). Тег `enum-not-enumerable`.
 - Eloquent-связи (`BelongsTo`, `HasMany`) в моделях не используются — данные собираются через репозитории; параметр `expanded` не используется (`mps-core/service.md`, «Связанные данные — без `expanded`»), тег `expanded-param-used`.
 - Модель лежит в домене/инфраструктуре **своей** сущности, не рядом с тем, кто её первым использовал.
 - **Известное расхождение (PHP-монолит):** `MPS\Core\Enums\EnumerableTrait::labels()` vs `App\Traits\EnumLabelTranslatable::getLabels()` — две конвенции, не сводить молча.
@@ -113,52 +113,9 @@
 - Предзагрузка / привязка чужих ресурсов по `id` из запроса → проверка владельца, иначе IDOR.
 - Состояние в памяти процесса (кэш, дедупликатор, счётчик) → вопрос «а если поднимут два инстанса?». Ответ «один инстанс» не принимается — через Redis/БД.
 
-### Мульти-тенантный скоуп — самый частый класс находок
+### Мульти-тенантный скоуп, fail-open, вебхуки — самые частые классы находок
 
-Из security-аудита `superapp-api` (2026-09): системный паттерн, повторившийся ~10 раз в разных доменах —
-`index`/`search`/дашборд-эндпоинт принимает id сущности-владельца (в исходном проекте это `building_id`/
-`organization_id`/`company_id`; в другом проекте это может быть `tenant_id`/`department_id`/`client_id`/
-`project_id` — название своё в каждом проекте, суть паттерна не в имени поля) как **необязательный**
-клиентский параметр вместо обязательного скоупа, выводимого сервером из прав/принадлежности текущего
-пользователя (в исходном проекте — `auth()->user()->getBuildingIds()`; в другом проекте искать аналог — как
-там вообще выражается «какими сущностями управляет текущий актор»). Без параметра — отдаёт данные всех
-сущностей; с чужим id — отдаёт чужую. Конкретные реальные кейсы аудита
-(для калибровки, что именно искать — сама форма бага переносится на любой проект с похожей моделью прав):
-
-- Список пользователей/сотрудников по объекту — `IndexRequest` без поля фильтрации по объекту вообще, при
-  этом у модели `User` нет `organization_id` в принципе (сравнить со «сквозным» полем у `Employee`).
-- `index()` контроллера скоупит по `getBuildingIds()` правильно, а соседние `show()/update()/destroy()` того
-  же контроллера — нет (обычный route-model binding без довеска). **Проверять все CRUD-методы контроллера
-  по отдельности, не только index.**
-- Дашборд/аналитика (выручка, обороты) — тот же паттерн через необязательный `building_id` в фильтре отчёта.
-- Компании-арендаторы — та же дыра дополнительно раскрывает банковские реквизиты (`bank_account`, `bank_bik`)
-  через `Resource`, а не только «служебные» поля.
-
-**Что проверять при ревью:** любой новый/изменённый `index`/`search`/`show`/`update`/`destroy` в
-мульти-тенантном домене — параметр сущности-владельца обязателен и валидируется на сервере против
-принадлежности текущего пользователя (аналог `getBuildingIds()` в этом проекте — найти его перед ревью), а
-не просто «если передан — фильтруем». Где это делается — `architecture/layers.md`, «Принадлежность записи
-скоупу — два случая»: id владельца из запроса — 403 в middleware, по ID записи — фильтр в репозитории, 404.
-
-### Fail-open авторизация — постоянная, а не временная
-
-RBAC/permission-middleware, который при отсутствии записи о праве для route **разрешает** запрос
-(`if (!$permission) return true;`), — сам по себе уже находка. Но проверять глубже: если синхронизатор/сидер
-прав генерирует имя права по regex/конвенции (например `admin.<module>.<action>`), а реальные имена роутов
-этой конвенции не соответствуют — для таких роутов запись прав **никогда не будет создана**, и fail-open
-работает не как временная дыра до первого деплоя сидера, а постоянно. Реальный кейс: финансовые роуты
-(`payments.pay`, `transactions.refund` и т.п.) физически не подходили под маску генератора прав — ни один
-админ-аккаунт не мог получить это право явно, но и middleware их не блокировал.
-
-### Webhook / callback без проверки подлинности
-
-Контроллер, принимающий колбэк от внешнего провайдера (платёжный шлюз, СКУД/терминал, партнёрский вебхук) и
-меняющий на основании него финансовое/бизнес-состояние (`markAsPaid()`, `markSuccess()`), — проверять
-на наличие HMAC/подписи/секрета согласно протоколу провайдера. Доверие полю статуса/суммы прямо из
-`$request->all()` без проверки подлинности — то же самое, что broken-access-control, только со стороны
-входящей интеграции, а не пользовательского ресурса. Реальный кейс: два разных платёжных шлюза в одном
-проекте — оба принимали колбэк без проверки подписи, при этом id транзакции в одном из них был просто
-последовательным числом (легко перебираемым).
+Из security-аудита `superapp-api` (2026-09): мульти-тенантный скоуп повторился ~10 раз в разных доменах. Признаки, реальные кейсы и что проверять — `security.md`, теги `tenant-scope-missing`, `fail-open-authorization`, `unverified-webhook`; схема скоупа — `architecture/layers.md`, «Принадлежность записи скоупу — два случая» (id владельца из запроса — 403 в middleware, по ID записи — фильтр в репозитории, 404).
 
 ### Копировать поведение с соседней реализации, не считать его образцовым
 
@@ -170,11 +127,12 @@ RBAC/permission-middleware, который при отсутствии запи�
 
 ## За пределами файла — что ревьюеры проверяют по репозиторию
 
-- **Разъезд захардкоженных списков.** Появился/расширился enum → `grep` по старому набору: `in:a,b` в других реквестах, `enum: [...]` в `@OA`-аннотациях, словари во фронтовых эндпоинтах. Типовой баг: значение добавили в один реквест, а публичный фильтр и swagger остались старыми. Новый кейс enum — ещё и мапперы, allowlist и `match` **по этому enum** (`MediaCollectionMapper::MAP` — «источник истины» допустимых коллекций по типу модели): кейс в enum есть, в маппере нет — разъезд (AINA-2978, `impact-analysis.md`). Тег `enum-list-drift`, [ОШИБКА].
-- **Данные под миграцию поведения.** Новый каст модели (`'col' => SomeEnum::class`), новое значение enum, новый `NOT NULL` — сначала смотреть, что в колонке лежит. Значение вне enum → `ValueError` при гидрации и 500 на **чтении**, не только на записи.
-- **Деплойный риск.** Раскомментированный крон, включённый флаг, снятый `if (false)` — не «мелочь в дифе»: первый прогон на проде отработает по всем накопленным данным. Отдельным MR и сначала с `--dry-run`.
-- **Гигиена дифа.** `composer.lock` вместе с `composer.json`; нет неиспользуемых импортов; `.php-cs-fixer.cache` и сгенерированный `storage/api-docs/*.json` не уезжают в MR как посторонняя правка (лежат в `.gitignore`, но исторически трекаются — смотреть `git status --short`, не только HEAD).
+Правила — `approaches/process/review.md`, «За пределами дифа»; здесь — что искать в PHP.
+
+- **Разъезд захардкоженных списков** (`enum-list-drift`): `in:a,b` в других реквестах, `enum: [...]` в `@OA`-аннотациях, словари во фронтовых эндпоинтах; мапперы, allowlist и `match` по enum (`MediaCollectionMapper::MAP` — кейс в enum есть, в маппере нет, AINA-2978).
+- **Данные под миграцию поведения**: новый каст модели (`'col' => SomeEnum::class`) — значение вне enum → `ValueError` при гидрации и 500 на чтении.
+- **Гигиена дифа**: `composer.lock` вместе с `composer.json`; `.php-cs-fixer.cache` и сгенерированный `storage/api-docs/*.json` не уезжают в MR (лежат в `.gitignore`, но исторически трекаются — смотреть `git status --short`, не только HEAD).
 - **Комментарии-пересказы кода**, сгенерированные ИИ (`// получаем пользователя`), — снимать до ревью; за них бьют прицельно. Сюда же — комментарии, объясняющие архитектуру/ответственность слоёв и устройство связей («проверяется здесь, а не в Request», «X о Y не знает — связь здесь») — `core/style.md`, «Комментарии». Тег `ai-style-comment`.
-- **Описание метода пересказывает имя** (AINA-2628, nit: «лишний коммент — читается из метода») — «Неудалённые здания по набору id» над `findAliveByIds`. Убрать описание, `@param`/`@return` с типами оставить. Тег `comment-restates-name`, [ИНФО].
-- **Коммиты** по регламенту: `feat|perf|conf|fix|refactor: описание #номер` — просят прямо в тредах.
+- **Описание метода пересказывает имя** (AINA-2628, nit: «лишний коммент — читается из метода») — «Неудалённые здания по набору id» над `findAliveByIds`. Убрать описание, `@param`/`@return` с типами оставить. Тег `comment-restates-name`.
+- **Коммиты** — по `regulations/git.md`, «Коммиты» (`тип: описание #КЛЮЧ-задачи`, типы и требования к описанию — там); несоблюдение просят исправить прямо в тредах.
 - «Поправим потом» как ответ на замечание — отклоняется; либо правка, либо явный `TODO` с тикетом.

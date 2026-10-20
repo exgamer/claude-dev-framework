@@ -1,9 +1,7 @@
 package middleware
 
 import (
-	"bytes"
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
@@ -11,13 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 
 	partnerdomain "example.com/parking-service/internal/domains/identity/partner"
+	"example.com/parking-service/pkg/requestbody"
 	"example.com/parking-service/pkg/signature"
 )
-
-// maxSignedBodyBytes Тело больше — 413: подпись считается по телу целиком, читать его без предела нельзя
-const maxSignedBodyBytes = 1 << 20
-
-var errBodyTooLarge = errors.New("signed body exceeds limit")
 
 // SignatureSettings Подпись машинного вызова партнёра из конфига
 type SignatureSettings struct {
@@ -27,14 +21,12 @@ type SignatureSettings struct {
 	Tolerance time.Duration
 }
 
-// SignatureAuthMiddleware Проверяет HMAC-подпись машинного вызова партнёра (заголовок X-Signature: время, nonce, подпись
-// метода, пути с query и тела) и окно времени, затем занимает nonce через сервис — неподписанный запрос чужой nonce не занимает;
-// ставится после FormattedResponseMiddleware. Тело возвращается в запрос для хендлера.
-// Подпись не принята (формат, окно времени, повтор nonce) — 401 без деталей и без Sentry; сбой хранилища nonce — 500
+// SignatureAuthMiddleware HMAC-подпись X-Signature (метод, путь с query, тело), окно времени и nonce; не принята — 401 без Sentry, тело больше 1 МБ — 413, сбой хранилища nonce — 500
 func SignatureAuthMiddleware(service *partnerdomain.Service, settings SignatureSettings) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		body, err := readBody(c)
-		if errors.Is(err, errBodyTooLarge) {
+		// Подпись считается по телу целиком — читать его без предела нельзя; тело возвращается в запрос для хендлера
+		body, err := requestbody.ReadLimited(c.Writer, c.Request, requestbody.DefaultLimit)
+		if errors.Is(err, requestbody.ErrTooLarge) {
 			response.ErrorResponseUntrackableSentry(c, http.StatusRequestEntityTooLarge, errors.New("тело запроса слишком большое"), nil)
 
 			return
@@ -46,6 +38,7 @@ func SignatureAuthMiddleware(service *partnerdomain.Service, settings SignatureS
 			return
 		}
 
+		// Nonce занимается только после проверки подписи: неподписанный запрос чужой nonce не занимает
 		parsed, err := verifySignature(c, body, settings)
 		if err != nil {
 			rejectSignature(c)
@@ -97,23 +90,4 @@ func verifySignature(c *gin.Context, body []byte, settings SignatureSettings) (s
 
 func rejectSignature(c *gin.Context) {
 	response.ErrorResponseUntrackableSentry(c, http.StatusUnauthorized, errors.New("подпись недействительна"), nil)
-}
-
-func readBody(c *gin.Context) ([]byte, error) {
-	if c.Request.Body == nil {
-		return nil, nil
-	}
-
-	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxSignedBodyBytes+1))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(body) > maxSignedBodyBytes {
-		return nil, errBodyTooLarge
-	}
-
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
-
-	return body, nil
 }

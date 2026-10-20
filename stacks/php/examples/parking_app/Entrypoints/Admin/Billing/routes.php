@@ -5,15 +5,16 @@ declare(strict_types=1);
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Controllers\TariffController;
 use Illuminate\Support\Facades\Route;
 
-// Право — на каждом маршруте: чтение и запись различаются (имена прав — как в Go-эталоне)
+// Право — на каждом маршруте: чтение и запись различаются.
+// {id} без ограничения маршрута (whereNumber и т.п.): любой сегмент доходит до Request — неверный id 422, а не 404.
+// Статические пути (tariffs/default) — до tariffs/{id}, иначе {id} их перехватит.
 Route::middleware([
+    'api.response',
     'auth:admin-api',
     'resolve.admin.parkings',
-    'api.response',
 ])
     ->prefix('parking/admin')
     ->as('parking.admin.')
-    ->whereNumber('id')
     ->group(function () {
         Route::get('tariffs', [TariffController::class, 'index'])
             ->middleware('permission:parking.admin.tariffs.view')

@@ -31,12 +31,6 @@ class ParkingDeactivatedHandlerTest extends TestCase
         $this->tariffCrudService = Mockery::mock(TariffCrudServiceInterface::class);
     }
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     public function test_tariffs_of_deactivated_parking_are_archived(): void
     {
         $this->tariffCrudService
@@ -91,6 +85,7 @@ class ParkingDeactivatedHandlerTest extends TestCase
         $handler = new ParkingDeactivatedHandler($this->tariffCrudService);
 
         // process() — protected-хук ядра: так его вызывает UtilsJob::handle()
-        (new ReflectionMethod($handler, 'process'))->invoke($handler, $payload);
+        $process = new ReflectionMethod($handler, 'process');
+        $process->invoke($handler, $payload);
     }
 }

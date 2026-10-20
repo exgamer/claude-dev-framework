@@ -2,7 +2,6 @@ package tariff
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter"
@@ -54,6 +53,27 @@ func (w *CreateTariffWorkflow) Exec(ctx context.Context, params *CreateTariffPar
 		return nil, exception.NewValidationException(fieldErrors, false)
 	}
 
+	// Парковка — своя БД, дешевле внешнего реестра: проверяется первой
+	parking, err := w.parkingRepository.GetByID(ctx, params.ParkingID)
+	if err != nil {
+		return nil, err
+	}
+
+	if parking == nil {
+		return nil, exception.NewValidationException(map[string]any{"parking_id": "парковка не найдена"}, false)
+	}
+
+	// Отключённая парковка — состояние данных, не доступ: 422, как «не найдена»
+	if !parking.IsActive {
+		return nil, exception.NewValidationException(map[string]any{"parking_id": "парковка отключена"}, false)
+	}
+
+	if tariff.Currency != parking.Currency {
+		message := fmt.Sprintf("валюта тарифа должна совпадать с валютой парковки (%s)", parking.Currency)
+
+		return nil, exception.NewValidationException(map[string]any{"currency": message}, false)
+	}
+
 	limit, err := w.priceLimitRepository.GetByParkingID(ctx, params.ParkingID)
 	if err != nil {
 		return nil, err
@@ -66,29 +86,10 @@ func (w *CreateTariffWorkflow) Exec(ctx context.Context, params *CreateTariffPar
 		return nil, exception.NewValidationException(map[string]any{"price": message}, false)
 	}
 
-	parking, err := w.parkingRepository.GetByID(ctx, params.ParkingID)
-	if err != nil {
-		return nil, err
-	}
-
-	if parking == nil {
-		return nil, exception.NewValidationException(map[string]any{"parking_id": "парковка не найдена"}, false)
-	}
-
-	if !parking.IsActive {
-		return nil, exception.NewForbiddenException(errors.New("парковка отключена"), false)
-	}
-
-	if tariff.Currency != parking.Currency {
-		message := fmt.Sprintf("валюта тарифа должна совпадать с валютой парковки (%s)", parking.Currency)
-
-		return nil, exception.NewValidationException(map[string]any{"currency": message}, false)
-	}
-
 	var created *tariffdomain.Tariff
 	var outboxEvent *outboxdomain.OutboxTariffEvent
 
-	// Парковку отключили до коммита — тариф останется активным: решение «Конкурентность» эталона — принять, в задаче — вопрос пользователю (approaches/patterns/concurrency.md, «Принятие риска»)
+	// Парковку отключили до коммита — тариф останется активным: риск принят
 	err = w.txManager.Exec(ctx, func(
 		ctx context.Context,
 		tariffRepository tariffdomain.Repository,

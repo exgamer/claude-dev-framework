@@ -7,7 +7,7 @@ namespace App\ParkingApp\Entrypoints\Integration\Billing;
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Провайдер точек входа Integration домена Billing.
+ * Подключает routes.php партнёрского API Billing автозагрузкой ModuleServiceProvider; middleware — в самих маршрутах.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */

@@ -13,6 +13,7 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepository
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +25,8 @@ use PHPUnit\Framework\TestCase;
  */
 class ActivatePlannedTariffJobTest extends TestCase
 {
+    use MockeryPHPUnitIntegration;
+
     private const PARKING_ID = 15;
 
     private const TARIFF_ID = 10;
@@ -41,12 +44,6 @@ class ActivatePlannedTariffJobTest extends TestCase
         $this->repository = Mockery::mock(TariffRepositoryInterface::class);
         // Сброс кеша проверяется там, где запись была; в остальных тестах — не важен
         $this->cacheRepository = Mockery::mock(TariffCacheRepositoryInterface::class)->shouldIgnoreMissing();
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
     public function test_job_runs_on_database_connection_with_retries(): void

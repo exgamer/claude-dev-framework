@@ -6,14 +6,14 @@ use App\ParkingApp\Entrypoints\Integration\Billing\Tariffs\Http\Controllers\Park
 use App\ParkingApp\Entrypoints\Integration\Billing\Tariffs\Http\Controllers\TariffController;
 use Illuminate\Support\Facades\Route;
 
-// Машинный вызов партнёра: подпись вместо администратора, скоупа парковок нет
+// Машинный вызов партнёра: подпись вместо администратора, скоупа парковок нет.
+// {id} без ограничения маршрута: неверный id — 422 из Request, а не 404.
 Route::middleware([
-    'verify.signature',
     'api.response',
+    'verify.signature',
 ])
     ->prefix('parking/integration')
     ->as('parking.integration.')
-    ->whereNumber('id')
     ->group(function () {
         Route::get('tariffs/{id}', [TariffController::class, 'view'])->name('tariffs.view');
         Route::get('parkings/{id}/tariffs', [ParkingTariffController::class, 'index'])->name('parking-tariffs.index');
