@@ -28,10 +28,11 @@ docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true \
 OWNER="$(docker exec "$CONTAINER" id -u):$(docker exec "$CONTAINER" id -g)"
 
 # Исходники — заново на каждый прогон, vendor и кеш phpstan остаются
-dexec "mkdir -p $WORKDIR && cd $WORKDIR && rm -rf parking_app tests config stub phpunit.xml phpstan.neon"
+dexec "mkdir -p $WORKDIR && cd $WORKDIR && rm -rf parking_app tests config stub phpunit.xml phpstan.neon phpstan-rules.neon"
 docker cp "$EXAMPLES/parking_app" "$CONTAINER:$WORKDIR/parking_app"
 docker cp "$EXAMPLES/tests" "$CONTAINER:$WORKDIR/tests"
 docker cp "$EXAMPLES/config" "$CONTAINER:$WORKDIR/config"
+docker cp "$EXAMPLES/phpstan-rules.neon" "$CONTAINER:$WORKDIR/phpstan-rules.neon"
 docker cp "$HERE/tests/TestCase.php" "$CONTAINER:$WORKDIR/tests/TestCase.php"
 docker cp "$HERE/stub" "$CONTAINER:$WORKDIR/stub"
 for f in composer.json phpunit.xml phpstan.neon; do
@@ -51,9 +52,16 @@ if [ -n "$FORCE_INSTALL" ] || [ "$(dexec "cat $WORKDIR/.composer.sum 2>/dev/null
     [ -n "${COMPOSER_AUTH:-}" ] || { echo "Нужен COMPOSER_AUTH, MPS_AUTH_JSON или tools/php-check/.auth-path (gitlab-token для git.mpinnovations.kz)" >&2; exit 2; }
     export COMPOSER_AUTH
     # Токен — через окружение docker exec (-e без значения), не в аргументах команды
-    docker exec -e COMPOSER_AUTH -e COMPOSER_NO_INTERACTION=1 "$CONTAINER" \
-        sh -c "cd $WORKDIR && rm -rf vendor composer.lock && composer update --no-progress --no-scripts -q"
-    dexec "echo $SUM > $WORKDIR/.composer.sum"
+    # Старый vendor — в сторону, а не удалить: установка упала (нет сети, нет доступа к GitLab) — он возвращается
+    dexec "cd $WORKDIR && rm -rf vendor.prev && if [ -d vendor ]; then mv vendor vendor.prev; fi; rm -f composer.lock"
+    if docker exec -e COMPOSER_AUTH -e COMPOSER_NO_INTERACTION=1 "$CONTAINER" \
+        sh -c "cd $WORKDIR && composer update --no-progress --no-scripts -q"; then
+        dexec "rm -rf $WORKDIR/vendor.prev && echo $SUM > $WORKDIR/.composer.sum"
+    else
+        dexec "cd $WORKDIR && rm -rf vendor && if [ -d vendor.prev ]; then mv vendor.prev vendor; fi"
+        echo "Установка vendor не удалась — прежний vendor восстановлен (если был); проверьте доступ к git.mpinnovations.kz" >&2
+        exit 2
+    fi
 else
     dexec "cd $WORKDIR && composer dump-autoload -q"
 fi

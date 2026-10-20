@@ -1,0 +1,117 @@
+# Механические правила эталона: каждое правило ниже — отражение правила памятки,
+# включено только после проверки, что ловит заведомое нарушение и не шумит на эталоне.
+# Собран tools/lint/lint.py фреймворка (lint.py go <проект> --render); правка — в генераторе, не здесь.
+version: "2"
+
+run:
+  tests: true
+  relative-path-mode: gomod
+
+linters:
+  default: none
+  enable:
+    - depguard # слои и границы доменов
+    - forbidigo # запрещённые вызовы
+    - nlreturn # пустая строка перед return/continue/break
+    - revive # ctx первым, ID в именах
+  settings:
+    depguard:
+      rules:
+        domain-no-infra:
+          files:
+            - "**/internal/domains/**"
+          deny:
+            - pkg: "example.com/parking-service/internal/infrastructure"
+              desc: "домен не знает инфраструктуру — порт в домене, адаптер в infrastructure"
+            - pkg: "example.com/parking-service/internal/entrypoints"
+              desc: "домен не знает точки входа"
+            - pkg: "example.com/parking-service/internal/workflows"
+              desc: "домен не вызывает workflow"
+            - pkg: "example.com/parking-service/internal/app"
+              desc: "домен не знает сборку"
+            - pkg: "gorm.io"
+              desc: "домен без ORM — модель и запросы в infrastructure"
+            - pkg: "github.com/gin-gonic"
+              desc: "домен без HTTP"
+            - pkg: "net/http"
+              desc: "домен без HTTP"
+        # Домены проекта не импортируют друг друга — по правилу на каждый домен (список доменов — internal/domains/*)
+        billing-no-other-domains:
+          files:
+            - "**/internal/domains/billing/**"
+          deny:
+            - pkg: "example.com/parking-service/internal/domains/handbook"
+              desc: "чужой домен — через workflow или internal/common"
+            - pkg: "example.com/parking-service/internal/domains/identity"
+              desc: "чужой домен — через workflow или internal/common"
+        handbook-no-other-domains:
+          files:
+            - "**/internal/domains/handbook/**"
+          deny:
+            - pkg: "example.com/parking-service/internal/domains/billing"
+              desc: "чужой домен — через workflow или internal/common"
+            - pkg: "example.com/parking-service/internal/domains/identity"
+              desc: "чужой домен — через workflow или internal/common"
+        identity-no-other-domains:
+          files:
+            - "**/internal/domains/identity/**"
+          deny:
+            - pkg: "example.com/parking-service/internal/domains/billing"
+              desc: "чужой домен — через workflow или internal/common"
+            - pkg: "example.com/parking-service/internal/domains/handbook"
+              desc: "чужой домен — через workflow или internal/common"
+        workflow-no-workflow:
+          files:
+            - "**/internal/workflows/**"
+            - "!$test" # внешний тест workflow импортирует сам workflow
+          deny:
+            - pkg: "example.com/parking-service/internal/workflows"
+              desc: "workflow не вызывает другой workflow"
+            - pkg: "example.com/parking-service/internal/infrastructure"
+              desc: "workflow берёт интерфейсы доменов, не инфраструктуру"
+        entrypoint-no-infra:
+          files:
+            - "**/internal/entrypoints/**"
+          deny:
+            - pkg: "example.com/parking-service/internal/infrastructure"
+              desc: "точка входа — через сервис/workflow, инфраструктура собирается в bootstrap"
+            - pkg: "example.com/parking-service/internal/app"
+              desc: "точка входа не знает сборку"
+        common-no-internal:
+          files:
+            - "**/internal/common/**"
+            - "!$test" # внешний тестовый пакет импортирует сам common
+          deny:
+            - pkg: "example.com/parking-service/internal/domains"
+              desc: "internal/common — общий словарь без зависимостей от слоёв"
+            - pkg: "example.com/parking-service/internal/infrastructure"
+              desc: "internal/common — общий словарь без зависимостей от слоёв"
+            - pkg: "example.com/parking-service/internal/entrypoints"
+              desc: "internal/common — общий словарь без зависимостей от слоёв"
+            - pkg: "example.com/parking-service/internal/workflows"
+              desc: "internal/common — общий словарь без зависимостей от слоёв"
+            - pkg: "example.com/parking-service/internal/app"
+              desc: "internal/common — общий словарь без зависимостей от слоёв"
+    forbidigo:
+      forbid:
+        - pattern: '^context\.(Background|TODO)$'
+          msg: "в бизнес-коде ctx приходит параметром; Background — только в main/console/тестах"
+      analyze-types: false
+    nlreturn:
+      block-size: 1
+    revive:
+      rules:
+        - name: context-as-argument
+        - name: var-naming
+  exclusions:
+    rules:
+      - path: '(^|/)(main\.go|cmd/|internal/console/|internal/app/)'
+        linters: [forbidigo]
+      - path: '_test\.go$'
+        linters: [forbidigo]
+      # ctx — правило бизнес-кода (conventions.md п. 1): pkg/ и миграции — не бизнес-код
+      - path: '(^|/)(pkg/|internal/migrations/)'
+        linters: [forbidigo]
+      # var-naming — только аббревиатуры (checklist.md п. 34); ALL_CAPS и подчёркивания правило фреймворка не запрещает
+      - linters: [revive]
+        text: "(don't use ALL_CAPS|don't use an underscore|don't use underscores|should not use underscores)"

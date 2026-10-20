@@ -1,0 +1,35 @@
+# Механические правила памятки для phpstan: собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
+# Нужны пакеты phpat/phpat и spaze/phpstan-disallowed-calls; каждое правило проверено заведомым нарушением.
+
+services:
+    -
+        class: Tests\Architecture\LayersArchitecture
+        tags:
+            - phpat.test
+
+parameters:
+    # Хранилище — только через Infrastructure (architecture/layers.md): фасад DB вне Infrastructure, миграций и тестов —
+    # находка; запрещён сам фасад, т. к. вызов DB::transaction() идёт через __callStatic и запрет метода его не видит.
+    # DB::transaction внутри Infrastructure (в репозитории) этим правилом не ловится — его проверяет агент.
+    disallowedClasses:
+        -
+            class: 'Illuminate\Support\Facades\DB'
+            message: 'фасад DB — только в Infrastructure (репозиторий, менеджер транзакций), миграциях и тестах; транзакция — TransactionManagerInterface::run()'
+            allowIn:
+                - '*/Infrastructure/*'
+                - '*/database/migrations/*'
+                - '*/tests/*'
+    disallowedFunctionCalls:
+        -
+            function:
+                - 'app()'
+                - 'resolve()'
+            message: 'зависимость — через конструктор, не из контейнера в бизнес-коде'
+            allowIn:
+                - '*/ServiceProvider.php'
+                - '*/Providers/*'
+                - '*/config/*'
+                - '*/routes/*'
+                - '*/commands.php'
+                - '*/database/migrations/*'
+                - '*/tests/*'

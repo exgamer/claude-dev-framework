@@ -82,6 +82,10 @@
 | `testsupport/billingfakes/outbox_tariff_event_*.go` | фейки outbox-репозитория (`updated_at` по часам процесса, `MakeStale`) и публикатора |
 | `testsupport/txfakes` | фейки `Manager` и `Manager2`: вызывают `fn` с переданными фейками, считают открытые транзакции |
 
+## Линтер
+
+`.golangci.yml` — механические правила памятки, которые проверяет `golangci-lint` (v2): границы слоёв и доменов (`depguard`: домен без инфраструктуры, точек входа, workflow, ORM и HTTP; домены не импортируют друг друга; workflow не вызывает workflow; точка входа без инфраструктуры; `internal/common` без зависимостей от слоёв), `context.Background()`/`TODO()` вне `main`/`console`/`app`/тестов (`forbidigo`), пустая строка перед `return`/`continue`/`break` (`nlreturn`), `ctx` первым параметром и `ID` в именах (`revive`). Запуск — `golangci-lint run ./...` (офлайн — те же переменные, что для сборки). Каждое правило проверено заведомым нарушением (`tools/check/lint-proof/go.py` фреймворка). Конфиг собран генератором фреймворка (`tools/lint/lint.py go … --render`); в проекте те же правила гоняет `tools/lint/lint.py go` своим конфигом вне проекта — в проект ничего не кладётся, его `.golangci.yml` не трогается (`tools/lint/README.md`); правила доменов — по `internal/domains/*`.
+
 ## Граница примера
 
 Эталон показывает форму; бизнес-решения ниже приняты для примера, в задаче — по ТЗ.

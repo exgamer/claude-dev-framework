@@ -27,7 +27,7 @@ tools/php-check/run.sh             # прогон; vendor ставится са�
 |---|---|
 | `tests/TestCase.php` | `Tests\TestCase` на testbench: провайдер подпроекта и логгер `mps/utils`, алиасы `verify.signature` и `api.response`, конфиги эталона `mps-utils`, `parking-app`, `services` (остальные `config/*.php` — фрагменты приложения, стенд их не грузит) |
 | `stub/App/Http/Controllers/Controller.php` | базовый контроллер приложения |
-| `phpstan.neon` | `ignoreErrors` только для шума типизации `mps/*` — с причиной у каждого |
+| `phpstan.neon` | `ignoreErrors` только для шума типизации `mps/*` — с причиной у каждого; подключает правила эталона `phpstan-rules.neon` (phpat — слои и домены `tests/Architecture/LayersArchitecture.php`; `phpstan-disallowed-calls` — фасад `DB` вне менеджера транзакций и миграций, `app()`/`resolve()` в бизнес-коде). Каждое правило проверено заведомым нарушением: `python3 tools/check/lint-proof/php.py` после прогона |
 
 Остальные алиасы хоста (`auth:admin-api`, `permission:*`, `resolve.admin.parkings`) общему `TestCase.php` не нужны: тест маршрутов Admin (`tests/Feature/ParkingApp/Admin/Billing/TariffRouteTest.php`) подменяет `permission` и `resolve.admin.parkings` у себя, `auth` снимает `withoutMiddleware`.
 

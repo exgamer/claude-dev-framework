@@ -26,3 +26,6 @@
 | `shared-mutable-state` | [ОШИБКА] | Изменяемое состояние после конструктора в структурах, разделяемых между запросами | `approaches/patterns/concurrency.md`, «Data race — Go» |
 | `unbounded-goroutines` | [ОШИБКА] | Горутина без ожидания, остановки по `ctx`, обработки ошибки и паники; `go` в цикле по входным данным без ограничения параллелизма | `approaches/patterns/concurrency.md`, «Data race — Go»; `performance.md`, «Go» |
 | `channel-misuse` | [ОШИБКА] | Канал закрывает не отправитель или дважды, отправка в закрытый, вечная блокировка без `ctx.Done()` | `approaches/patterns/concurrency.md`, «Data race — Go» |
+| `context-not-propagated` | [ОШИБКА] | `ctx` не первым параметром в методе с I/O (или вызывающем его); `context.Background()`/`TODO()` в бизнес-коде; ctx в поле структуры | `checklist.md` п. 18, `conventions.md` п. 1, 2 |
+| `initialism-case` | [ВНИМАНИЕ] | Аббревиатура не заглавными в имени (`Id`, `Url`, `Dto` вместо `ID`, `URL`, `DTO`) | `checklist.md` п. 34, `style.md` |
+| `missing-blank-before-return` | [ВНИМАНИЕ] | Нет пустой строки перед `return`/`continue`/`break`, кроме первой строки блока | `checklist.md` п. 35, `style.md` |

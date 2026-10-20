@@ -138,7 +138,8 @@ agents/          агенты df-* — роли как субагенты /dev (
 tools/sdk-ref/   генераторы справочников SDK/ядра из исходников (go.sh, php.sh)
 tools/graph/     граф правил (graphify) для /dev-rule: найти все места темы, проверить правку, сверка на противоречия
 tools/php-check/ прогон PHP-эталона: phpunit + phpstan в docker (run.sh)
-tools/check/     проверки фреймворка после правки: битые ссылки и орфаны (links.py); весь набор — /dev-rule, Шаг 3а и /dev-rule audit
+tools/lint/      механические правила фреймворка на проекте конфигом фреймворка, без файлов в проекте (lint.py go|php, tools/lint/README.md)
+tools/check/     проверки фреймворка после правки: битые ссылки и орфаны (links.py), теги и уровни (tags.py), правила анализаторов не потерялись и вызываются (lint-rules.py, таблица tools/check/lint-proof/RULES.md), доказательства (lint-proof/); весь набор — /dev-rule, Шаг 3а и /dev-rule audit
 install.sh       симлинки: фреймворк в ~/.claude, скиллы и агенты — в .claude проекта
 ```
 
@@ -195,7 +196,7 @@ install.sh       симлинки: фреймворк в ~/.claude, скиллы
 |---|---|---|
 | Claude Code | всё остальное работает внутри него | да |
 | `git`, `bash` | клонирование, `install.sh` | да |
-| Go + доступ к `git.mpinnovations.kz/mps/go-packages` (`GOPRIVATE`, ключ/токен для git) | сборка и тесты Go-проектов, справочник SDK (`tools/sdk-ref/go.sh`) | для Go |
+| Go + доступ к `git.mpinnovations.kz/mps/go-packages` (`GOPRIVATE`, ключ/токен для git); `golangci-lint` v2 — для прогона Go-эталона | сборка и тесты Go-проектов, справочник SDK (`tools/sdk-ref/go.sh`) | для Go |
 | PHP + Composer или Docker-контейнер проекта | `csfix`, `phpstan`, тесты PHP-проектов | для PHP |
 | Docker-контейнер с PHP >= 8.3 + `gitlab-token` для `git.mpinnovations.kz` (`mps/*`) | прогон PHP-эталона (`tools/php-check/run.sh`) | для правки эталона |
 | `python3` | справочник ядра PHP (`tools/sdk-ref/php.sh`) | для пересборки справочника |

@@ -18,8 +18,10 @@
         "larastan/larastan": "^3.1",
         "mockery/mockery": "^1.6",
         "orchestra/testbench": "^10.0",
+        "phpat/phpat": "^0.11",
         "phpstan/phpstan-mockery": "^2.0",
-        "phpunit/phpunit": "^11.0.1"
+        "phpunit/phpunit": "^11.0.1",
+        "spaze/phpstan-disallowed-calls": "^4.0"
     },
     "autoload": {
         "psr-4": {
