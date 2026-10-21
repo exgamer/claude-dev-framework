@@ -20,9 +20,9 @@ const testMaxAttempts = 3
 
 func newTestConsumer(tariffs ...*tariffdomain.Tariff) (*Consumer, *billingfakes.TariffRepository) {
 	repository := billingfakes.NewTariffRepository(tariffs...)
-	service := tariffdomain.NewService(repository, billingfakes.NewTariffCacheRepository())
+	command := tariffdomain.NewDeactivateParkingTariffsCommand(repository, billingfakes.NewTariffCacheRepository())
 
-	return NewConsumer(service, testMaxAttempts), repository
+	return NewConsumer(command, testMaxAttempts), repository
 }
 
 // failingTariffRepository Хранилище недоступно
@@ -37,7 +37,7 @@ func (r *failingTariffRepository) DeactivateByParkingID(_ context.Context, _ uin
 func newFailingConsumer() *Consumer {
 	repository := &failingTariffRepository{TariffRepository: billingfakes.NewTariffRepository()}
 
-	return NewConsumer(tariffdomain.NewService(repository, billingfakes.NewTariffCacheRepository()), testMaxAttempts)
+	return NewConsumer(tariffdomain.NewDeactivateParkingTariffsCommand(repository, billingfakes.NewTariffCacheRepository()), testMaxAttempts)
 }
 
 // deliveredMessage Сообщение, как его отдаёт брокер после returns возвратов из retry-очереди, через маршалер из consumer_registry.go
@@ -54,16 +54,16 @@ func deliveredMessage(t *testing.T, payload string, returns int64) *message.Mess
 }
 
 func TestConsumer_DeactivatesParkingTariffs(t *testing.T) {
-	consumer, repository := newTestConsumer(&tariffdomain.Tariff{ID: 1, ParkingID: 7, IsActive: true})
+	consumer, repository := newTestConsumer(tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, false, true))
 
 	err := consumer.Consume(context.Background(), deliveredMessage(t, `{"parking_id":7}`, 0))
 
 	require.NoError(t, err)
-	assert.False(t, repository.Items[1].IsActive)
+	assert.False(t, repository.Items[1].IsActive())
 }
 
 func TestConsumer_BrokenPayloadIsAcked(t *testing.T) {
-	consumer, repository := newTestConsumer(&tariffdomain.Tariff{ID: 1, ParkingID: 7, IsActive: true})
+	consumer, repository := newTestConsumer(tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, false, true))
 
 	for _, payload := range []string{`not json`, `{}`} {
 		err := consumer.Consume(context.Background(), deliveredMessage(t, payload, 0))
@@ -71,7 +71,7 @@ func TestConsumer_BrokenPayloadIsAcked(t *testing.T) {
 		assert.NoError(t, err, "битый payload повтором не исправить — ACK")
 	}
 
-	assert.True(t, repository.Items[1].IsActive)
+	assert.True(t, repository.Items[1].IsActive())
 }
 
 func TestDeliveryAttempt_GrowsWithRetryQueueReturns(t *testing.T) {

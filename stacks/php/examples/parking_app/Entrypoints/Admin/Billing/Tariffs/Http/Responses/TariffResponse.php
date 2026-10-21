@@ -29,7 +29,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'is_default', description: 'Тариф по умолчанию', type: 'boolean', example: true),
         new OA\Property(property: 'status', ref: '#/components/schemas/TariffStatusEnum'),
         new OA\Property(property: 'grace_minutes', description: 'Льготный период (минуты)', type: 'integer', example: 15, nullable: true),
-        new OA\Property(property: 'scheduled_at', description: 'Дата активации, ISO 8601; у действующего и архивного — null', type: 'string', format: 'date-time', example: '2026-11-01T00:00:00.000000Z', nullable: true),
+        new OA\Property(property: 'scheduled_at', description: 'Дата активации, ISO 8601; у действующего — null; у архивного — дата, если он ушёл в архив запланированным', type: 'string', format: 'date-time', example: '2026-11-01T00:00:00.000000Z', nullable: true),
         new OA\Property(property: 'created_at', description: 'Дата создания, ISO 8601', type: 'string', format: 'date-time', example: '2026-10-20T09:30:00.000000Z'),
         new OA\Property(property: 'updated_at', description: 'Дата обновления, ISO 8601; null — не обновлялся', type: 'string', format: 'date-time', example: '2026-10-20T09:30:00.000000Z', nullable: true),
     ],

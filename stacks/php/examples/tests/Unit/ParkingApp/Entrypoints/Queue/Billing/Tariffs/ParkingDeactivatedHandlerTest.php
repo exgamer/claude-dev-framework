@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Entrypoints\Queue\Billing\Tariffs;
 
-use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Commands\DeactivateParkingTariffsCommand;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use App\ParkingApp\Entrypoints\Queue\Billing\Tariffs\ParkingDeactivatedHandler;
 use Illuminate\Support\Facades\Log;
 use Mockery;
@@ -22,19 +25,21 @@ class ParkingDeactivatedHandlerTest extends TestCase
 {
     private const PARKING_ID = 15;
 
-    private TariffCrudServiceInterface&MockInterface $tariffCrudService;
+    private TariffRepositoryInterface&MockInterface $repository;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->tariffCrudService = Mockery::mock(TariffCrudServiceInterface::class);
+        // Command — final: настоящий, на мок-репозитории; список ID для сброса кеша — пустой
+        $this->repository = Mockery::mock(TariffRepositoryInterface::class);
+        $this->repository->shouldReceive('allNotArchivedIdsByParkingId')->andReturn([])->byDefault();
     }
 
     public function test_tariffs_of_deactivated_parking_are_archived(): void
     {
-        $this->tariffCrudService
-            ->shouldReceive('deactivateByParkingId')
+        $this->repository
+            ->shouldReceive('archiveNotArchivedByParkingId')
             ->once()
             ->with(self::PARKING_ID)
             ->andReturn(2);
@@ -46,8 +51,8 @@ class ParkingDeactivatedHandlerTest extends TestCase
 
     public function test_object_payload_is_accepted(): void
     {
-        $this->tariffCrudService
-            ->shouldReceive('deactivateByParkingId')
+        $this->repository
+            ->shouldReceive('archiveNotArchivedByParkingId')
             ->once()
             ->with(self::PARKING_ID)
             ->andReturn(0);
@@ -58,18 +63,18 @@ class ParkingDeactivatedHandlerTest extends TestCase
 
     public function test_message_without_parking_id_is_rejected_without_retry(): void
     {
-        $this->tariffCrudService->shouldNotReceive('deactivateByParkingId');
+        $this->repository->shouldNotReceive('archiveNotArchivedByParkingId');
         Log::shouldReceive('error')->twice();
 
-        // Ни исключения, ни вызова сервиса: повтор такого сообщения бесполезен
+        // Ни исключения, ни вызова Command: повтор такого сообщения бесполезен
         $this->process(['id' => self::PARKING_ID]);
         $this->process(['parking_id' => 0]);
     }
 
     public function test_transient_failure_is_rethrown_for_retry(): void
     {
-        $this->tariffCrudService
-            ->shouldReceive('deactivateByParkingId')
+        $this->repository
+            ->shouldReceive('archiveNotArchivedByParkingId')
             ->once()
             ->with(self::PARKING_ID)
             ->andThrow(new OperationFailedAppException('Postgres недоступен'));
@@ -82,7 +87,12 @@ class ParkingDeactivatedHandlerTest extends TestCase
 
     private function process(object|array $payload): void
     {
-        $handler = new ParkingDeactivatedHandler($this->tariffCrudService);
+        $command = new DeactivateParkingTariffsCommand(
+            $this->repository,
+            Mockery::mock(TariffCacheRepositoryInterface::class),
+            Mockery::mock(ExceptionHandler::class),
+        );
+        $handler = new ParkingDeactivatedHandler($command);
 
         // process() — protected-хук ядра: так его вызывает UtilsJob::handle()
         $process = new ReflectionMethod($handler, 'process');

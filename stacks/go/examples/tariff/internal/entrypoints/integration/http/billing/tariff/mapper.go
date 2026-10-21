@@ -13,7 +13,7 @@ func tariffToData(tariff *tariffdomain.Tariff) *tariffData {
 		ID:           tariff.ID,
 		ParkingID:    tariff.ParkingID,
 		Currency:     string(tariff.Currency),
-		IsActive:     tariff.IsActive,
+		IsActive:     tariff.IsActive(),
 		GraceMinutes: tariff.GraceMinutes,
 		Price:        tariff.Price,
 	}

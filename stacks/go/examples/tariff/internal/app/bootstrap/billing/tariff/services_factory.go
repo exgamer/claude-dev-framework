@@ -19,6 +19,10 @@ func newServicesFactory(repositoriesFactory *repositoriesFactory, outboxMaxAttem
 			repositoriesFactory.TariffCacheRepository,
 			repositoriesFactory.DefaultTariffTxManager,
 		),
+		DeactivateParkingTariffsCommand: tariffdomain.NewDeactivateParkingTariffsCommand(
+			repositoriesFactory.TariffRepository,
+			repositoriesFactory.TariffCacheRepository,
+		),
 		PublishOutboxTariffEventCommand: outboxdomain.NewPublishOutboxTariffEventCommand(
 			repositoriesFactory.OutboxRepository,
 			repositoriesFactory.OutboxEventPublisher,
@@ -32,5 +36,6 @@ type servicesFactory struct {
 	TariffService                   *tariffdomain.Service
 	GetDefaultTariffQuery           *tariffdomain.GetDefaultTariffQuery
 	SetDefaultTariffCommand         *tariffdomain.SetDefaultTariffCommand
+	DeactivateParkingTariffsCommand *tariffdomain.DeactivateParkingTariffsCommand
 	PublishOutboxTariffEventCommand *outboxdomain.PublishOutboxTariffEventCommand
 }

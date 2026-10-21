@@ -34,9 +34,9 @@
 
 Одиночный `create`/`update`/`delete` через `CRUDService` — один модифицирующий запрос, ядро оборачивает само: не флагать (`approaches/patterns/transactions.md`, «Не нужна»). Это только о транзакции: запись массивом через `create()`/`update()` ядра — `write-array-instead-of-dto` (`conventions.md` п. 11a).
 
-## Дублирование бизнес-логики между похожими обработчиками
+## Дублирование скелета инфраструктурных обработчиков
 
-Правило, уровень и что писать в находке — `core/style.md`, «Форма кода» («Дублированный скелет обработчика»). Признак в PHP: N файлов (обычно Command или Job в `Domains/*/Modules/*/Commands|Jobs/`) почти дословно повторяют один порядок шагов; общий скелет — класс/метод с шагами, `action` — через интерфейс, `match` по типу/статусу или DI.
+Правило и что писать в находке — `core/style.md`, «Форма кода» («Дублированный скелет обработчика»), уровни — каталог тегов. Признак в PHP: N обработчиков транспорта (Job и consumer в `Entrypoints/Queue/`, адаптеры в `Infrastructure/`) почти дословно повторяют один порядок шагов; общий скелет — класс или метод в `Core/` подпроекта, `action` — через интерфейс, `match` по типу или DI. Command, Query, сервисы и workflow домена — не находка (O-25).
 
 ## Остальные правила
 
@@ -99,6 +99,12 @@
      | grep -vE "MPS\\\\Core\\\\Enums\\\\Enumerable(Trait)?;"
    ```
    Строка — `common-with-logic`; конструктор `Common/` с сервисом или репозиторием — то же (в эталоне это ловит тест `tests/Unit/ParkingApp/Architecture/CommonBoundaryTest.php`).
+0e. **Статус мимо перехода** (`status-set-directly`, `status-in-update-request`; `regulations/entity.md`, «Переход состояния») — по файлам дифа:
+   ```
+   grep -nE -e "->status\s*=[^=>]|'status'\s*=>" <файлы дифа> | grep -vE "/Infrastructure/|/Resources/|Response\.php|FilterDto\.php|(Index|Search)Request\.php|/tests/"
+   grep -rnE "'(status|is_[a-z_]+)'\s*=>" <код>/Entrypoints --include='*UpdateRequest.php' --include='*PatchRequest.php'
+   ```
+   Первая команда: запись статуса в сервисе, Command, workflow — `status-set-directly`; в модели и репозитории (`Infrastructure/`, исключены из вывода) — сверить глазами, что это метод конкретного перехода; фильтр списка (`FilterDto`, `IndexRequest`) и HTTP-статус ответа внешнего сервиса — не статус сущности. Вторая: поле состояния в Request изменения — `status-in-update-request`; не флаг состояния (обычное булево поле данных) — не находка.
 1. **Разъезд списков, новый статус без потребителя, гигиена MR** — правила общие, `approaches/process/review.md`, «За пределами дифа»; здесь только что искать в PHP: `in:a,b`/`Rule::in`/`Rule::enum` в других Request, `enum:` в `#[OA\…]`, словари во фронтовых эндпоинтах, `match` и мапперы по enum (`MediaCollectionMapper::MAP`); сгенерированные файлы, которые не должны уехать в MR, — `.php-cs-fixer.cache`, `storage/api-docs/*.json` (смотреть `git status --short`, не только HEAD).
 2. **Данные под миграцию поведения** (правило — там же): новый каст модели, значение enum, `NOT NULL`, check-constraint —
    ```

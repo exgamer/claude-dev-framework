@@ -12,6 +12,8 @@ use MPS\Core\Models\Model;
 
 /**
  * Строка parking.tariffs: мягкое удаление, статус и валюта — enum, у парковки один тариф по умолчанию (частичный уникальный индекс).
+ * Состояние (status, is_default, scheduled_at) не в $fillable: начальное задаёт initState(), смену — Command перехода
+ * после проверки can*() этой модели и условный UPDATE метода репозитория этого перехода.
  *
  * @property int $id
  * @property int $parking_id
@@ -39,10 +41,7 @@ class Tariff extends Model
         'name',
         'currency',
         'price',
-        'is_default',
-        'status',
         'grace_minutes',
-        'scheduled_at',
     ];
 
     protected $casts = [
@@ -57,4 +56,41 @@ class Tariff extends Model
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
+
+    /**
+     * Начальное состояние нового тарифа: с датой активации — запланированный (действующим и по умолчанию его сделает
+     * ActivatePlannedTariffJob в эту дату), без неё — сразу действующий; по умолчанию не создаётся — только переходом.
+     */
+    public function initState(?Carbon $scheduledAt): self
+    {
+        $this->status = $scheduledAt !== null ? TariffStatusEnum::SCHEDULED : TariffStatusEnum::ACTIVE;
+        $this->is_default = false;
+        $this->scheduled_at = $scheduledAt;
+
+        return $this;
+    }
+
+    /**
+     * Активировать можно только запланированный: действующий уже активирован, архивный отключён вместе с парковкой.
+     */
+    public function canActivate(): bool
+    {
+        return $this->status === TariffStatusEnum::SCHEDULED;
+    }
+
+    /**
+     * Тарифом по умолчанию назначается только действующий: запланированный станет им сам в дату активации, архивный — нет.
+     */
+    public function canBeDefault(): bool
+    {
+        return $this->status === TariffStatusEnum::ACTIVE;
+    }
+
+    /**
+     * В архив — действующий и запланированный; тот же набор — в условии UPDATE archiveNotArchivedByParkingId.
+     */
+    public function canArchive(): bool
+    {
+        return in_array($this->status, TariffStatusEnum::notArchived(), true);
+    }
 }

@@ -13,9 +13,9 @@ import (
 // TariffRepository In-memory tariffdomain.Repository для unit-тестов
 type TariffRepository struct {
 	Items map[uint]*tariffdomain.Tariff
-	// SetDefaultErr Ошибка SetDefault(…, true) — как отказ уникального индекса при параллельной смене; флаг не пишется
-	SetDefaultErr error
-	nextID        uint
+	// MakeDefaultErr Ошибка MakeDefault — как отказ уникального индекса или условного UPDATE при параллельной смене; флаг не пишется
+	MakeDefaultErr error
+	nextID         uint
 }
 
 func NewTariffRepository(items ...*tariffdomain.Tariff) *TariffRepository {
@@ -38,13 +38,18 @@ func (r *TariffRepository) GetByID(_ context.Context, id uint, scope tariffdomai
 		return nil, nil
 	}
 
-	return item, nil
+	// Копия, как строка из БД: переход в памяти вызывающего не пишет в хранилище
+	found := *item
+
+	return &found, nil
 }
 
 func (r *TariffRepository) GetDefaultByParkingID(_ context.Context, parkingID uint) (*tariffdomain.Tariff, error) {
 	for _, item := range r.Items {
-		if item.ParkingID == parkingID && item.IsDefault {
-			return item, nil
+		if item.ParkingID == parkingID && item.IsDefault() {
+			found := *item
+
+			return &found, nil
 		}
 	}
 
@@ -93,17 +98,31 @@ func (r *TariffRepository) Update(_ context.Context, id uint, patch *tariffdomai
 	return nil
 }
 
-func (r *TariffRepository) SetDefault(_ context.Context, id uint, isDefault bool) error {
-	if isDefault && r.SetDefaultErr != nil {
-		return r.SetDefaultErr
+// MakeDefault Условие — как у UPDATE в Postgres: активный и ещё не по умолчанию, иначе ErrTariffStateChanged
+func (r *TariffRepository) MakeDefault(_ context.Context, id uint) error {
+	if r.MakeDefaultErr != nil {
+		return r.MakeDefaultErr
 	}
 
 	item, ok := r.Items[id]
-	if !ok {
-		return tariffdomain.ErrTariffNotFound
+	if !ok || item.IsDefault() {
+		return tariffdomain.ErrTariffStateChanged
 	}
 
-	item.IsDefault = isDefault
+	if err := item.MakeDefault(); err != nil {
+		return tariffdomain.ErrTariffStateChanged
+	}
+
+	return nil
+}
+
+func (r *TariffRepository) UnsetDefault(_ context.Context, id uint) error {
+	item, ok := r.Items[id]
+	if !ok || !item.IsDefault() {
+		return tariffdomain.ErrTariffStateChanged
+	}
+
+	item.UnsetDefault()
 
 	return nil
 }
@@ -111,9 +130,9 @@ func (r *TariffRepository) SetDefault(_ context.Context, id uint, isDefault bool
 func (r *TariffRepository) DeactivateByParkingID(_ context.Context, parkingID uint) ([]uint, error) {
 	ids := []uint{}
 
-	for _, item := range r.Items {
-		if item.ParkingID == parkingID && item.IsActive {
-			item.IsActive = false
+	for id, item := range r.Items {
+		if item.ParkingID == parkingID && item.IsActive() {
+			r.Items[id] = tariffdomain.RestoreTariff(*item, item.IsDefault(), false)
 			ids = append(ids, item.ID)
 		}
 	}

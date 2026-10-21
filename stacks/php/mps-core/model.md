@@ -2,7 +2,7 @@
 
 > Справочник по использованию `mps/core` / `mps/utils` (перенесён из `claude-skills/php-arch`, пути приведены к структуре фреймворка). **Где класть файлы — `../structure.md`**, что есть в ядре и с какой версии — `capabilities.md`, официальная дока — `official/`. При расхождении главнее они — в фактах API (что есть и как вызывается); что из этого использовать — по правилам фреймворка (`../conventions.md`): примеры `official/` с `expanded`, `*OrFail`, суффиксом `DTO` — не образец.
 
-Модель — только маппинг на таблицу. Никакой бизнес-логики.
+Модель — маппинг на таблицу и правила состояния своей строки: начальное состояние, проверки перехода `can*()` (O-26, O-28); процессов, запросов и побочных эффектов в ней нет. Поля состояния (`status`, флаги) не в `$fillable`: их меняют только метод модели и метод репозитория конкретного перехода (`regulations/entity.md`, «Переход состояния»).
 
 ```php
 namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Models;
@@ -27,13 +27,30 @@ class YourModel extends Model
     protected $fillable = [
         'name',
         'price',
-        'status',
     ];
 
     protected $casts = [
         'status'     => YourStatusEnum::class,
         'created_at' => 'datetime',
     ];
+
+    /**
+     * Начальное состояние новой строки — модель, не Request.
+     */
+    public function initState(): self
+    {
+        $this->status = YourStatusEnum::DRAFT;
+
+        return $this;
+    }
+
+    /**
+     * Опубликовать можно только черновик.
+     */
+    public function canPublish(): bool
+    {
+        return $this->status === YourStatusEnum::DRAFT;
+    }
 }
 ```
 
@@ -47,6 +64,7 @@ class YourModel extends Model
 | `$fillable` / `$guarded` | защита mass assignment |
 | `$casts` | типизация колонок, cast в Enum |
 | `$appends` + accessor | простое вычисление без зависимостей |
+| Начальное состояние, `can*()` | `initState()`, `canArchive()` — обычные методы, не мутаторы (`regulations/entity.md`, «Переход состояния») |
 | Relations | нет — связанные данные собираются через репозитории (`../conventions.md`, «Модели и внешние системы») |
 
 ## Что запрещено

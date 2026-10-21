@@ -18,14 +18,14 @@ func driverError(code, constraint string) error {
 	return fmt.Errorf("exec: %w", &pgconn.PgError{Code: code, ConstraintName: constraint})
 }
 
-func TestSetDefaultError_DefaultIndexViolationIsDomainError(t *testing.T) {
-	err := setDefaultError(driverError("23505", defaultTariffUniqueIndex), 2)
+func TestMakeDefaultError_DefaultIndexViolationIsDomainError(t *testing.T) {
+	err := makeDefaultError(driverError("23505", defaultTariffUniqueIndex), 2)
 
 	require.ErrorIs(t, err, tariffdomain.ErrDefaultTariffTaken)
 	assert.Contains(t, err.Error(), "tariff_id=2")
 }
 
-func TestSetDefaultError_OtherFailuresStayInternal(t *testing.T) {
+func TestMakeDefaultError_OtherFailuresStayInternal(t *testing.T) {
 	cases := map[string]error{
 		"другой уникальный индекс": driverError("23505", "tariffs_other_unique"),
 		"другой SQLSTATE":          driverError("23503", defaultTariffUniqueIndex),
@@ -34,7 +34,7 @@ func TestSetDefaultError_OtherFailuresStayInternal(t *testing.T) {
 
 	for name, driverErr := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := setDefaultError(driverErr, 2)
+			err := makeDefaultError(driverErr, 2)
 
 			require.Error(t, err)
 			assert.NotErrorIs(t, err, tariffdomain.ErrDefaultTariffTaken)
@@ -43,8 +43,8 @@ func TestSetDefaultError_OtherFailuresStayInternal(t *testing.T) {
 	}
 }
 
-func TestSetDefaultError_NilIsNil(t *testing.T) {
-	assert.NoError(t, setDefaultError(nil, 2))
+func TestMakeDefaultError_NilIsNil(t *testing.T) {
+	assert.NoError(t, makeDefaultError(nil, 2))
 }
 
 func TestPostgresRepository_GetByID_ZeroScopeFindsNothingWithoutQuery(t *testing.T) {

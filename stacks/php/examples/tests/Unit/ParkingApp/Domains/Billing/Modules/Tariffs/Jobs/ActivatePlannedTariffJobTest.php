@@ -67,6 +67,7 @@ class ActivatePlannedTariffJobTest extends TestCase
             ->shouldReceive('archive')
             ->once()
             ->with(self::PREVIOUS_DEFAULT_ID)
+            ->andReturn(true)
             ->ordered();
         $this->repository
             ->shouldReceive('activateScheduled')
@@ -76,6 +77,35 @@ class ActivatePlannedTariffJobTest extends TestCase
             ->ordered();
         $this->cacheRepository->shouldReceive('forget')->once()->with(self::PREVIOUS_DEFAULT_ID);
         $this->cacheRepository->shouldReceive('forget')->once()->with(self::TARIFF_ID);
+
+        $this->handle();
+    }
+
+    public function test_archived_previous_default_only_loses_flag(): void
+    {
+        $this->expectTariff(TariffStatusEnum::SCHEDULED);
+        $this->repository
+            ->shouldReceive('getDefaultByParkingId')
+            ->once()
+            ->andReturn($this->tariff(self::PREVIOUS_DEFAULT_ID, TariffStatusEnum::ARCHIVED));
+        $this->repository->shouldNotReceive('archive');
+        $this->repository->shouldReceive('unsetDefault')->once()->with(self::PREVIOUS_DEFAULT_ID)->ordered();
+        $this->repository->shouldReceive('activateScheduled')->once()->with(self::TARIFF_ID)->andReturn(true)->ordered();
+
+        $this->handle();
+    }
+
+    public function test_previous_default_archived_in_parallel_rolls_back(): void
+    {
+        $this->expectTariff(TariffStatusEnum::SCHEDULED);
+        $this->repository
+            ->shouldReceive('getDefaultByParkingId')
+            ->once()
+            ->andReturn($this->tariff(self::PREVIOUS_DEFAULT_ID, TariffStatusEnum::ACTIVE));
+        $this->repository->shouldReceive('archive')->once()->with(self::PREVIOUS_DEFAULT_ID)->andReturn(false);
+        $this->repository->shouldNotReceive('activateScheduled');
+
+        $this->expectException(OperationFailedAppException::class);
 
         $this->handle();
     }

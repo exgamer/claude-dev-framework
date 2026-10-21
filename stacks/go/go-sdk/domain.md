@@ -30,7 +30,7 @@
 
 ## entity.go
 
-Деньги — целым числом в минимальных единицах валюты (`regulations/entity.md`, «Value Object»), не `float64`; статус — свой тип из `{name}_enum.go`. Эталон — `../examples/tariff/internal/domains/billing/tariff/entity.go`.
+Деньги — целым числом в минимальных единицах валюты (`regulations/entity.md`, «Value Object»), не `float64`; статус — свой тип из `{name}_enum.go`, поле неэкспортируемое: чтение — геттер, смена — методы перехода, сборка из БД — `Restore*` (`regulations/entity.md`, «Переход состояния»). Эталон — `../examples/tariff/internal/domains/billing/tariff/entity.go`.
 
 ```go
 package product
@@ -42,7 +42,31 @@ type Product struct {
 	// Price Цена в минимальных единицах валюты (тиын для KZT)
 	Price      uint
 	CategoryID uint
-	Status     Status
+	status     Status
+}
+
+// RestoreProduct Сборка из БД — без проверок
+func RestoreProduct(id uint, name string, price uint, categoryID uint, status Status) *Product {
+	return &Product{ID: id, Name: name, Price: price, CategoryID: categoryID, status: status}
+}
+
+func (p *Product) Status() Status {
+	return p.status
+}
+
+// CanDeactivate Снять с продажи можно только активный товар
+func (p *Product) CanDeactivate() bool {
+	return p.status == StatusActive
+}
+
+func (p *Product) Deactivate() error {
+	if !p.CanDeactivate() {
+		return ErrProductNotActive
+	}
+
+	p.status = StatusInactive
+
+	return nil
 }
 ```
 

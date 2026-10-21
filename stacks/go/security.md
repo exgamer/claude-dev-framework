@@ -30,6 +30,6 @@
 
 ## Меры по слоям
 
-Таблица слоёв общая — `architecture/layers.md`, «Меры по слоям». В Go: формат — тег `binding` в хендлере без запросов к хранилищу (`conventions.md` п. 7); доступ — middleware контекста → `context.Context`; уникальность — индекс + перехват `23505` → 422 (`checklist.md` п. 25); инварианты — `{entity}_validator.go` (O-18) или сущность с `New*`/`Restore*` (`regulations/entity.md`): форма — в `design.md` модуля, внутри модуля одна.
+Таблица слоёв общая — `architecture/layers.md`, «Меры по слоям». В Go: формат — тег `binding` в хендлере без запросов к хранилищу (`conventions.md` п. 7); доступ — middleware контекста → `context.Context`; уникальность — индекс + перехват `23505` → 422 (`checklist.md` п. 25); значения входа DTO — `{entity}_validator.go` (O-18), правила состояния — методы сущности (`regulations/entity.md`, O-26).
 
 ---

@@ -91,17 +91,3 @@ func (s *Service) Update(ctx context.Context, id uint, scope ParkingScope, patch
 
 	return updated, nil
 }
-
-// DeactivateByParkingID Отключает тарифы отключённой парковки. Повтор безопасен: уже неактивные тарифы запрос не выбирает
-func (s *Service) DeactivateByParkingID(ctx context.Context, parkingID uint) error {
-	ids, err := s.repository.DeactivateByParkingID(ctx, parkingID)
-	if err != nil {
-		return err
-	}
-
-	if err := s.cacheRepository.Invalidate(ctx, ids...); err != nil {
-		errorreporter.CaptureSoft(ctx, err, map[string]string{"component": "tariff_cache"})
-	}
-
-	return nil
-}

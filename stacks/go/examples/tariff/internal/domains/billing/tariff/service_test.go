@@ -12,44 +12,10 @@ import (
 	"example.com/parking-service/internal/testsupport/billingfakes"
 )
 
-func TestService_DeactivateByParkingID(t *testing.T) {
-	tariffs := billingfakes.NewTariffRepository(
-		&tariffdomain.Tariff{ID: 1, ParkingID: 7, IsActive: true},
-		&tariffdomain.Tariff{ID: 2, ParkingID: 7, IsActive: true},
-		&tariffdomain.Tariff{ID: 3, ParkingID: 8, IsActive: true},
-	)
-	cache := billingfakes.NewTariffCacheRepository()
-	cache.Items[1] = *tariffs.Items[1]
-	cache.Items[3] = *tariffs.Items[3]
-	service := tariffdomain.NewService(tariffs, cache)
-
-	err := service.DeactivateByParkingID(context.Background(), 7)
-
-	require.NoError(t, err)
-	assert.False(t, tariffs.Items[1].IsActive)
-	assert.False(t, tariffs.Items[2].IsActive)
-	assert.True(t, tariffs.Items[3].IsActive, "тариф другой парковки не трогается")
-	assert.NotContains(t, cache.Items, uint(1), "кеш отключённого тарифа сброшен")
-	assert.Contains(t, cache.Items, uint(3))
-}
-
-func TestService_DeactivateByParkingID_RepeatIsNoop(t *testing.T) {
-	tariffs := billingfakes.NewTariffRepository(&tariffdomain.Tariff{ID: 1, ParkingID: 7, IsActive: false})
-	cache := billingfakes.NewTariffCacheRepository()
-	cache.Items[1] = *tariffs.Items[1]
-	service := tariffdomain.NewService(tariffs, cache)
-
-	err := service.DeactivateByParkingID(context.Background(), 7)
-
-	require.NoError(t, err)
-	assert.False(t, tariffs.Items[1].IsActive)
-	assert.Contains(t, cache.Items, uint(1), "повтор события ничего не меняет")
-}
-
 func newScopedService() (*tariffdomain.Service, *billingfakes.TariffRepository, *billingfakes.TariffCacheRepository) {
 	tariffs := billingfakes.NewTariffRepository(
-		&tariffdomain.Tariff{ID: 1, ParkingID: 7, Name: "свой"},
-		&tariffdomain.Tariff{ID: 2, ParkingID: 8, Name: "чужой"},
+		tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7, Name: "свой"}, false, true),
+		tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 2, ParkingID: 8, Name: "чужой"}, false, true),
 	)
 	cache := billingfakes.NewTariffCacheRepository()
 

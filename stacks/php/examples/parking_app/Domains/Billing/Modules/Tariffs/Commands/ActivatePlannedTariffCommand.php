@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Commands;
 
 use App\ParkingApp\Core\Database\Managers\TransactionManagerInterface;
-use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -13,7 +12,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 use Throwable;
 
 /**
- * Активация запланированного тарифа: он становится действующим и тарифом по умолчанию, прежний по умолчанию — в архив.
+ * Переход Activate: он становится действующим и тарифом по умолчанию, прежний по умолчанию — в архив.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -28,19 +27,20 @@ final class ActivatePlannedTariffCommand
     }
 
     /**
-     * Повтор безопасен: тариф не найден или уже не запланирован (активирован, отключён вместе с парковкой) — выход
-     * без записи. Вызывает отложенный Job — внутренняя точка входа, скоупа парковок нет (null). Кеш обоих тарифов
+     * Повтор безопасен: тариф не найден или Tariff::canActivate() — нет (активирован, отключён вместе с парковкой) —
+     * выход без записи. Вызывает отложенный Job — внутренняя точка входа, скоупа парковок нет (null). Кеш обоих тарифов
      * сбрасывается после коммита.
      *
-     * @throws OperationFailedAppException тариф перестал быть запланированным между проверкой и записью — архивация
-     *                                     прежнего откатывается, повтор Job выйдет на проверке статуса
+     * @throws OperationFailedAppException тариф перестал быть запланированным (или прежний — действующим) между
+     *                                     проверкой и записью — запись откатывается, повтор Job выйдет на проверке
+     *                                     статуса
      * @throws Throwable
      */
     public function execute(int $tariffId): void
     {
         $tariff = $this->repository->getByIdInParkings($tariffId, null);
 
-        if (! $tariff || $tariff->status !== TariffStatusEnum::SCHEDULED) {
+        if (! $tariff || ! $tariff->canActivate()) {
             return;
         }
 
@@ -49,9 +49,15 @@ final class ActivatePlannedTariffCommand
             $previous = $this->repository->getDefaultByParkingId($tariff->parking_id);
             $archivePrevious = $previous && $previous->id !== $tariff->id;
 
-            // Сначала снять флаг прежнего: уникальный индекс не допускает двух тарифов по умолчанию у парковки
-            if ($archivePrevious) {
-                $this->repository->archive($previous->id);
+            // Сначала снять флаг прежнего: уникальный индекс не допускает двух тарифов по умолчанию у парковки.
+            // Прежний уже в архиве (парковку отключали) — только снять флаг
+            if ($archivePrevious && ! $previous->canArchive()) {
+                $this->repository->unsetDefault($previous->id);
+            } elseif ($archivePrevious && ! $this->repository->archive($previous->id)) {
+                throw new OperationFailedAppException('Прежний тариф по умолчанию архивирован параллельно', [
+                    'tariff_id' => $tariff->id,
+                    'previous_tariff_id' => $previous->id,
+                ]);
             }
 
             if (! $this->repository->activateScheduled($tariff->id)) {

@@ -38,15 +38,14 @@ type CreateTariffWorkflow struct {
 }
 
 func (w *CreateTariffWorkflow) Exec(ctx context.Context, params *CreateTariffParams) (*tariffdomain.Tariff, error) {
-	// Новый тариф — не по умолчанию: флаг ставится отдельным запросом
-	tariff := &tariffdomain.Tariff{
+	// Начальное состояние задаёт сущность: активный, не по умолчанию — флаг ставится отдельным переходом
+	tariff := tariffdomain.NewTariff(tariffdomain.Tariff{
 		ParkingID:    params.ParkingID,
 		Name:         params.Name,
 		Currency:     params.Currency,
-		IsActive:     true,
 		GraceMinutes: params.GraceMinutes,
 		Price:        params.Price,
-	}
+	})
 
 	// Инварианты — до обращения к реестру и БД: тот же сценарий вызывается не только из HTTP
 	if fieldErrors := tariffdomain.ValidateTariff(tariff); len(fieldErrors) > 0 {

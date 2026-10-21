@@ -19,9 +19,9 @@ func newDefaultTariffQuery(items ...*tariffdomain.Tariff) (*tariffdomain.GetDefa
 
 func TestGetDefaultTariffQuery_ReturnsActiveDefaultAndCachesIt(t *testing.T) {
 	query, cache := newDefaultTariffQuery(
-		&tariffdomain.Tariff{ID: 1, ParkingID: 7, IsActive: true},
-		&tariffdomain.Tariff{ID: 2, ParkingID: 7, IsActive: true, IsDefault: true},
-		&tariffdomain.Tariff{ID: 3, ParkingID: 8, IsActive: true, IsDefault: true},
+		tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, false, true),
+		tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 2, ParkingID: 7}, true, true),
+		tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 3, ParkingID: 8}, true, true),
 	)
 
 	tariff, err := query.Exec(context.Background(), 7, tariffdomain.ParkingScope{IDs: []uint{7}})
@@ -37,10 +37,10 @@ func TestGetDefaultTariffQuery_NotFound(t *testing.T) {
 		tariffs []*tariffdomain.Tariff
 		scope   tariffdomain.ParkingScope
 	}{
-		{"no default", []*tariffdomain.Tariff{{ID: 1, ParkingID: 7, IsActive: true}}, tariffdomain.ParkingScope{All: true}},
-		{"default is inactive", []*tariffdomain.Tariff{{ID: 1, ParkingID: 7, IsDefault: true}}, tariffdomain.ParkingScope{All: true}},
-		{"parking out of scope", []*tariffdomain.Tariff{{ID: 1, ParkingID: 7, IsActive: true, IsDefault: true}}, tariffdomain.ParkingScope{IDs: []uint{8}}},
-		{"zero scope", []*tariffdomain.Tariff{{ID: 1, ParkingID: 7, IsActive: true, IsDefault: true}}, tariffdomain.ParkingScope{}},
+		{"no default", []*tariffdomain.Tariff{tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, false, true)}, tariffdomain.ParkingScope{All: true}},
+		{"default is inactive", []*tariffdomain.Tariff{tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, true, false)}, tariffdomain.ParkingScope{All: true}},
+		{"parking out of scope", []*tariffdomain.Tariff{tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, true, true)}, tariffdomain.ParkingScope{IDs: []uint{8}}},
+		{"zero scope", []*tariffdomain.Tariff{tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, true, true)}, tariffdomain.ParkingScope{}},
 	}
 
 	for _, tc := range cases {

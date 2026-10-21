@@ -7,7 +7,6 @@ namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories;
 use App\ParkingApp\Core\Database\Query\Page;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
-use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
@@ -15,7 +14,8 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterf
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Запросы к тарифам для домена Billing: чтение со скоупом парковок, список по TariffFilterDto и Page, смена статуса и флага по умолчанию.
+ * Запросы к тарифам для домена Billing: чтение со скоупом парковок, список по TariffFilterDto и Page; смена статуса и флага
+ * по умолчанию — только методами переходов, каждый — условный UPDATE (0 строк — false, параллельная смена).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -51,19 +51,28 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
      */
     public function allNotArchivedIdsByParkingId(int $parkingId): array;
 
-    public function createFromDto(TariffDto $dto, TariffStatusEnum $status, bool $isDefault): Tariff;
+    /**
+     * Колонки из DTO, начальное состояние — Tariff::initState() по дате активации.
+     */
+    public function createFromDto(TariffDto $dto): Tariff;
 
     /**
-     * Пишет колонки из DTO. false — тариф по умолчанию переносится на парковку, где тариф по умолчанию уже есть
+     * Пишет колонки из DTO, состояние (status, is_default) не трогает. false — тариф по умолчанию переносится на парковку, где тариф по умолчанию уже есть
      * (уникальный индекс): запись не сделана, вызывающий только бросает исключение.
      */
     public function updateFromDto(int $id, TariffDto $dto): bool;
 
     /**
-     * Пишет флаг. false — у парковки уже есть другой тариф по умолчанию (уникальный индекс, параллельная смена):
-     * транзакция Postgres после этого прервана, вызывающий только бросает исключение.
+     * Переход SetDefault: флаг ставится действующему тарифу не по умолчанию. false — тариф уже не действующий или уже
+     * по умолчанию (0 строк) либо у парковки есть другой тариф по умолчанию (уникальный индекс; транзакция Postgres
+     * после этого прервана) — параллельная смена, вызывающий только бросает исключение.
      */
-    public function setDefault(int $id, bool $isDefault): bool;
+    public function setDefault(int $id): bool;
+
+    /**
+     * Шаг перехода SetDefault: флаг снимается с прежнего тарифа по умолчанию (любого статуса).
+     */
+    public function unsetDefault(int $id): void;
 
     /**
      * Запланированный тариф — действующим и по умолчанию, дата активации снимается. false — тариф уже не
@@ -72,9 +81,10 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
     public function activateScheduled(int $id): bool;
 
     /**
-     * Тариф — в архив, флаг «по умолчанию» снимается.
+     * Переход Archive: действующий или запланированный тариф — в архив, флаг «по умолчанию» снимается. false — тариф
+     * уже в архиве (0 строк): запись не изменена.
      */
-    public function archive(int $id): void;
+    public function archive(int $id): bool;
 
     /**
      * Действующие и запланированные тарифы парковки — в архив; возвращает число изменённых.

@@ -28,7 +28,7 @@
 | `list-form-not-as-designed` | [ВНИМАНИЕ] | Новый список не по форме из раздела «Список» `design.md`; существующий на форме (1) — не нарушение | `conventions.md` п. 2c (P-19) |
 | `command-query-form` | [ВНИМАНИЕ] | Command/Query наследует базовый класс ядра (`MPS\Core\Commands\Command`, `MPS\Core\Queries\Query`), реализует `prepare()`/`get()`/`setQueryParams()`, параметры — fluent-сеттерами с массивом или точка входа не `execute(...)` с типизированными аргументами | `mps-core/commands.md`, «Форма Command и Query» |
 | `exception-not-domain-type` | [ОШИБКА] | `\RuntimeException`/`\Exception` вместо `*AppException` ядра | `conventions.md` п. 13 |
-| `invariants-inline` | [ВНИМАНИЕ] | Доменные инварианты проверяются inline в сервисе/workflow, а не в `{E}DtoValidator` (или в сущности `New*`/`Restore*`, если так выбрано в `design.md`) | `conventions.md` п. 10 |
+| `status-set-directly` | [ОШИБКА] | Статус записан мимо перехода: `->status =`, `status` в `fill()`/`update()`/`create()` вне метода модели или метода репозитория конкретного перехода; начальный статус из Request, а не из модели или фабрики | `regulations/entity.md`, «Переход состояния» (O-28); `conventions.md`, «Модели и внешние системы» |
 | `exception-generic-with-type` | [ВНИМАНИЕ] | `new AppException(..., AppErrorTypeEnum::X)` при готовом классе исключения ядра для этого типа | `conventions.md` п. 13 (P-12) |
 | `deprecated-core-api` | [ОШИБКА] | Устаревшее API ядра в новом коде (`RabbitManager::putIn`, `QueryFilters` V1, `FileManager::upload`, `setMessagePrefix`; `getOrCreate`/`getCacheKeyByParts` — с utils ≥ 2.6.4) | `conventions.md` п. 22 |
 | `dto-suffix-uppercase` | [ВНИМАНИЕ] | Суффикс `DTO` вместо `Dto` в новом PHP-коде (`BuildingDataDTO`) | `style.md`, «Имена» (P-5, P-7) |

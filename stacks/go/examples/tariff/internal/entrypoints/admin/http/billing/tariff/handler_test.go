@@ -100,8 +100,8 @@ func TestHandler_Default_ParkingScope(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			tariffs := billingfakes.NewTariffRepository(
-				&tariffdomain.Tariff{ID: 1, ParkingID: 7, IsActive: true, IsDefault: true},
-				&tariffdomain.Tariff{ID: 2, ParkingID: 8, IsActive: true, IsDefault: true},
+				tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 1, ParkingID: 7}, true, true),
+				tariffdomain.RestoreTariff(tariffdomain.Tariff{ID: 2, ParkingID: 8}, true, true),
 			)
 			cache := billingfakes.NewTariffCacheRepository()
 			handler := NewHandler(

@@ -32,20 +32,20 @@ func (r *RedisRepository) GetByID(ctx context.Context, id uint) (*tariffdomain.T
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	tariff, err := rediscore.NewHelper[tariffdomain.Tariff](ctx, r.client).GetStruct(key(id))
+	model, err := rediscore.NewHelper[tariff](ctx, r.client).GetStruct(key(id))
 	if err != nil {
 		return nil, fmt.Errorf("get tariff cache failed (tariff_id=%d): %w", id, err)
 	}
 
-	return tariff, nil
+	return tariffToEntity(model), nil
 }
 
-func (r *RedisRepository) Set(ctx context.Context, tariff *tariffdomain.Tariff) error {
+func (r *RedisRepository) Set(ctx context.Context, entity *tariffdomain.Tariff) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if err := rediscore.NewHelper[tariffdomain.Tariff](ctx, r.client).SetStruct(key(tariff.ID), *tariff, ttl); err != nil {
-		return fmt.Errorf("set tariff cache failed (tariff_id=%d): %w", tariff.ID, err)
+	if err := rediscore.NewHelper[tariff](ctx, r.client).SetStruct(key(entity.ID), *tariffFromEntity(entity), ttl); err != nil {
+		return fmt.Errorf("set tariff cache failed (tariff_id=%d): %w", entity.ID, err)
 	}
 
 	return nil

@@ -33,7 +33,7 @@ func (q *GetDefaultTariffQuery) Exec(ctx context.Context, parkingID uint, scope 
 		return nil, err
 	}
 
-	if tariff == nil || !tariff.IsActive {
+	if tariff == nil || !tariff.IsActive() {
 		return nil, exception.NewNotFoundException(errors.New("тариф по умолчанию не найден"), false)
 	}
 

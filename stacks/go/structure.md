@@ -133,8 +133,10 @@ internal/
 │   │   ├── model.go
 │   │   ├── repository.go
 │   │   └── mapper.go
-│   ├── redis/{domain}/{module}/
-│   │   └── repository.go
+│   ├── redis/{domain}/{module}/              ← кеш хранит модель, сущность собирает маппер (состояние сущности неэкспортируемое)
+│   │   ├── model.go
+│   │   ├── repository.go
+│   │   └── mapper.go
 │   ├── http/{provider}/{product}/            ← внешний провайдер (kaspi/autopay, webkassa)
 │   │   ├── model.go
 │   │   ├── repository.go                     ← HTTPRepository (источник данных)
@@ -235,9 +237,9 @@ main()
 - [ ] Зарегистрировать `Module` в `internal/app/app.go`
 
 **Опционально:**
-- [ ] `domains/{domain}/{module}/{entity}_validator.go` — если есть доменные инварианты сверх формата запроса (O-18); другая допустимая форма — `New*`/`Restore*` в `entity.go` (`regulations/entity.md`), выбор — в `design.md`, в модуле одна форма
+- [ ] `domains/{domain}/{module}/{entity}_validator.go` — если есть проверки значений входа сверх формата запроса (O-18); правила состояния и переходов — методы сущности в `entity.go` (`regulations/entity.md`, O-26)
 - [ ] `domains/{domain}/{module}/modules.go`, `system.go` — если модулю нужны соседние модули домена или системные зависимости (`conventions.md` п. 12); транзакции — `tx_manager.go`
-- [ ] `infrastructure/redis/{domain}/{module}/repository.go`
+- [ ] `infrastructure/redis/{domain}/{module}/model.go`, `repository.go`, `mapper.go`
 - [ ] `infrastructure/http/{provider}/{product}/model.go` (или `http/{service}/{module}/`)
 - [ ] `infrastructure/http/{provider}/{product}/repository.go`
 - [ ] `infrastructure/http/{provider}/{product}/mapper.go`

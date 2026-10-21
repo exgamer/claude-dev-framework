@@ -6,6 +6,7 @@ namespace Tests\Unit\ParkingApp\Entrypoints\Console\Billing\Tariffs;
 
 use App\ParkingApp\Core\Database\Managers\NoopTransactionManager;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Commands\SetDefaultTariffCommand;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Entrypoints\Console\Billing\Tariffs\SetDefaultTariffConsoleCommand;
@@ -88,6 +89,7 @@ class SetDefaultTariffConsoleCommandTest extends TestCase
         $tariff->id = self::TARIFF_ID;
         $tariff->parking_id = self::PARKING_ID;
         $tariff->is_default = $isDefault;
+        $tariff->status = TariffStatusEnum::ACTIVE;
 
         return $tariff;
     }

@@ -86,7 +86,8 @@ func (r *PostgresRepository) GetDefaultByParkingID(ctx context.Context, parkingI
 
 func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search) (*pagination.Paginated[tariffdomain.Tariff], error) {
 	// Таймаут — секунды числом: хелпер сам умножает на time.Second (gosdk-db-core v1.0.10, gorm_paginated_helper.go)
-	helper := helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).SetTimeout(10)
+	// Хелпер сканирует в модель: состояние сущности неэкспортируемое, GORM его не заполнит — сущности собирает маппер
+	helper := helpers.NewGormPaginatedHelper[tariff](ctx, r.client).SetTimeout(10)
 
 	// per_page не передан — умолчание хелпера 30; SetPerPage(0) дал бы 20 из pagination.Pages
 	if search.PerPage > 0 {
@@ -115,7 +116,10 @@ func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain
 		return nil, fmt.Errorf("paginate tariffs failed (parking_id=%d, page=%d): %w", search.ParkingID, search.Page, err)
 	}
 
-	return paginated, nil
+	return &pagination.Paginated[tariffdomain.Tariff]{
+		Items:      tariffsToEntities(paginated.Items),
+		Pagination: paginated.Pagination,
+	}, nil
 }
 
 func (r *PostgresRepository) Create(ctx context.Context, entity *tariffdomain.Tariff) (*tariffdomain.Tariff, error) {
@@ -157,37 +161,62 @@ func (r *PostgresRepository) Update(ctx context.Context, id uint, patch *tariffd
 	return nil
 }
 
-func (r *PostgresRepository) SetDefault(ctx context.Context, id uint, isDefault bool) error {
+// MakeDefault Условный UPDATE перехода: только активный, не удалённый и ещё не по умолчанию — гонка с отключением или удалением даёт 0 строк
+func (r *PostgresRepository) MakeDefault(ctx context.Context, id uint) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	result := r.client.WithContext(ctx).
 		Model(&tariff{}).
 		Where("id = ?", id).
+		Where("is_active = TRUE").
+		Where("is_default = FALSE").
 		Where("deleted_at IS NULL").
-		Update("is_default", isDefault)
+		Update("is_default", true)
 	if result.Error != nil {
-		return setDefaultError(result.Error, id)
+		return makeDefaultError(result.Error, id)
 	}
 
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("set default tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrTariffNotFound)
+		return fmt.Errorf("make default tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrTariffStateChanged)
 	}
 
 	return nil
 }
 
-// setDefaultError Ошибка записи флага: нарушение индекса тарифа по умолчанию — tariffdomain.ErrDefaultTariffTaken, прочее — с ID тарифа
-func setDefaultError(err error, id uint) error {
+// UnsetDefault Условный UPDATE: снимает флаг только у тарифа по умолчанию; уже снятый или удалённый — 0 строк
+func (r *PostgresRepository) UnsetDefault(ctx context.Context, id uint) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	result := r.client.WithContext(ctx).
+		Model(&tariff{}).
+		Where("id = ?", id).
+		Where("is_default = TRUE").
+		Where("deleted_at IS NULL").
+		Update("is_default", false)
+	if result.Error != nil {
+		return fmt.Errorf("unset default tariff failed (tariff_id=%d): %w", id, result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("unset default tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrTariffStateChanged)
+	}
+
+	return nil
+}
+
+// makeDefaultError Ошибка записи флага: нарушение индекса тарифа по умолчанию — tariffdomain.ErrDefaultTariffTaken, прочее — с ID тарифа
+func makeDefaultError(err error, id uint) error {
 	if err == nil {
 		return nil
 	}
 
 	if isUniqueViolation(err, defaultTariffUniqueIndex) {
-		return fmt.Errorf("set default tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrDefaultTariffTaken)
+		return fmt.Errorf("make default tariff failed (tariff_id=%d): %w", id, tariffdomain.ErrDefaultTariffTaken)
 	}
 
-	return fmt.Errorf("set default tariff failed (tariff_id=%d): %w", id, err)
+	return fmt.Errorf("make default tariff failed (tariff_id=%d): %w", id, err)
 }
 
 // isUniqueViolation Нарушение именно индекса index: SQLSTATE 23505 и имя ограничения из ошибки драйвера; чужой индекс — не оно
@@ -206,7 +235,7 @@ func (r *PostgresRepository) DeactivateByParkingID(ctx context.Context, parkingI
 		Model(&models).
 		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).
 		Where("parking_id = ?", parkingID).
-		Where("is_active = TRUE").
+		Where("is_active = TRUE"). // условие перехода — Tariff.CanDeactivate
 		Where("deleted_at IS NULL").
 		Update("is_active", false)
 

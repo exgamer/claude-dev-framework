@@ -143,17 +143,14 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
             ->all();
     }
 
-    public function createFromDto(TariffDto $dto, TariffStatusEnum $status, bool $isDefault): Tariff
+    public function createFromDto(TariffDto $dto): Tariff
     {
         /** @var Tariff $tariff */
         $tariff = $this->model->newInstance();
         // Дата активации пишется только при создании: перенос даты отложенный Job не догонит
-        $tariff->fill([
-            ...$this->columns($dto),
-            'status' => $status,
-            'is_default' => $isDefault,
-            'scheduled_at' => $dto->getScheduledAt(),
-        ])->save();
+        $tariff->fill($this->columns($dto))
+            ->initState($dto->getScheduledAt())
+            ->save();
 
         return $tariff;
     }
@@ -183,12 +180,15 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
     /**
      * @throws QueryException ошибка БД, кроме нарушения индекса тарифа по умолчанию (оно — false)
      */
-    public function setDefault(int $id, bool $isDefault): bool
+    public function setDefault(int $id): bool
     {
+        // Условие Tariff::canBeDefault() — в самом UPDATE: тариф, архивированный параллельно, флаг не получит
         try {
-            $this->getQuery()
+            $updated = $this->getQuery()
                 ->whereKey($id)
-                ->update(['is_default' => $isDefault]);
+                ->where('status', TariffStatusEnum::ACTIVE->value)
+                ->where('is_default', false)
+                ->update(['is_default' => true]);
         } catch (QueryException $e) {
             if ($this->isUniqueViolation($e, self::DEFAULT_TARIFF_UNIQUE_INDEX)) {
                 return false;
@@ -197,7 +197,15 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
             throw $e;
         }
 
-        return true;
+        return $updated > 0;
+    }
+
+    public function unsetDefault(int $id): void
+    {
+        $this->getQuery()
+            ->whereKey($id)
+            ->where('is_default', true)
+            ->update(['is_default' => false]);
     }
 
     public function activateScheduled(int $id): bool
@@ -215,14 +223,18 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
         return $updated > 0;
     }
 
-    public function archive(int $id): void
+    public function archive(int $id): bool
     {
-        $this->getQuery()
+        // Условие Tariff::canArchive() — в самом UPDATE
+        $updated = $this->getQuery()
             ->whereKey($id)
+            ->whereIn('status', TariffStatusEnum::notArchivedValues())
             ->update([
                 'status' => TariffStatusEnum::ARCHIVED->value,
                 'is_default' => false,
             ]);
+
+        return $updated > 0;
     }
 
     public function archiveNotArchivedByParkingId(int $parkingId): int
@@ -245,7 +257,8 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
     }
 
     /**
-     * Колонки тарифа из DTO: status и is_default задаются отдельно; update() мимо $casts — enum значением.
+     * Колонки тарифа из DTO без состояния: status, is_default и scheduled_at задают initState() и методы переходов;
+     * update() мимо $casts — enum значением.
      *
      * @return array<string, mixed>
      */

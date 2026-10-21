@@ -69,6 +69,12 @@
    grep -rnE '"[^"]+/internal/(domains|infrastructure|workflows|entrypoints|app)/|"context"|"net/http"|"database/sql"|gorm' internal/common --include='*.go' | grep -v '_test\.go:'
    ```
    Пара enum, где один файл — в дифе, и это то же понятие — `duplicated-enum` (в находке — перенос в `internal/common/` и откуда импортировать); совпадение случайных значений разных понятий — не находка. Импорт другого `{domain}` из `internal/domains/{domain}/`: enum или value-объект — `duplicated-enum` с переносом в `internal/common/`, сервис или репозиторий — сценарий двух доменов, его место — workflow (O-7). Строка третьей команды — `common-with-logic`.
+0c. **Поле состояния сущности** (`state-field-exported`, `status-in-update-request`; `regulations/entity.md`, «Переход состояния») — по файлам дифа:
+   ```
+   grep -nE '^\s+(Status|Is[A-Z][A-Za-z]*)\s' <entity.go в дифе>
+   grep -nE '(Status|Is[A-Z][A-Za-z]*)\s.*binding:' <request.go в дифе>
+   ```
+   Первая: экспортируемое поле состояния у новой сущности — `state-field-exported` (у существующей анемичной — не находка, `regulations/entity.md`, «Когда применять»). Вторая: поле состояния в запросе PUT/PATCH — `status-in-update-request`; фильтр списка — не находка.
 1. **Разъезд списков, новый статус без потребителя, данные под миграцию, гигиена MR** — правила общие, `approaches/process/review.md`, «За пределами дифа»; здесь только что искать в Go: `switch`/`map` по типу статуса, `enums:` в swagger-аннотациях DTO, строковые литералы значений; `go.sum` вместе с `go.mod`; локальной базы в репозитории может не быть — тогда проверку колонок явно поручать автору.
 2. **Инструменты.** Прогон Go — по `approaches/process/self-check.md` (команды, `-race`, CI без гейтов). Падение e2e из `tests/*` без `APP_URL` («unsupported protocol scheme») — не сигнал; локальный гейт — юнит-тесты пакетов. Swagger: `swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1`.
 3. **Платёжные пути** — раздел «Платёжные пути» выше.

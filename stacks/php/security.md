@@ -40,7 +40,7 @@
 
 ## Меры по слоям
 
-Таблица слоёв общая — `architecture/layers.md`, «Меры по слоям». В PHP: формат — Request без SQL (P-17, `conventions.md` п. 9a), вложенная коллекция — `list` + `{поле}.*: array` (иначе ядро соберёт пустую коллекцию = «отвязать всё», `mps-core/data-objects.md`); доступ — middleware контекста (`conventions.md` п. 19a); существование и уникальность — сервис/workflow через репозиторий; инварианты — `{E}DtoValidator` (P-8).
+Таблица слоёв общая — `architecture/layers.md`, «Меры по слоям». В PHP: формат — Request без SQL (P-17, `conventions.md` п. 9a), вложенная коллекция — `list` + `{поле}.*: array` (иначе ядро соберёт пустую коллекцию = «отвязать всё», `mps-core/data-objects.md`); доступ — middleware контекста (`conventions.md` п. 19a); существование и уникальность — сервис/workflow через репозиторий; значения входа DTO — `{E}DtoValidator` (P-8), правила состояния — методы модели (`regulations/entity.md`, O-26).
 
 ```php
 // плохо: мера легаси в Request

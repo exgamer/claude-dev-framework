@@ -14,7 +14,8 @@ use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\ValidationAppException;
 
 /**
- * Чтение и изменение тарифов с проверкой скоупа парковок и доменных инвариантов; тариф по умолчанию назначает SetDefaultTariffCommand.
+ * Чтение и изменение тарифов с проверкой скоупа парковок и доменных инвариантов; переходы состояния —
+ * Command на каждый (SetDefaultTariffCommand, ActivatePlannedTariffCommand, DeactivateParkingTariffsCommand).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -36,14 +37,16 @@ interface TariffCrudServiceInterface
     public function paginate(TariffFilterDto $filter, Page $page): LengthAwarePaginator;
 
     /**
-     * С датой активации тариф создаётся запланированным (SCHEDULED), без неё — действующим (ACTIVE); не по умолчанию.
+     * С датой активации тариф создаётся запланированным (SCHEDULED), без неё — действующим (ACTIVE); не по умолчанию —
+     * начальное состояние задаёт Tariff::initState().
      *
      * @throws ValidationAppException
      */
     public function create(TariffDto $dto): Tariff;
 
     /**
-     * Полная замена: DTO пишется целиком, null в необязательном поле очищает его. Тариф чужой парковки — 404.
+     * Полная замена: DTO пишется целиком, null в необязательном поле очищает его; status и is_default не меняются.
+     * Тариф чужой парковки — 404.
      *
      * @param ?list<int> $parkingIds
      *
@@ -51,10 +54,4 @@ interface TariffCrudServiceInterface
      * @throws ValidationAppException
      */
     public function update(int $id, ?array $parkingIds, TariffDto $dto): Tariff;
-
-    /**
-     * Парковку отключили: действующие и запланированные тарифы — в архив, их кеш сбрасывается. Возвращает число
-     * изменённых; повтор безопасен — архивные запрос не выбирает.
-     */
-    public function deactivateByParkingId(int $parkingId): int;
 }

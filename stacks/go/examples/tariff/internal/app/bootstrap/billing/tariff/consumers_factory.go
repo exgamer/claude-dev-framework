@@ -6,7 +6,7 @@ import (
 
 func newConsumersFactory(servicesFactory *servicesFactory, retryConfig *consumerRetryConfig) *consumersFactory {
 	return &consumersFactory{
-		TariffConsumer: tariffrabbit.NewConsumer(servicesFactory.TariffService, retryConfig.MaxAttempts),
+		TariffConsumer: tariffrabbit.NewConsumer(servicesFactory.DeactivateParkingTariffsCommand, retryConfig.MaxAttempts),
 	}
 }
 

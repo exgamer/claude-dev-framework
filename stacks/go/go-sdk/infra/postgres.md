@@ -20,6 +20,7 @@
 type product struct {
 	ID         uint   `gorm:"column:id;primaryKey;autoIncrement"`
 	Name       string `gorm:"column:name"`
+	Price      uint   `gorm:"column:price"`
 	CategoryID uint   `gorm:"column:category_id"`
 	Status     uint   `gorm:"column:status"`
 }
@@ -39,12 +40,7 @@ func modelToEntity(m *product) *domain.Product {
 		return nil
 	}
 
-	return &domain.Product{
-		ID:         m.ID,
-		Name:       m.Name,
-		CategoryID: m.CategoryID,
-		Status:     domain.Status(m.Status),
-	}
+	return domain.RestoreProduct(m.ID, m.Name, m.Price, m.CategoryID, domain.Status(m.Status))
 }
 
 func entityToModel(e *domain.Product) *product {
@@ -55,8 +51,9 @@ func entityToModel(e *domain.Product) *product {
 	return &product{
 		ID:         e.ID,
 		Name:       e.Name,
+		Price:      e.Price,
 		CategoryID: e.CategoryID,
-		Status:     uint(e.Status),
+		Status:     uint(e.Status()),
 	}
 }
 ```
@@ -172,18 +169,23 @@ err := c.txManager.Exec(ctx, func(ctx context.Context, repository Repository) er
 		return exception.NewNotFoundException(errors.New("тариф не найден"), false)
 	}
 
+	if err := tariff.MakeDefault(); err != nil { // допустимость перехода — у сущности
+		return err
+	}
+
 	previous, err := repository.GetDefaultByParkingID(ctx, tariff.ParkingID)
 	if err != nil {
 		return err
 	}
 
 	if previous != nil {
-		if err := repository.SetDefault(ctx, previous.ID, false); err != nil {
+		if err := repository.UnsetDefault(ctx, previous.ID); err != nil && !errors.Is(err, ErrTariffStateChanged) {
 			return err
 		}
 	}
 
-	return repository.SetDefault(ctx, tariff.ID, true)
+	// метод репозитория этого перехода — условный UPDATE, общего сеттера состояния нет (regulations/entity.md, «Переход состояния»)
+	return repository.MakeDefault(ctx, tariff.ID)
 })
 if errors.Is(err, ErrDefaultTariffTaken) { // параллельную смену закрывает уникальный индекс — 422
 	...
@@ -207,7 +209,8 @@ if errors.Is(err, ErrDefaultTariffTaken) { // параллельную смен�
 
 ```go
 func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain.Search) (*pagination.Paginated[tariffdomain.Tariff], error) {
-	helper := helpers.NewGormPaginatedHelper[tariffdomain.Tariff](ctx, r.client).
+	// хелпер сканирует в модель: состояние сущности неэкспортируемое, GORM его не заполнит — сущности собирает маппер
+	helper := helpers.NewGormPaginatedHelper[tariff](ctx, r.client).
 		SetTimeout(10) // секунды числом: хелпер сам умножает на time.Second
 
 	if search.PerPage > 0 {
@@ -236,6 +239,9 @@ func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain
 		return nil, fmt.Errorf("paginate tariffs failed (parking_id=%d, page=%d): %w", search.ParkingID, search.Page, err)
 	}
 
-	return paginated, nil
+	return &pagination.Paginated[tariffdomain.Tariff]{
+		Items:      tariffsToEntities(paginated.Items),
+		Pagination: paginated.Pagination,
+	}, nil
 }
 ```

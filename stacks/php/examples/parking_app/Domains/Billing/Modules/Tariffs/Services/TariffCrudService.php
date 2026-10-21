@@ -7,7 +7,6 @@ namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Services;
 use App\ParkingApp\Core\Database\Query\Page;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
-use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Validators\TariffDtoValidator;
@@ -88,22 +87,8 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
 
-        // С датой активации — запланированный: действующим и тарифом по умолчанию его сделает ActivatePlannedTariffJob
-        $status = $dto->getScheduledAt() !== null ? TariffStatusEnum::SCHEDULED : TariffStatusEnum::ACTIVE;
-
-        return $this->repository->createFromDto($dto, status: $status, isDefault: false);
-    }
-
-    public function deactivateByParkingId(int $parkingId): int
-    {
-        $ids = $this->repository->allNotArchivedIdsByParkingId($parkingId);
-        $archived = $this->repository->archiveNotArchivedByParkingId($parkingId);
-
-        foreach ($ids as $id) {
-            $this->forgetCached($id);
-        }
-
-        return $archived;
+        // Начальный статус задаёт модель (Tariff::initState) по дате активации, не вызывающий
+        return $this->repository->createFromDto($dto);
     }
 
     /**

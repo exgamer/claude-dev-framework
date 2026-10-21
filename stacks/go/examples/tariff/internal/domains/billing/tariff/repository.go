@@ -14,9 +14,12 @@ type Repository interface {
 	Create(ctx context.Context, tariff *Tariff) (*Tariff, error)
 	// Update Тариф удалён или не существует — ErrTariffNotFound
 	Update(ctx context.Context, id uint, patch *Patch) error
-	// SetDefault Пишет флаг; второй тариф по умолчанию у парковки (уникальный индекс, параллельная смена) — ErrDefaultTariffTaken, тариф удалён — ErrTariffNotFound
-	SetDefault(ctx context.Context, id uint, isDefault bool) error
-	// DeactivateByParkingID Снимает активность с активных тарифов парковки; возвращает ID изменённых, уже неактивные не трогает
+	// MakeDefault Переход «тариф по умолчанию» условным UPDATE (активный, не удалён, ещё не по умолчанию); 0 строк — ErrTariffStateChanged,
+	// второй тариф по умолчанию у парковки (уникальный индекс, параллельная смена) — ErrDefaultTariffTaken
+	MakeDefault(ctx context.Context, id uint) error
+	// UnsetDefault Снятие флага условным UPDATE (не удалён, по умолчанию); 0 строк — ErrTariffStateChanged
+	UnsetDefault(ctx context.Context, id uint) error
+	// DeactivateByParkingID Переход «отключён» для активных тарифов парковки одним условным UPDATE; возвращает ID изменённых, уже неактивные не трогает
 	DeactivateByParkingID(ctx context.Context, parkingID uint) ([]uint, error)
 }
 

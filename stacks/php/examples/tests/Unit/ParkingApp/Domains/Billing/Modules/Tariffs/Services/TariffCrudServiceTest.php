@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\ParkingApp\Domains\Billing\Modules\Tariffs\Services;
 
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
-use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudService;
@@ -21,7 +20,7 @@ use MPS\Core\Exceptions\ValidationAppException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Запись тарифа через TariffCrudService: инварианты, статус при создании, 404, 422 при переносе тарифа по умолчанию, кеш по ID.
+ * Запись тарифа через TariffCrudService: инварианты, создание без статуса от вызывающего, 404, 422 при переносе тарифа по умолчанию, кеш по ID.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -52,50 +51,19 @@ class TariffCrudServiceTest extends TestCase
         $this->service = new TariffCrudService($this->repository, $this->cacheRepository, $this->exceptionHandler);
     }
 
-    public function test_created_tariff_is_active_and_not_default(): void
-    {
-        $dto = $this->dto(name: 'Стандарт');
-        $tariff = new Tariff();
-
-        $this->repository
-            ->shouldReceive('createFromDto')
-            ->once()
-            ->with($dto, TariffStatusEnum::ACTIVE, false)
-            ->andReturn($tariff);
-
-        $this->assertSame($tariff, $this->service->create($dto));
-    }
-
-    public function test_tariff_with_activation_date_is_created_scheduled_and_not_default(): void
+    public function test_created_tariff_gets_initial_state_from_model(): void
     {
         $dto = $this->dto(name: 'Стандарт')->setScheduledAt(Carbon::now()->addDay());
         $tariff = new Tariff();
 
+        // Статус и флаг не передаются: начальное состояние задаёт Tariff::initState() (TariffTest)
         $this->repository
             ->shouldReceive('createFromDto')
             ->once()
-            ->with($dto, TariffStatusEnum::SCHEDULED, false)
+            ->with($dto)
             ->andReturn($tariff);
 
         $this->assertSame($tariff, $this->service->create($dto));
-    }
-
-    public function test_deactivation_archives_tariffs_of_parking_and_forgets_their_cache(): void
-    {
-        $this->repository
-            ->shouldReceive('allNotArchivedIdsByParkingId')
-            ->once()
-            ->with(15)
-            ->andReturn([3, 4]);
-        $this->repository
-            ->shouldReceive('archiveNotArchivedByParkingId')
-            ->once()
-            ->with(15)
-            ->andReturn(2);
-        $this->cacheRepository->shouldReceive('forget')->once()->with(3);
-        $this->cacheRepository->shouldReceive('forget')->once()->with(4);
-
-        $this->assertSame(2, $this->service->deactivateByParkingId(15));
     }
 
     public function test_invalid_dto_is_rejected_without_write(): void

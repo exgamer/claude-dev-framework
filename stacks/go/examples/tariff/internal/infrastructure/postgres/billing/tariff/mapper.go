@@ -10,16 +10,25 @@ func tariffToEntity(model *tariff) *tariffdomain.Tariff {
 		return nil
 	}
 
-	return &tariffdomain.Tariff{
+	// Состояние — неэкспортируемое поле сущности: собирается только RestoreTariff
+	return tariffdomain.RestoreTariff(tariffdomain.Tariff{
 		ID:           model.ID,
 		ParkingID:    model.ParkingID,
 		Name:         model.Name,
 		Currency:     common.Currency(model.Currency),
-		IsDefault:    model.IsDefault,
-		IsActive:     model.IsActive,
 		GraceMinutes: model.GraceMinutes,
 		Price:        model.Price,
+	}, model.IsDefault, model.IsActive)
+}
+
+func tariffsToEntities(models []*tariff) []*tariffdomain.Tariff {
+	entities := make([]*tariffdomain.Tariff, 0, len(models))
+
+	for _, model := range models {
+		entities = append(entities, tariffToEntity(model))
 	}
+
+	return entities
 }
 
 func tariffFromEntity(entity *tariffdomain.Tariff) *tariff {
@@ -32,8 +41,8 @@ func tariffFromEntity(entity *tariffdomain.Tariff) *tariff {
 		ParkingID:    entity.ParkingID,
 		Name:         entity.Name,
 		Currency:     string(entity.Currency),
-		IsDefault:    entity.IsDefault,
-		IsActive:     entity.IsActive,
+		IsDefault:    entity.IsDefault(),
+		IsActive:     entity.IsActive(),
 		GraceMinutes: entity.GraceMinutes,
 		Price:        entity.Price,
 	}

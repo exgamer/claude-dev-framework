@@ -6,6 +6,7 @@ namespace Tests\Unit\ParkingApp\Domains\Billing\Modules\Tariffs\Commands;
 
 use App\ParkingApp\Core\Database\Managers\NoopTransactionManager;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Commands\SetDefaultTariffCommand;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
@@ -19,7 +20,7 @@ use MPS\Core\Exceptions\ValidationAppException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Тариф по умолчанию у парковки один: прежний теряет флаг; кеш обоих сбрасывается после записи, сбой кеша — в Sentry.
+ * Тариф по умолчанию у парковки один: назначается только действующий, прежний теряет флаг; кеш обоих сбрасывается после записи, сбой кеша — в Sentry.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -73,15 +74,14 @@ class SetDefaultTariffCommandTest extends TestCase
             ->with(self::PARKING_ID)
             ->andReturn($previous);
         $this->repository
-            ->shouldReceive('setDefault')
+            ->shouldReceive('unsetDefault')
             ->once()
-            ->with(self::PREVIOUS_TARIFF_ID, false)
-            ->ordered()
-            ->andReturn(true);
+            ->with(self::PREVIOUS_TARIFF_ID)
+            ->ordered();
         $this->repository
             ->shouldReceive('setDefault')
             ->once()
-            ->with(self::TARIFF_ID, true)
+            ->with(self::TARIFF_ID)
             ->ordered()
             ->andReturn(true);
         $this->cacheRepository->shouldReceive('forget')->once()->with(self::PREVIOUS_TARIFF_ID);
@@ -102,7 +102,7 @@ class SetDefaultTariffCommandTest extends TestCase
             ->with(self::TARIFF_ID, null)
             ->andReturn($tariff, $updated);
         $this->repository->shouldReceive('getDefaultByParkingId')->once()->andReturn(null);
-        $this->repository->shouldReceive('setDefault')->once()->with(self::TARIFF_ID, true)->andReturn(true);
+        $this->repository->shouldReceive('setDefault')->once()->with(self::TARIFF_ID)->andReturn(true);
         $this->cacheRepository->shouldReceive('forget')->once()->with(self::TARIFF_ID)->andThrow($failure);
         $this->exceptionHandler->shouldReceive('report')->once()->with($failure);
 
@@ -125,15 +125,14 @@ class SetDefaultTariffCommandTest extends TestCase
             ->with(self::PARKING_ID)
             ->andReturn($previous);
         $this->repository
-            ->shouldReceive('setDefault')
+            ->shouldReceive('unsetDefault')
             ->once()
-            ->with(self::PREVIOUS_TARIFF_ID, false)
-            ->andReturn(true);
+            ->with(self::PREVIOUS_TARIFF_ID);
         // Параллельный запрос успел назначить другой тариф: уникальный индекс отклонил запись
         $this->repository
             ->shouldReceive('setDefault')
             ->once()
-            ->with(self::TARIFF_ID, true)
+            ->with(self::TARIFF_ID)
             ->andReturn(false);
         $this->cacheRepository->shouldNotReceive('forget');
 
@@ -158,6 +157,55 @@ class SetDefaultTariffCommandTest extends TestCase
         $this->repository->shouldNotReceive('setDefault');
 
         $this->assertSame($tariff, $this->command->execute(self::TARIFF_ID, null));
+    }
+
+    public function test_not_active_tariff_is_validation_error_without_writes(): void
+    {
+        foreach ([TariffStatusEnum::SCHEDULED, TariffStatusEnum::ARCHIVED] as $status) {
+            $this->repository = Mockery::mock(TariffRepositoryInterface::class);
+            $this->command = new SetDefaultTariffCommand(
+                $this->repository,
+                new NoopTransactionManager(),
+                $this->cacheRepository,
+                $this->exceptionHandler,
+            );
+            $this->repository
+                ->shouldReceive('getByIdInParkings')
+                ->once()
+                ->with(self::TARIFF_ID, null)
+                ->andReturn($this->tariff(self::TARIFF_ID, isDefault: false, status: $status));
+            $this->repository->shouldNotReceive('unsetDefault');
+            $this->repository->shouldNotReceive('setDefault');
+
+            try {
+                $this->command->execute(self::TARIFF_ID, null);
+                $this->fail('Ожидалось ValidationAppException: ' . $status->value);
+            } catch (ValidationAppException $e) {
+                $this->assertArrayHasKey('id', $e->getDetails());
+            }
+        }
+    }
+
+    public function test_archived_default_tariff_is_validation_error_without_writes(): void
+    {
+        // Массовый архив при отключении парковки флаг по умолчанию не снимает
+        $tariff = $this->tariff(self::TARIFF_ID, isDefault: true, status: TariffStatusEnum::ARCHIVED);
+
+        $this->repository
+            ->shouldReceive('getByIdInParkings')
+            ->once()
+            ->with(self::TARIFF_ID, null)
+            ->andReturn($tariff);
+        $this->repository->shouldNotReceive('unsetDefault');
+        $this->repository->shouldNotReceive('setDefault');
+
+        try {
+            $this->command->execute(self::TARIFF_ID, null);
+            $this->fail('Ожидалось ValidationAppException');
+        } catch (ValidationAppException $e) {
+            $this->assertSame(422, $e->getStatusCode());
+            $this->assertArrayHasKey('id', $e->getDetails());
+        }
     }
 
     public function test_missing_tariff_is_not_found_without_writes(): void
@@ -188,12 +236,13 @@ class SetDefaultTariffCommandTest extends TestCase
         $this->command->execute(self::TARIFF_ID, [self::PARKING_ID + 1]);
     }
 
-    private function tariff(int $id, bool $isDefault): Tariff
+    private function tariff(int $id, bool $isDefault, TariffStatusEnum $status = TariffStatusEnum::ACTIVE): Tariff
     {
         $tariff = new Tariff();
         $tariff->id = $id;
         $tariff->parking_id = self::PARKING_ID;
         $tariff->is_default = $isDefault;
+        $tariff->status = $status;
 
         return $tariff;
     }

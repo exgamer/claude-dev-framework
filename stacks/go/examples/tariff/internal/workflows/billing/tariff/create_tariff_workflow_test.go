@@ -256,7 +256,7 @@ func TestCreateTariffWorkflow_CreatesAndNotifiesAfterWrite(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint(1), tariff.ParkingID)
 	assert.Equal(t, uint(500), tariff.Price)
-	assert.False(t, tariff.IsDefault)
+	assert.False(t, tariff.IsDefault())
 	require.Len(t, f.notifier.sent, 1)
 	assert.Equal(t, tariff.ID, f.notifier.sent[0].ID)
 	assert.True(t, f.notifier.storedOnNotify)
@@ -280,7 +280,7 @@ func TestCreateTariffWorkflow_WritesOutboxEventInSameTransaction(t *testing.T) {
 	tariff, err := f.workflow.Exec(context.Background(), &CreateTariffParams{ParkingID: 1, Name: "Стандарт", Currency: common.CurrencyKZT, GraceMinutes: 15, Price: 100})
 
 	require.NoError(t, err)
-	assert.True(t, tariff.IsActive)
+	assert.True(t, tariff.IsActive())
 	assert.Equal(t, 1, f.txManager.Calls)
 	require.Len(t, f.outbox.Items, 1)
 

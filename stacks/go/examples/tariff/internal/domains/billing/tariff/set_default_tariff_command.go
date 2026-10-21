@@ -15,14 +15,14 @@ func NewSetDefaultTariffCommand(cacheRepository CacheRepository, txManager Defau
 	}
 }
 
-// SetDefaultTariffCommand Назначение тарифа по умолчанию; прежний тариф по умолчанию той же парковки теряет флаг
+// SetDefaultTariffCommand Переход «тариф по умолчанию»; прежний тариф по умолчанию той же парковки теряет флаг
 type SetDefaultTariffCommand struct {
 	cacheRepository CacheRepository
 	txManager       DefaultTariffTxManager
 }
 
-// Exec Чужой или удалённый тариф — 404.
-// Поиск прежнего и снятие его флага — для обычного случая; от параллельной смены защищает уникальный индекс: ErrDefaultTariffTaken → 422, транзакция откатывается
+// Exec Чужой или удалённый тариф — 404; допустимость перехода — у сущности (CanMakeDefault, раньше проверки «уже по умолчанию»), отказ — 422.
+// Поиск прежнего и снятие его флага — для обычного случая; от гонки защищают условный UPDATE (0 строк — 422) и уникальный индекс (ErrDefaultTariffTaken — 422), транзакция откатывается
 func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope ParkingScope) error {
 	var changedIDs []uint
 
@@ -36,8 +36,18 @@ func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope Parki
 			return exception.NewNotFoundException(errors.New("тариф не найден"), false)
 		}
 
-		if tariff.IsDefault {
+		// Допустимость — раньше «уже по умолчанию»: отключение парковки флаг не снимает, отключённый с флагом — тоже 422
+		if err := tariff.CanMakeDefault(); err != nil {
+			return err
+		}
+
+		// Повтор запроса безопасен: тариф уже по умолчанию — записи нет
+		if tariff.IsDefault() {
 			return nil
+		}
+
+		if err := tariff.MakeDefault(); err != nil {
+			return err
 		}
 
 		previous, err := repository.GetDefaultByParkingID(ctx, tariff.ParkingID)
@@ -46,8 +56,10 @@ func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope Parki
 		}
 
 		if previous != nil {
-			// Прежний удалён параллельно — снимать нечего
-			if err := repository.SetDefault(ctx, previous.ID, false); err != nil && !errors.Is(err, ErrTariffNotFound) {
+			previous.UnsetDefault()
+
+			// Прежний удалён или снят параллельно — снимать нечего; второй флаг не даст поставить уникальный индекс
+			if err := repository.UnsetDefault(ctx, previous.ID); err != nil && !errors.Is(err, ErrTariffStateChanged) {
 				return err
 			}
 
@@ -56,15 +68,19 @@ func (c *SetDefaultTariffCommand) Exec(ctx context.Context, id uint, scope Parki
 
 		changedIDs = append(changedIDs, tariff.ID)
 
-		return repository.SetDefault(ctx, tariff.ID, true)
+		return repository.MakeDefault(ctx, tariff.ID)
 	})
+	if errors.Is(err, ErrTariffInactive) {
+		return exception.NewValidationException(map[string]any{"id": "отключённый тариф нельзя сделать тарифом по умолчанию"}, false)
+	}
+
 	if errors.Is(err, ErrDefaultTariffTaken) {
 		return exception.NewValidationException(map[string]any{"is_default": "тариф по умолчанию этой парковки только что изменён другим запросом, обновите данные и повторите"}, false)
 	}
 
-	// Тариф удалён между чтением и записью флага — 404, как не найденный
-	if errors.Is(err, ErrTariffNotFound) {
-		return exception.NewNotFoundException(errors.New("тариф не найден"), false)
+	// Тариф удалён, отключён или назначен между чтением и записью — условный UPDATE изменил 0 строк
+	if errors.Is(err, ErrTariffStateChanged) {
+		return exception.NewValidationException(map[string]any{"id": "состояние тарифа только что изменено другим запросом, обновите данные и повторите"}, false)
 	}
 
 	if err != nil {

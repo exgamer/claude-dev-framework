@@ -10,7 +10,6 @@ use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEv
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventRoutingKeyEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
-use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Jobs\ActivatePlannedTariffJob;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\PriceLimitRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
@@ -102,7 +101,8 @@ final class CreateTariffWorkflow
             $this->exceptionHandler->report($e);
         }
 
-        if ($tariff->status === TariffStatusEnum::SCHEDULED) {
+        // Запланированный ждёт перехода Activate — его допустимость решает модель
+        if ($tariff->canActivate()) {
             ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->scheduled_at);
         }
 

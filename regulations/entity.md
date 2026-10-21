@@ -4,7 +4,7 @@
 
 **Итоговое правило: если объект существует — он валиден.**
 
-**Две приемлемые формы инвариантов** (решение 2026-10-20): (1) сущность с `New*`/`Restore*` и инвариантами внутри — этот файл; (2) валидатор DTO — `{E}DtoValidator` / `{entity}_validator.go` (O-18, `architecture/layers.md`, «Service, Command/Query, Workflow», строка Validator, и «Меры по слоям»; эталоны обоих стеков — на ней). Выбор — в `design.md` модуля (раздел «Домены и слои»), внутри одного модуля — одна форма. Форма, отличная от выбранной в `design.md`, или две формы в одном модуле — находка ревью; выбор любой из двух сам по себе — не находка.
+**Где какое правило** (O-26): проверки значений входа — формат, диапазоны, связи полей DTO между собой — валидатор DTO `{E}DtoValidator` / `{entity}_validator.go` (O-18, `architecture/layers.md`, «Service, Command/Query, Workflow», строка Validator). Правила состояния и переходов (можно ли оплатить, отменить, архивировать) — методы модели домена: Go — методы сущности (`CanArchive()`/`Archive()`), PHP — методы Eloquent-модели (`canArchive()`; не мутаторы, модель — P-4). В Service, Command и Workflow таких проверок inline нет — они вызывают модель (`invariants-inline`). Почему: знание о статусах в одном месте; сервис, который сам сравнивает статусы, расходится с соседним при первой правке.
 
 ---
 
@@ -13,35 +13,52 @@
 | Слой | Ответственность |
 |---|---|
 | Entrypoints (request DTO) | формат: обязательность, типы, длины, формат email/даты |
-| Entity / Value Object или валидатор DTO (O-18) | инварианты — условия существования объекта, без данных из БД |
+| Валидатор DTO (O-18) | значения входа: диапазоны, связи полей DTO между собой, без данных из БД |
+| Модель домена (сущность Go, Eloquent-модель PHP) / Value Object | правила состояния и переходов; Value Object — правило одного значения |
 | Domain Service / Workflow | проверки с обращением к миру: уникальность, существование, права, другие сервисы |
 | Infrastructure / Mapper | трансформация, восстановление уже валидной сущности |
 | Repository | только сохраняет и восстанавливает, не валидирует |
 
-## Два способа создания
+## Создание, сборка из БД, переход (Go)
 
 ```go
-// Новая сущность — полная проверка инвариантов
-func NewOrder(amount Money, userID uint) (*Order, error) {
-    if amount.IsZero() {
-        return nil, ErrEmptyOrder
-    }
-
-    return &Order{amount: amount, userID: userID, status: StatusDraft}, nil
+// NewOrder Начальный статус задаёт сущность, не запрос
+func NewOrder(amount Money, userID uint) *Order {
+    return &Order{amount: amount, userID: userID, status: StatusDraft}
 }
 
-// Восстановление из БД — без проверок (данные попали туда через домен)
+// RestoreOrder Сборка из БД — без проверок (данные попали туда через домен)
 func RestoreOrder(id uint, amount Money, userID uint, status Status) *Order {
     return &Order{id: id, amount: amount, userID: userID, status: status}
+}
+
+func (o *Order) Status() Status {
+    return o.status
+}
+
+// CanCancel Отменить можно черновик и неоплаченный заказ
+func (o *Order) CanCancel() bool {
+    return o.status == StatusDraft || o.status == StatusAwaitingPayment
+}
+
+func (o *Order) Cancel() error {
+    if !o.CanCancel() {
+        return ErrOrderNotCancellable
+    }
+
+    o.status = StatusCancelled
+
+    return nil
 }
 ```
 
 Mapper инфраструктуры вызывает `Restore*`, никогда `New*`.
 
-## Инвариант vs валидация формата
+## Формат, значения, состояние
 
 - Формат (entrypoints): поле обязательно, длина ≤ 255, корректный email.
-- Инвариант (entity): сумма не отрицательная, статус из допустимого набора, период: конец позже начала.
+- Значения входа (валидатор DTO): сумма не отрицательная, период: конец позже начала.
+- Состояние (модель): переход из текущего статуса допустим.
 
 ## Value Object
 
@@ -51,8 +68,38 @@ Mapper инфраструктуры вызывает `Restore*`, никогда 
 
 ## Поведение в сущности
 
-Правило **про объект** — метод сущности (`order.Cancel()` сам проверяет статус). Правило **процесса нескольких объектов** — Domain Service или Workflow. Знание о статусах объекта, размазанное по сервисам, — антипаттерн.
+Правило **про объект** — метод модели домена (`order.Cancel()` сам проверяет статус). Правило **процесса нескольких объектов** — Domain Service или Workflow. Знание о статусах объекта, размазанное по сервисам, — антипаттерн.
+
+## Переход состояния
+
+Каждый переход — своя Command, свой эндпоинт и свой метод модели (`Pay`, `Ship`, `Cancel`, `Archive`, `SetDefault`); общего `ChangeStatus`/`setStatus` со статусом аргументом нет (O-28). Почему: у перехода свои условия и побочные эффекты; общий метод сводит их в одно ветвление, и правка одного перехода задевает остальные (`core/style.md`, «Форма кода», O-25).
+
+- Допустимость перехода проверяет модель (`CanArchive()`/`canArchive()`); Command вызывает её и условие не повторяет.
+- Запись — метод репозитория этого перехода условным UPDATE (`… SET status = :new WHERE id = ? AND status = :expected`): 0 строк — запись уже изменили параллельно, 422 (`approaches/patterns/concurrency.md`, `race-on-status`).
+- **Массовый переход** — много записей одним UPDATE без загрузки сущностей (отключение парковки: все её тарифы — в архив): метод модели по одной записи не вызывается; условие UPDATE — то же, что проверка допустимости в модели (`CanArchive()`/`canArchive()`: тот же набор статусов), запись — метод репозитория этого перехода (`archiveNotArchivedByParkingId`), Command — своя (`DeactivateParkingTariffsCommand`). Эталоны: Go — `stacks/go/examples/tariff/internal/domains/billing/tariff/deactivate_parking_tariffs_command.go`, PHP — `stacks/php/examples/parking_app/Domains/Billing/Modules/Tariffs/Commands/DeactivateParkingTariffsCommand.php`.
+- Публичного сеттера статуса нет. Go: поле состояния неэкспортируемое, чтение — геттер, смена — методы перехода, сборка из БД — `Restore*`; записать мимо перехода не даст компилятор, экспортируемое поле состояния у новой сущности — `state-field-exported`. PHP: статус меняет только метод модели или метод репозитория конкретного перехода; `->status =`, `status` в `fill()`/`update()`/`create()` вне них — `status-set-directly`.
+- Начальный статус при создании задаёт модель или фабрика (Go — `New*`), не Request.
+- PATCH/PUT статус не меняют (`regulations/rest-api.md`, «Методы»): поле `status` или другого флага состояния в Request изменения, общий эндпоинт смены статуса — `status-in-update-request`.
+
+```php
+// Модель: допустимость перехода
+public function canArchive(): bool
+{
+    return $this->status === TariffStatusEnum::ACTIVE;
+}
+
+// Репозиторий: запись перехода одним условным UPDATE, false — статус уже сменили
+public function archive(int $id): bool
+{
+    $updated = $this->getQuery()
+        ->whereKey($id)
+        ->where('status', TariffStatusEnum::ACTIVE->value)
+        ->update(['status' => TariffStatusEnum::ARCHIVED->value]);
+
+    return $updated === 1;
+}
+```
 
 ## Когда применять
 
-Форма (1) или (2) — выбор архитектора в `design.md` модуля (см. начало файла). В существующих проектах сущности анемичные (публичные поля, без `New/Restore`) — **не переписывать массово**: существующий модуль сохраняет свою форму. Для нового модуля с реальными инвариантами (деньги, статусы, периоды) инварианты обязательны в одной из двух форм; не ясно, какая форма нужна модулю, — вопрос к пользователю (`core/principles.md`, «Пробелы и споры»).
+В существующих проектах сущности анемичные (публичные поля, без `New/Restore`, статус пишется сеттером) — **не переписывать массово**: правила этого файла — для нового кода и новых переходов; правишь переход — переводишь только его. Новый модуль с реальными правилами (деньги, статусы, периоды) — значения входа в валидаторе, состояние в модели с первого дня; неясно, где правило, — вопрос к пользователю (`core/principles.md`, «Пробелы и споры»).

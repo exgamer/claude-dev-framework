@@ -16,7 +16,8 @@ use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 
 /**
- * Уникальность тарифа по умолчанию: нарушение именно этого индекса (SQLSTATE 23505 + имя) — false, другое — наверх.
+ * Переходы — условный UPDATE (0 строк — false); уникальность тарифа по умолчанию: нарушение именно этого индекса
+ * (SQLSTATE 23505 + имя) — false, другое — наверх.
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -37,6 +38,7 @@ class TariffRepositoryTest extends TestCase
         // Запрос — мок Builder: БД в unit-тесте нет, проверяется разбор QueryException
         $this->query = Mockery::mock(Builder::class);
         $this->query->shouldReceive('whereKey')->with(self::TARIFF_ID)->andReturnSelf();
+        $this->query->shouldReceive('where')->andReturnSelf();
         $this->repository = Mockery::mock(TariffRepository::class)->makePartial();
         $this->repository->shouldReceive('getQuery')->andReturn($this->query);
     }
@@ -46,7 +48,7 @@ class TariffRepositoryTest extends TestCase
         $exception = $this->queryException('23505', 'duplicate key value violates unique constraint "tariffs_parking_id_default_unique"');
         $this->query->shouldReceive('update')->once()->andThrow($exception);
 
-        $this->assertFalse($this->repository->setDefault(self::TARIFF_ID, true));
+        $this->assertFalse($this->repository->setDefault(self::TARIFF_ID));
     }
 
     public function test_other_unique_index_violation_is_rethrown(): void
@@ -56,7 +58,7 @@ class TariffRepositoryTest extends TestCase
 
         $this->expectExceptionObject($exception);
 
-        $this->repository->setDefault(self::TARIFF_ID, true);
+        $this->repository->setDefault(self::TARIFF_ID);
     }
 
     public function test_other_error_with_index_name_is_rethrown(): void
@@ -66,14 +68,40 @@ class TariffRepositoryTest extends TestCase
 
         $this->expectExceptionObject($exception);
 
-        $this->repository->setDefault(self::TARIFF_ID, true);
+        $this->repository->setDefault(self::TARIFF_ID);
     }
 
     public function test_successful_update_is_true(): void
     {
         $this->query->shouldReceive('update')->once()->with(['is_default' => true])->andReturn(1);
 
-        $this->assertTrue($this->repository->setDefault(self::TARIFF_ID, true));
+        $this->assertTrue($this->repository->setDefault(self::TARIFF_ID));
+    }
+
+    public function test_set_default_updates_only_active_not_default_tariff(): void
+    {
+        $query = Mockery::mock(Builder::class);
+        $query->shouldReceive('whereKey')->once()->with(self::TARIFF_ID)->andReturnSelf();
+        $query->shouldReceive('where')->once()->with('status', 'active')->andReturnSelf();
+        $query->shouldReceive('where')->once()->with('is_default', false)->andReturnSelf();
+        // 0 строк: тариф архивирован или назначен параллельно — переход не сделан
+        $query->shouldReceive('update')->once()->with(['is_default' => true])->andReturn(0);
+        $repository = Mockery::mock(TariffRepository::class)->makePartial();
+        $repository->shouldReceive('getQuery')->andReturn($query);
+
+        $this->assertFalse($repository->setDefault(self::TARIFF_ID));
+    }
+
+    public function test_archive_updates_only_not_archived_tariff(): void
+    {
+        $query = Mockery::mock(Builder::class);
+        $query->shouldReceive('whereKey')->once()->with(self::TARIFF_ID)->andReturnSelf();
+        $query->shouldReceive('whereIn')->once()->with('status', ['active', 'scheduled'])->andReturnSelf();
+        $query->shouldReceive('update')->once()->with(['status' => 'archived', 'is_default' => false])->andReturn(0);
+        $repository = Mockery::mock(TariffRepository::class)->makePartial();
+        $repository->shouldReceive('getQuery')->andReturn($query);
+
+        $this->assertFalse($repository->archive(self::TARIFF_ID));
     }
 
     private function queryException(string $sqlState, string $message): QueryException

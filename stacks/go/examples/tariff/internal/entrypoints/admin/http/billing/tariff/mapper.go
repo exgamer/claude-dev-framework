@@ -44,8 +44,8 @@ func tariffToData(tariff *tariffdomain.Tariff) *tariffData {
 		ParkingID:    tariff.ParkingID,
 		Name:         tariff.Name,
 		Currency:     string(tariff.Currency),
-		IsDefault:    tariff.IsDefault,
-		IsActive:     tariff.IsActive,
+		IsDefault:    tariff.IsDefault(),
+		IsActive:     tariff.IsActive(),
 		GraceMinutes: tariff.GraceMinutes,
 		Price:        tariff.Price,
 	}

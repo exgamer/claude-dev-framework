@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\ParkingApp\Entrypoints\Queue\Billing\Tariffs;
 
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\ParkingDeactivatedEventDto;
-use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Commands\DeactivateParkingTariffsCommand;
 use MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job as UtilsJob;
 
 /**
@@ -16,14 +16,14 @@ use MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job as UtilsJob;
 class ParkingDeactivatedHandler extends UtilsJob
 {
     public function __construct(
-        private readonly TariffCrudServiceInterface $tariffCrudService,
+        private readonly DeactivateParkingTariffsCommand $deactivateParkingTariffsCommand,
     ) {
     }
 
     /**
      * Постоянная ошибка (нет parking_id) — повтор не поможет: error-лог и выход без исключения, сообщение
-     * подтверждается. Временная (БД недоступна) — исключение сервиса уходит наверх, ядро повторит сообщение
-     * с задержками durability.delayed. Повторная доставка безопасна: архивные тарифы сервис не трогает.
+     * подтверждается. Временная (БД недоступна) — исключение Command уходит наверх, ядро повторит сообщение
+     * с задержками durability.delayed. Повторная доставка безопасна: архивные тарифы Command не трогает.
      * Своей записи о сообщении нет — постоянная ошибка фиксируется только в логе.
      */
     protected function process(object|array $payload): void
@@ -37,7 +37,7 @@ class ParkingDeactivatedHandler extends UtilsJob
             return;
         }
 
-        $archived = $this->tariffCrudService->deactivateByParkingId($parkingId);
+        $archived = $this->deactivateParkingTariffsCommand->execute($parkingId);
 
         $this->infoLog("Тарифы парковки {$parkingId} в архиве: {$archived}");
     }

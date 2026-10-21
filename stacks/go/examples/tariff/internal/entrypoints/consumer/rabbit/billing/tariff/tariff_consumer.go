@@ -20,16 +20,16 @@ type parkingDeactivatedMessage struct {
 	ParkingID uint `json:"parking_id"`
 }
 
-func NewConsumer(tariffService *tariffdomain.Service, maxAttempts uint) *Consumer {
+func NewConsumer(deactivateParkingTariffsCommand *tariffdomain.DeactivateParkingTariffsCommand, maxAttempts uint) *Consumer {
 	return &Consumer{
-		tariffService: tariffService,
-		maxAttempts:   maxAttempts,
+		deactivateParkingTariffsCommand: deactivateParkingTariffsCommand,
+		maxAttempts:                     maxAttempts,
 	}
 }
 
 type Consumer struct {
-	tariffService *tariffdomain.Service
-	maxAttempts   uint
+	deactivateParkingTariffsCommand *tariffdomain.DeactivateParkingTariffsCommand
+	maxAttempts                     uint
 }
 
 // Consume Парковку отключили в справочнике — отключить её тарифы.
@@ -53,7 +53,7 @@ func (c *Consumer) Consume(ctx context.Context, msg *message.Message) error {
 		return nil
 	}
 
-	err := c.tariffService.DeactivateByParkingID(ctx, payload.ParkingID)
+	err := c.deactivateParkingTariffsCommand.Exec(ctx, payload.ParkingID)
 	if err == nil {
 		return nil
 	}
