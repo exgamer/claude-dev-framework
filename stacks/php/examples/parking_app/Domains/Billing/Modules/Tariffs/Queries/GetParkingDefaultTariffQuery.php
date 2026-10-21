@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Queries;
 
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\ParkingDefaultTariffDto;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffEventStatusRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 
 /**
- * Тариф по умолчанию парковки вместе со статусом доставки последнего события о нём (модуль OutboxTariffEvents).
+ * Тариф по умолчанию парковки вместе со статусом доставки последнего события о нём: статус — от модуля OutboxTariffEvents через свой интерфейс (O-6).
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
@@ -17,7 +17,7 @@ final class GetParkingDefaultTariffQuery
 {
     public function __construct(
         private readonly TariffRepositoryInterface $tariffRepository,
-        private readonly OutboxTariffEventRepositoryInterface $outboxRepository,
+        private readonly TariffEventStatusRepositoryInterface $eventStatusRepository,
     ) {
     }
 
@@ -33,10 +33,8 @@ final class GetParkingDefaultTariffQuery
             return null;
         }
 
-        $lastEvent = $this->outboxRepository->getLatestByTariffId($tariff->id);
-
         return ParkingDefaultTariffDto::make()
             ->setTariff($tariff)
-            ->setLastEventStatus($lastEvent?->status);
+            ->setLastEventStatus($this->eventStatusRepository->getLatestStatusByTariffId($tariff->id));
     }
 }

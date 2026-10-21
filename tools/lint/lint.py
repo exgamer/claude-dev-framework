@@ -117,6 +117,23 @@ def render_go(project: Path) -> str:
             for other in domains:
                 if other != d:
                     out.append(deny(f"{mod}/internal/domains/{other}", "чужой домен — через workflow или internal/common"))
+    # Модуль домена не импортирует соседний модуль того же домена; общее модулей — в internal/domains/<домен>/common
+    # (он модулей не знает). Точное совпадение пути ($) и подпакеты (/) — чтобы tariff не задевал tariff_rule;
+    # в имени правила «_» модуля — «-» (имена правил — [a-z0-9-])
+    for d in domains:
+        modules = sorted(p.name for p in (project / "internal" / "domains" / d).iterdir() if p.is_dir())
+        siblings = [m for m in modules if m != "common"]
+        for m in modules:
+            others = siblings if m == "common" else [o for o in siblings if o != m]
+            if not others:
+                continue
+            desc = ("общее домена модулей не знает" if m == "common"
+                    else f"соседний модуль домена {d} — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/{d}/common")
+            out.append(f'        {d}-{m.replace("_", "-")}-no-other-modules:\n          files:\n            - "**/internal/domains/{d}/{m}/**"\n'
+                       '            - "!$test"\n          deny:\n')
+            for o in others:
+                out.append(deny(f"{mod}/internal/domains/{d}/{o}$", desc))
+                out.append(deny(f"{mod}/internal/domains/{d}/{o}/", desc))
     if shared and domains:
         out.append('        domains-common-no-domains:\n          files:\n            - "**/internal/domains/common/**"\n'
                    '            - "!$test"\n          deny:\n')
@@ -134,6 +151,9 @@ def render_go(project: Path) -> str:
                '            - "!$test" # внешний тестовый пакет импортирует сам common\n          deny:\n')
     for sub in ("domains", "infrastructure", "entrypoints", "workflows", "app"):
         out.append(deny(f"{mod}/internal/{sub}", COMMON_DESC))
+    # pkg/ — код без домена: может зависеть от транспорта (gin) и SDK ответа, не от internal/** (structure.md, «pkg/»)
+    out.append('        pkg-no-internal:\n          files:\n            - "**/pkg/**"\n          deny:\n')
+    out.append(deny(f"{mod}/internal", "pkg/ — код без домена: internal/** (в т. ч. internal/common) не импортирует; нужен доменный тип — код в слое домена"))
     out.append(FOOTER)
     return "".join(out)
 
@@ -154,6 +174,10 @@ def gocheck_binary() -> Path:
     return binary
 
 
+# Агенты делали `git add -N`, чтобы новые файлы попали в проверку: они и так учтены (git ls-files --others)
+NEW_FILES_NOTE = "новые файлы задачи (не в git): {} — учтены, `git add` не нужен"
+
+
 def changed_go_files(project: Path, base) -> list[str]:
     """Изменённые и новые .go; неверная ревизия или не git — ошибка (код 2), а не «изменённых нет»."""
     d = subprocess.run(["git", "diff", "--name-only", "--diff-filter=ACMR", base, "--", "*.go"], cwd=project,
@@ -165,6 +189,7 @@ def changed_go_files(project: Path, base) -> list[str]:
     new = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", "*.go"], cwd=project,
                          capture_output=True, text=True).stdout.split()
     prefix = subprocess.run(["git", "rev-parse", "--show-prefix"], cwd=project, capture_output=True, text=True).stdout.strip()
+    print(NEW_FILES_NOTE.format(len(new)), flush=True)
     return sorted({f.removeprefix(prefix) for f in diff} | set(new))
 
 
@@ -287,7 +312,7 @@ parameters:
 """
     docker(container, f"mkdir -p {work}/cache")
     docker(container, f"mkdir -p {PHP_TOOLS}/rules/P{tag}")
-    docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/LayersArchitecture.php", php_rules.render_arch(ns, root, domains))
+    docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/LayersArchitecture.php", php_rules.render_arch(ns, root, domains, php_rules.domain_modules(dom_dir)))
     docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/{php_rules.EXCEPTION_RULE}.php", php_rules.render_exception_rule(ns))
     docker(container, f"cat > {work}/rules.neon", php_rules.render_neon(ns + "\\LayersArchitecture"))
     docker(container, f"cat > {work}/phpstan.neon", neon)
@@ -295,7 +320,9 @@ parameters:
     if base:
         diff = subprocess.check_output(["git", "diff", "--name-only", "--diff-filter=ACMR", base, "--", sub], cwd=project).decode().split()
         # новые файлы задачи ещё не в git — git diff их не показывает, а нарушение в них — тоже нарушение
-        diff += subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard", "--", sub], cwd=project).decode().split()
+        new = subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard", "--", sub], cwd=project).decode().split()
+        print(NEW_FILES_NOTE.format(len([f for f in new if f.endswith(".php")])), flush=True)
+        diff += new
         files = [f"{cpath}/{f}" for f in sorted(set(diff)) if f.endswith(".php")]
         if not files:
             print(f"нет изменённых PHP-файлов в {sub} относительно {base}")

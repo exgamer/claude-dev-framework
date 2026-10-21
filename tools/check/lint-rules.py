@@ -10,6 +10,7 @@
 упомянуты в таблице — правило в конфиге без строки таблицы или без доказательства — находка.
 """
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -121,7 +122,8 @@ def main():
     # Правила PHP-эталона — вывод tools/lint/php_rules.py: шаблон и эталон не расходятся
     sys.path.insert(0, "tools/lint")
     import php_rules  # noqa: E402
-    if php_rules.render_arch("Tests\\Architecture", "App\\ParkingApp", ["Billing", "Catalog"]) != read(STACKS["PHP"]["configs"][1]):
+    if php_rules.render_arch("Tests\\Architecture", "App\\ParkingApp", ["Billing", "Catalog"],
+                                php_rules.domain_modules(Path("stacks/php/examples/parking_app/Domains"))) != read(STACKS["PHP"]["configs"][1]):
         problems.append("PHP: tests/Architecture/LayersArchitecture.php эталона не совпадает с выводом tools/lint/php_rules.py")
     if php_rules.render_neon("Tests\\Architecture\\LayersArchitecture") != read(STACKS["PHP"]["configs"][0]):
         problems.append("PHP: phpstan-rules.neon эталона не совпадает с выводом tools/lint/php_rules.py")

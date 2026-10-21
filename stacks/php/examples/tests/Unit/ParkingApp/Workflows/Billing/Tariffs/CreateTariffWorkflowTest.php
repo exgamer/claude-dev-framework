@@ -6,10 +6,10 @@ namespace Tests\Unit\ParkingApp\Workflows\Billing\Tariffs;
 
 use App\ParkingApp\Common\Enums\TimeUnitEnum;
 use App\ParkingApp\Core\Database\Managers\TransactionManagerInterface;
+use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Commands\PublishOutboxTariffEventCommand;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEventDto;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventRoutingKeyEnum;
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventPublisherInterface;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;

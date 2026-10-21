@@ -1,9 +1,10 @@
 """Шаблоны правил PHP для phpstan (phpat + phpstan-disallowed-calls): класс архитектурных правил и neon.
 
 Эталон (`stacks/php/examples/tests/Architecture/LayersArchitecture.php`, `phpstan-rules.neon`) — вывод этих функций
-для `App\\ParkingApp` и доменов `Billing`, `Catalog`; сверка — `tools/check/lint-rules.py`.
+для `App\\ParkingApp`, доменов `Billing`, `Catalog` и их модулей (`domain_modules`); сверка — `tools/check/lint-rules.py`.
 """
 import re
+from pathlib import Path
 
 LAYERS = ("Core", "Domains", "Entrypoints", "Infrastructure", "Workflows")
 
@@ -17,7 +18,18 @@ def regex_root(root: str) -> str:
     return root.replace("\\", "\\\\\\\\")
 
 
-def render_arch(namespace: str, root: str, domains: list[str]) -> str:
+def domain_modules(dom_dir: Path) -> dict[str, list[str]]:
+    """Модули каждого домена — каталоги `Domains/{Домен}/Modules/*`; `Common` в списке — у домена есть `Domains/{Домен}/Common/`."""
+    out = {}
+    for d in sorted(p for p in dom_dir.iterdir() if p.is_dir()) if dom_dir.is_dir() else []:
+        mods = d / "Modules"
+        names = sorted(p.name for p in mods.iterdir() if p.is_dir()) if mods.is_dir() else []
+        out[d.name] = names + (["Common"] if (d / "Common").is_dir() else [])
+    return out
+
+
+def render_arch(namespace: str, root: str, domains: list[str], modules: dict[str, list[str]] | None = None) -> str:
+    modules = modules or {}
     rr = regex_root(root)
     # Domains/Common — общий модуль проекта внутри Domains (старая раскладка), не домен: его знает любой домен,
     # а сам он не знает ни доменов, ни внешних слоёв
@@ -74,6 +86,31 @@ final class LayersArchitecture
 {targets}
             )
             ->because('чужой домен — через workflow или Common');
+    }}
+""")
+    # Модуль домена не знает соседний модуль того же домена (правило на каждый модуль домена из двух и больше модулей);
+    # Common домена — общее его модулей — не знает ни один из них
+    for d in domains:
+        mods = [m for m in modules.get(d, []) if m != "Common"]
+        for m in mods + (["Common"] if "Common" in modules.get(d, []) else []):
+            others = mods if m == "Common" else [o for o in mods if o != m]
+            if not others:
+                continue
+            src = f"Domains\\{d}\\Common" if m == "Common" else f"Domains\\{d}\\Modules\\{m}"
+            name = f"test_{snake(d)}_common_does_not_know_modules" if m == "Common" else f"test_{snake(d)}_{snake(m)}_does_not_know_other_modules"
+            why = (f"Common домена {d} — общее его модулей: модули его знают, он их — нет" if m == "Common"
+                   else f"соседний модуль домена {d} — интерфейс у потребителя, DI связывает его с соседом (O-6); общее модулей — Domains/{d}/Common")
+            targets = "\n".join(f"                Selector::inNamespace(self::ROOT . '\\Domains\\{d}\\Modules\\{o}')," for o in others)
+            out.append(f"""
+    public function {name}(): Rule
+    {{
+        return PHPat::rule()
+            ->classes(Selector::inNamespace(self::ROOT . '\\{src}'))
+            ->shouldNotDependOn()
+            ->classes(
+{targets}
+            )
+            ->because('{why}');
     }}
 """)
     if shared and domains:

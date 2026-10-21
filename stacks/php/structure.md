@@ -29,6 +29,7 @@ parking_app/                                   ← корень подпроек
 ├── Domains/{Domain}/
 │   ├── ServiceProvider.php                    ← extends Core\Providers\ServiceProvider (подхватывает definitions.php)
 │   ├── definitions.php                        ← биндинги сервисов домена: Interface → класс
+│   ├── Common/                                ← общее двух и более модулей домена (`architecture/layers.md`, «Зависимости»): Enums/, ValueObjects/, Support/, Exceptions/; импортируют только модули домена
 │   └── Modules/{Module}/
 │       ├── DTO/{Entity}Dto.php                ← extends MPS\Core\DataObjects\DataObject
 │       ├── Enums/{Entity}StatusEnum.php
@@ -81,6 +82,8 @@ config/database.php                            ← у приложения, не
 - `Infrastructure/Http/{Provider}/Providers/definitions.php` — интерфейс порта → адаптер внешней системы (+ `mock`), ниже;
 - `Core/definitions.php` — **только** технические библиотеки подпроекта без бизнес-логики (`Core/{Lib}/…`, ниже, «`Core/`»; AINA-2744); биндинг интерфейса домена, workflow или инфраструктуры здесь — `di-outside-definitions`;
 - `config/definitions.php` приложения — только глобальные биндинги приложения; биндинги домена туда не добавляются.
+
+**Связь модулей одного домена** — как в Go (O-6, `architecture/layers.md`, «Зависимости»): модуль не импортирует соседний модуль своего домена (`domain-module-cross-import`), а объявляет у себя интерфейс на то, что ему нужно от соседа (`Modules/{M}/Repositories/{Name}RepositoryInterface.php` — чтение и запись соседа, `Services/{Name}ServiceInterface.php` — его логика), с типами из своего модуля, `Domains/{D}/Common/` или `Common/`; DI связывает интерфейс с классом соседа в том `definitions.php`, где лежит биндинг этого класса (репозиторий — `Infrastructure/Postgres/{D}/Providers/definitions.php`, сервис — `Domains/{D}/definitions.php`); класс соседа реализует оба интерфейса. Интерфейс у потребителя в PHP допустим так же, как в Go: свой интерфейс модуля-владельца (`regulations/contracts.md`) остаётся для его собственных потребителей. Эталон — `TariffEventStatusRepositoryInterface` модуля `Tariffs` → `OutboxTariffEventRepository` (`examples/README.md`).
 
 Новый домен — свои `definitions.php` в `Domains/{D}/` и `Infrastructure/{Type}/{D}/Providers/`. Биндинг в другом месте (в т. ч. `$this->app->bind()` в провайдере, кроме исключения `conventions.md` п. 7) — нарушение п. 7.
 

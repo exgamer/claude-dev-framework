@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Models;
 
+use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventRoutingKeyEnum;
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventStatusEnum;
 use Carbon\Carbon;
 use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Models\Model;

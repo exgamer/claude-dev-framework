@@ -56,6 +56,40 @@ final class LayersArchitecture
             ->because('чужой домен — через workflow или Common');
     }
 
+    public function test_billing_outbox_tariff_events_does_not_know_other_modules(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\OutboxTariffEvents'))
+            ->shouldNotDependOn()
+            ->classes(
+                Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\Tariffs'),
+            )
+            ->because('соседний модуль домена Billing — интерфейс у потребителя, DI связывает его с соседом (O-6); общее модулей — Domains/Billing/Common');
+    }
+
+    public function test_billing_tariffs_does_not_know_other_modules(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\Tariffs'))
+            ->shouldNotDependOn()
+            ->classes(
+                Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\OutboxTariffEvents'),
+            )
+            ->because('соседний модуль домена Billing — интерфейс у потребителя, DI связывает его с соседом (O-6); общее модулей — Domains/Billing/Common');
+    }
+
+    public function test_billing_common_does_not_know_modules(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace(self::ROOT . '\Domains\Billing\Common'))
+            ->shouldNotDependOn()
+            ->classes(
+                Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\OutboxTariffEvents'),
+                Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\Tariffs'),
+            )
+            ->because('Common домена Billing — общее его модулей: модули его знают, он их — нет');
+    }
+
     public function test_common_has_no_layer_dependencies(): Rule
     {
         return PHPat::rule()

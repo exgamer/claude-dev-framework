@@ -64,6 +64,42 @@ linters:
               desc: "чужой домен — через workflow или internal/common"
             - pkg: "example.com/parking-service/internal/domains/handbook"
               desc: "чужой домен — через workflow или internal/common"
+        billing-outbox-tariff-event-no-other-modules:
+          files:
+            - "**/internal/domains/billing/outbox_tariff_event/**"
+            - "!$test"
+          deny:
+            - pkg: "example.com/parking-service/internal/domains/billing/tariff$"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+            - pkg: "example.com/parking-service/internal/domains/billing/tariff/"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+        billing-tariff-no-other-modules:
+          files:
+            - "**/internal/domains/billing/tariff/**"
+            - "!$test"
+          deny:
+            - pkg: "example.com/parking-service/internal/domains/billing/outbox_tariff_event$"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+            - pkg: "example.com/parking-service/internal/domains/billing/outbox_tariff_event/"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+        identity-admin-no-other-modules:
+          files:
+            - "**/internal/domains/identity/admin/**"
+            - "!$test"
+          deny:
+            - pkg: "example.com/parking-service/internal/domains/identity/partner$"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
+            - pkg: "example.com/parking-service/internal/domains/identity/partner/"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
+        identity-partner-no-other-modules:
+          files:
+            - "**/internal/domains/identity/partner/**"
+            - "!$test"
+          deny:
+            - pkg: "example.com/parking-service/internal/domains/identity/admin$"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
+            - pkg: "example.com/parking-service/internal/domains/identity/admin/"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
         workflow-no-workflow:
           files:
             - "**/internal/workflows/**"
@@ -97,6 +133,12 @@ linters:
               desc: "internal/common — общий словарь без зависимостей от слоёв"
             - pkg: "example.com/parking-service/internal/app"
               desc: "internal/common — общий словарь без зависимостей от слоёв"
+        pkg-no-internal:
+          files:
+            - "**/pkg/**"
+          deny:
+            - pkg: "example.com/parking-service/internal"
+              desc: "pkg/ — код без домена: internal/** (в т. ч. internal/common) не импортирует; нужен доменный тип — код в слое домена"
     forbidigo:
       forbid:
         - pattern: '^context\.(Background|TODO)$'

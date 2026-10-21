@@ -103,7 +103,7 @@ func checkFile(fset *token.FileSet, root, rel string) []finding {
 		out = append(out, finding{at, fmt.Sprintf("файл %s — общий термин, назвать по объявленному (repository.go, publisher.go; в модуле домена — файл группы) (interface-file-generic-name)", base)})
 	}
 	if abstractionFiles[base] {
-		out = append(out, finding{at, fmt.Sprintf("файл %s назван по абстракции — по смыслу ({name}_enum.go, dto.go, entity.go) (file-named-by-abstraction)", base)})
+		out = append(out, finding{at, fmt.Sprintf("файл %s назван по абстракции — по смыслу (enum.go модуля, dto.go, entity.go) (file-named-by-abstraction)", base)})
 	}
 	file, err := parser.ParseFile(fset, filepath.Join(root, rel), nil, parser.SkipObjectResolution)
 	if err != nil {

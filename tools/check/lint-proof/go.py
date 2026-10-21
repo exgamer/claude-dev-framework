@@ -6,8 +6,12 @@
 (`core/rules-evolution.md`, «Статика первой»: тег отдаётся инструменту только после такой проверки).
 """
 import os, shutil, subprocess, sys, tempfile
+from pathlib import Path
 SRC = sys.argv[1]
 M = "example.com/parking-service"
+# Случаи, для которых конфиг собирается заново на копии с файлом случая: правило появляется, только когда есть каталог
+# (`common` домена в эталоне нет — lint.py на проекте создаёт `{домен}-common-no-other-modules` по каталогам)
+RERENDER = {"common домена→модуль домена"}
 CASES = [  # (имя, путь файла, код, что должно быть в выводе)
  ("domain→infrastructure", "internal/domains/billing/tariff/zz_v.go", f'package tariff\nimport _ "{M}/internal/infrastructure/jwt/identity/admin"\n', "domain-no-infra"),
  ("domain→entrypoints", "internal/domains/billing/tariff/zz_v.go", f'package tariff\nimport _ "{M}/internal/entrypoints/system/http/healthcheck"\n', "domain-no-infra"),
@@ -19,6 +23,10 @@ CASES = [  # (имя, путь файла, код, что должно быть 
  ("billing→identity", "internal/domains/billing/tariff/zz_v.go", f'package tariff\nimport _ "{M}/internal/domains/identity/admin"\n', "billing-no-other-domains"),
  ("identity→billing", "internal/domains/identity/admin/zz_v.go", f'package admin\nimport _ "{M}/internal/domains/billing/tariff"\n', "identity-no-other-domains"),
  ("handbook→billing", "internal/domains/handbook/parking/zz_v.go", f'package parking\nimport _ "{M}/internal/domains/billing/tariff"\n', "handbook-no-other-domains"),
+ ("модуль→соседний модуль домена", "internal/domains/billing/tariff/zz_v.go", f'package tariff\nimport _ "{M}/internal/domains/billing/outbox_tariff_event"\n', "billing-tariff-no-other-modules"),
+ ("модуль→соседний модуль домена (identity)", "internal/domains/identity/admin/zz_v.go", f'package admin\nimport _ "{M}/internal/domains/identity/partner"\n', "identity-admin-no-other-modules"),
+ ("common домена→модуль домена", "internal/domains/billing/common/zz_v.go", f'package common\nimport _ "{M}/internal/domains/billing/tariff"\n', "billing-common-no-other-modules"),
+ ("pkg→internal", "pkg/zzthing/zz_v.go", f'package zzthing\nimport _ "{M}/internal/common"\n', "pkg-no-internal"),
  ("workflow→workflow", "internal/workflows/billing/zzother/zz_v.go", f'package zzother\nimport _ "{M}/internal/workflows/billing/tariff"\n', "workflow-no-workflow"),
  ("workflow→infrastructure", "internal/workflows/billing/tariff/zz_v.go", f'package tariff\nimport _ "{M}/internal/infrastructure/postgres/billing/tariff"\n', "workflow-no-workflow"),
  ("entrypoint→infrastructure", "internal/entrypoints/admin/http/billing/tariff/zz_v.go", f'package tariff\nimport _ "{M}/internal/infrastructure/postgres/billing/tariff"\n', "entrypoint-no-infra"),
@@ -64,7 +72,12 @@ for name, path, code, expect in CASES:
     full = os.path.join(dst, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
     open(full, "w").write(code)
+    cfg = os.path.join(dst, ".golangci.yml")
+    original = open(cfg).read()
+    if name in RERENDER:
+        open(cfg, "w").write(lint.render_go(Path(dst)))
     text = run_all(dst)
+    open(cfg, "w").write(original)
     if expect is None:  # разрешённое правилами: замечаний быть не должно (zzsub создаётся предыдущим случаем)
         ok = "zz_v" not in text and text.strip().splitlines()[-1] == "0 issues."
         fails += not ok

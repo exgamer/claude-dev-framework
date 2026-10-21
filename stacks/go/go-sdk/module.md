@@ -11,9 +11,10 @@
 - `workflows_factory.go` (если есть workflow — только сборка workflow, не в `services_factory.go`)
 - `handlers_factory.go`
 - `consumers_factory.go` (если есть очередь)
-- `commands_factory.go` (модуль консоли — cobra-команды)
 
-Эталон — `../examples/tariff/internal/app/bootstrap/billing/tariff/` (`config.go`, `workflows_factory.go`), `../examples/tariff/internal/app/bootstrap/billing/outbox_tariff_event/` (`commands_factory.go`).
+Модуль консоли — не здесь: `internal/console/bootstrap/{domain}/{module}/` со своим `module.go` (поле `Console`) и `commands_factory.go` (`../structure.md`, «Entrypoint Layer»).
+
+Эталон — `../examples/tariff/internal/app/bootstrap/billing/tariff/` (`config.go`, `workflows_factory.go`); консольный — `../examples/tariff/internal/console/bootstrap/billing/outbox_tariff_event/` (`commands_factory.go`).
 
 ## Module.Init — порядок сборки
 
@@ -24,7 +25,7 @@ client (postgres DI), config (load{Name}Config)
       → workflowsFactory (repositoriesFactory, servicesFactory)
         → handlersFactory (servicesFactory, workflowsFactory) → SetRoutes(a, handler, auth)
       → consumersFactory → GetConsumers(...) → reg.RegisterMultipleHandler(...)
-      → commandsFactory → m.Console.AddCommand(...)   (модуль консоли)
+      → commandsFactory → m.Console.AddCommand(...)   (только модуль консоли, internal/console/bootstrap/)
 ```
 
 ## Правила

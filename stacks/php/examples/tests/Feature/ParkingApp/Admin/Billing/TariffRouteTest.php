@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ParkingApp\Admin\Billing;
 
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffEventStatusRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Services\TariffCrudServiceInterface;
 use App\ParkingApp\Domains\Catalog\Modules\Parkings\Repositories\ParkingRepositoryInterface;
@@ -89,8 +89,8 @@ class TariffRouteTest extends TestCase
         $tariff = $this->tariff();
         $this->mock(TariffRepositoryInterface::class)
             ->shouldReceive('getDefaultByParkingId')->once()->with(self::PARKING_ID)->andReturn($tariff);
-        $this->mock(OutboxTariffEventRepositoryInterface::class)
-            ->shouldReceive('getLatestByTariffId')->once()->with(self::TARIFF_ID)->andReturnNull();
+        $this->mock(TariffEventStatusRepositoryInterface::class)
+            ->shouldReceive('getLatestStatusByTariffId')->once()->with(self::TARIFF_ID)->andReturnNull();
         $this->service->shouldNotReceive('findById');
 
         $this->getJson('/parking/admin/tariffs/default?parking_id=' . self::PARKING_ID)

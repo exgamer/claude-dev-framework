@@ -21,7 +21,7 @@
 | Интерфейсы соседних модулей своего домена (O-6) | `modules.go` |
 | Технические сервисы без данных домена — время, ID, отправка событий и сообщений, планирование (`Clock`, `IDGenerator`, `ChangeNotifier`, публикатор); спорный случай — `../conventions.md` п. 12 | `system.go` |
 | Сервис | `service.go` |
-| Константы (используются в нескольких местах) | `{name}_enum.go` |
+| Константы модуля, в том числе типизированные перечисления | `enum.go` |
 | Sentinel-ошибки домена (`var Err… = errors.New(...)`), которые проверяют через `errors.Is` | `errors.go` |
 | Значение домена в `context.Context` (ключ — unexported тип, `With{X}`/`FromContext`) | `context.go` |
 | DTO операций | `dto.go` |
@@ -30,7 +30,7 @@
 
 ## entity.go
 
-Деньги — целым числом в минимальных единицах валюты (`regulations/entity.md`, «Value Object»), не `float64`; статус — свой тип из `{name}_enum.go`, поле неэкспортируемое: чтение — геттер, смена — методы перехода, сборка из БД — `Restore*` (`regulations/entity.md`, «Переход состояния»). Эталон — `../examples/tariff/internal/domains/billing/tariff/entity.go`.
+Деньги — целым числом в минимальных единицах валюты (`regulations/entity.md`, «Value Object»), не `float64`; статус — свой тип из `enum.go`, поле неэкспортируемое: чтение — геттер, смена — методы перехода, сборка из БД — `Restore*` (`regulations/entity.md`, «Переход состояния»). Эталон — `../examples/tariff/internal/domains/billing/tariff/entity.go`.
 
 ```go
 package product
@@ -159,11 +159,11 @@ func (s *Service) Update(ctx context.Context, m *Product) (*Product, error) {
 }
 ```
 
-## status_enum.go — константы
+## enum.go — константы
 
-Константы, которые используются в нескольких местах (хендлер, сервис, репозиторий, тесты), выносятся в отдельный файл `{name}_enum.go`:
+Все константы модуля, в том числе типизированные перечисления, — в одном `enum.go`, блоками по смыслу: тип и его `const`-блок рядом. Константа, нужная одному файлу, может остаться в нём; константы Service, Command и Query — всегда в `enum.go`. `internal/common/` и `Common` домена — не модули: файл по понятию (`currency_enum.go`).
 
-Значения — свой тип, не голый `int` (эталон — `../examples/tariff/internal/domains/billing/outbox_tariff_event/status_enum.go`):
+Значения перечисления — свой тип, не голый `int` (эталон — `../examples/tariff/internal/domains/billing/outbox_tariff_event/enum.go`):
 
 ```go
 package product
@@ -176,11 +176,10 @@ const (
 	StatusInactive
 	StatusDeleted
 )
+
+// RoutingKeyProductChanged Ключ маршрутизации события изменения товара
+const RoutingKeyProductChanged = "product.changed"
 ```
-
-Все константы одного контекста в одном файле. Разбивать по файлам только если контексты разные: `status_enum.go`, `type_enum.go`.
-
-Локальные константы, нужные только внутри одного файла, можно объявить там же.
 
 ## Command / Query — сложная бизнес-логика
 

@@ -22,7 +22,7 @@
 
 ## Консольное приложение
 
-`cmd/console` — отдельный бинарник со своим набором ядер (`PostgresKernel`, `RabbitKernel` с `EnablePublisher()` при отправке в брокер, `ConsoleKernel`) и модулями консоли (`&outbox_tariff_event.Module{Console: consoleKernel}`); `HttpKernel` и consumer-ы сервиса туда не входят. Путь команд, модуль консоли, `commands_factory.go`, миграции — `../structure.md`, «Entrypoint Layer»; эталон — `examples/tariff` (README, `app/bootstrap/billing/outbox_tariff_event/`).
+`cmd/console` — отдельный бинарник со своим набором ядер (`PostgresKernel`, `RabbitKernel` с `EnablePublisher()` при отправке в брокер, `ConsoleKernel`) и модулями консоли (`&outbox_tariff_event.Module{Console: consoleKernel}`); `HttpKernel` и consumer-ы сервиса туда не входят. Путь команд, модуль консоли, `commands_factory.go`, миграции — `../structure.md`, «Entrypoint Layer»; эталон — `examples/tariff` (README, `internal/console/bootstrap/billing/outbox_tariff_event/`).
 
 ## Порядок модулей важен
 

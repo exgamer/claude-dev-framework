@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventRoutingKeyEnum;
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventStatusEnum;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;

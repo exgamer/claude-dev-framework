@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO;
 
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventStatusEnum;
+use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use MPS\Core\DataObjects\DataObject;
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Доказательство для правил PHP-эталона (`tests/Architecture/LayersArchitecture.php`, `phpstan-rules.neon`):
-каждое ловит заведомое нарушение, разрешённое (Eloquent-модель в домене, P-4) — не ловит.
+каждое ловит заведомое нарушение, разрешённое (Eloquent-модель в домене, P-4; Common домена из его модуля) — не ловит.
 
 Запуск из корня репозитория после `tools/php-check/run.sh` (стенд с vendor уже в контейнере):
     python3 tools/check/lint-proof/php.py [PHP_CONTAINER]
@@ -38,6 +38,18 @@ CASES = [  # (имя, путь в parking_app, код класса, ожидае
     ("Catalog → Billing", "Domains/Catalog/Modules/Parkings/ZzV.php",
      f"namespace {R}\\Domains\\Catalog\\Modules\\Parkings;\nfinal class ZzV {{ public function f(\\{R}\\Domains\\Billing\\Modules\\Tariffs\\Services\\TariffCrudServiceInterface $s): void {{}} }}",
      "testCatalogDoesNotKnowOtherDomains"),
+    ("модуль → соседний модуль домена", "Domains/Billing/Modules/Tariffs/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(\\{R}\\Domains\\Billing\\Modules\\OutboxTariffEvents\\Repositories\\OutboxTariffEventRepositoryInterface $r): void {{}} }}",
+     "testBillingTariffsDoesNotKnowOtherModules"),
+    ("модуль → соседний модуль домена (OutboxTariffEvents)", "Domains/Billing/Modules/OutboxTariffEvents/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\OutboxTariffEvents;\nfinal class ZzV {{ public function f(\\{R}\\Domains\\Billing\\Modules\\Tariffs\\Enums\\TariffStatusEnum $s): void {{}} }}",
+     "testBillingOutboxTariffEventsDoesNotKnowOtherModules"),
+    ("Common домена → модуль домена", "Domains/Billing/Common/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Common;\nfinal class ZzV {{ public function f(\\{R}\\Domains\\Billing\\Modules\\Tariffs\\Enums\\TariffStatusEnum $s): void {{}} }}",
+     "testBillingCommonDoesNotKnowModules"),
+    ("разрешено: модуль → Common своего домена", "Domains/Billing/Modules/Tariffs/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(\\{R}\\Domains\\Billing\\Common\\Enums\\OutboxTariffEventStatusEnum $s): void {{}} }}",
+     None),
     ("Common → Domains", "Common/ZzV.php",
      f"namespace {R}\\Common;\nfinal class ZzV {{ public function f(\\{R}\\Domains\\Billing\\Modules\\Tariffs\\Services\\TariffCrudServiceInterface $s): void {{}} }}",
      "testCommonHasNoLayerDependencies"),

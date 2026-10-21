@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums;
+namespace App\ParkingApp\Domains\Billing\Common\Enums;
 
 use MPS\Core\Enums\Enumerable;
 use MPS\Core\Enums\EnumerableTrait;

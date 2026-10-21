@@ -14,7 +14,7 @@ import (
 	rabbitapp "git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/app"
 	sentryapp "git.mpinnovations.kz/mps/go-packages/gosdk-sentry-core/pkg/app"
 
-	"example.com/parking-service/internal/app/bootstrap/billing/outbox_tariff_event"
+	"example.com/parking-service/internal/console/bootstrap/billing/outbox_tariff_event"
 	"example.com/parking-service/internal/migrations"
 )
 

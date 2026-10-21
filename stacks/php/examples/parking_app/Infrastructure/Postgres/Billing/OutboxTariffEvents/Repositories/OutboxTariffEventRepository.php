@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Repositories;
 
+use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEventDto;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventRoutingKeyEnum;
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventRepositoryInterface;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffEventStatusRepositoryInterface;
 use App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Models\OutboxTariffEvent;
 use Carbon\Carbon;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
@@ -18,7 +19,7 @@ use MPS\Core\Exceptions\InvalidConfigurationAppException;
  *
  * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
  */
-class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariffEventRepositoryInterface
+class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariffEventRepositoryInterface, TariffEventStatusRepositoryInterface
 {
     /**
      * @throws InvalidConfigurationAppException
@@ -30,13 +31,15 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
         parent::__construct();
     }
 
-    public function getLatestByTariffId(int $tariffId): ?OutboxTariffEvent
+    public function getLatestStatusByTariffId(int $tariffId): ?OutboxTariffEventStatusEnum
     {
-        /** @var ?OutboxTariffEvent */
-        return $this->getQuery()
+        /** @var ?OutboxTariffEvent $event */
+        $event = $this->getQuery()
             ->where('tariff_id', $tariffId)
             ->orderByDesc('id')
             ->first();
+
+        return $event?->status;
     }
 
     public function createPending(OutboxTariffEventDto $dto, OutboxTariffEventRoutingKeyEnum $routingKey): OutboxTariffEvent

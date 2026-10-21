@@ -21,6 +21,7 @@
 | RabbitMQ Consumer | `{module}_consumer.go`, метод `Consume(ctx, *message.Message)` | `internal/entrypoints/consumer/rabbit/{domain}/{module}/` (`structure.md`) |
 | Workflow | любой `.go` с оркестрацией нескольких доменных сервисов | `internal/workflows/{domain}/{module}/` |
 | Bootstrap Module | `module.go` + `repositories_factory.go` / `services_factory.go` / `handlers_factory.go` | `internal/app/bootstrap/{module}/` или `internal/app/bootstrap/{domain}/{module}/` |
+| Bootstrap Module консоли | `module.go` + `commands_factory.go`, модуль с полем `Console` | `internal/console/bootstrap/{domain}/{module}/` (`structure.md`, «Entrypoint Layer», консоль) |
 
 **Правило проверки:**
 1. Определи тип компонента (один или несколько из таблицы выше)
@@ -56,19 +57,19 @@
    # пары enum с одним набором значений
    python3 - <<'PY'
    import re,glob
-   e={f:set(re.findall(r'=\s*"([^"]+)"',open(f).read())) for f in glob.glob('internal/**/*_enum.go',recursive=True)}
+   e={f:set(re.findall(r'=\s*"([^"]+)"',open(f).read())) for f in glob.glob('internal/**/*enum.go',recursive=True)}
    e={f:v for f,v in e.items() if v}; fs=list(e)
    for i,a in enumerate(fs):
        for b in fs[i+1:]:
            c=e[a]&e[b]
            if len(c)>=3 and len(c)/min(len(e[a]),len(e[b]))>=0.6: print(len(c),a,b)
    PY
-   # импорты доменов из доменов — сверить {domain} в пути импорта с папкой файла
+   # импорты доменов из доменов — сверить {domain} и {module} в пути импорта с папкой файла
    grep -rnE '"[^"]+/internal/domains/[^"/]+' internal/domains --include='*.go' | grep -v '_test\.go'
    # зависимости Common
    grep -rnE '"[^"]+/internal/(domains|infrastructure|workflows|entrypoints|app)/|"context"|"net/http"|"database/sql"|gorm' internal/common --include='*.go' | grep -v '_test\.go:'
    ```
-   Пара enum, где один файл — в дифе, и это то же понятие — `duplicated-enum` (в находке — перенос в `internal/common/` и откуда импортировать); совпадение случайных значений разных понятий — не находка. Импорт другого `{domain}` из `internal/domains/{domain}/`: enum или value-объект — `duplicated-enum` с переносом в `internal/common/`, сервис или репозиторий — сценарий двух доменов, его место — workflow (O-7). Строка третьей команды — `common-with-logic`.
+   Пара enum, где один файл — в дифе, и это то же понятие — `duplicated-enum` (в находке — перенос в `internal/common/` и откуда импортировать); совпадение случайных значений разных понятий — не находка. Импорт другого `{domain}` из `internal/domains/{domain}/`: enum или value-объект — `duplicated-enum` с переносом в `internal/common/`, сервис или репозиторий — сценарий двух доменов, его место — workflow (O-7). Импорт другого модуля своего домена (кроме `internal/domains/{domain}/common/`) — `domain-module-cross-import`. Строка третьей команды — `common-with-logic`.
 0c. **Поле состояния сущности** (`state-field-exported`, `status-in-update-request`; `regulations/entity.md`, «Переход состояния») — по файлам дифа:
    ```
    grep -nE '^\s+(Status|Is[A-Z][A-Za-z]*)\s' <entity.go в дифе>

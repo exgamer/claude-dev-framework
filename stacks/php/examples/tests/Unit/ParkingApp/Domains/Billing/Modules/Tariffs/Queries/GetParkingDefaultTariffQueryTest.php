@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Domains\Billing\Modules\Tariffs\Queries;
 
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventStatusEnum;
-use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventRepositoryInterface;
+use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Queries\GetParkingDefaultTariffQuery;
+use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffEventStatusRepositoryInterface;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
-use App\ParkingApp\Infrastructure\Postgres\Billing\OutboxTariffEvents\Models\OutboxTariffEvent;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
@@ -30,7 +29,7 @@ class GetParkingDefaultTariffQueryTest extends TestCase
 
     private TariffRepositoryInterface&MockInterface $tariffRepository;
 
-    private OutboxTariffEventRepositoryInterface&MockInterface $outboxRepository;
+    private TariffEventStatusRepositoryInterface&MockInterface $eventStatusRepository;
 
     private GetParkingDefaultTariffQuery $query;
 
@@ -39,18 +38,19 @@ class GetParkingDefaultTariffQueryTest extends TestCase
         parent::setUp();
 
         $this->tariffRepository = Mockery::mock(TariffRepositoryInterface::class);
-        $this->outboxRepository = Mockery::mock(OutboxTariffEventRepositoryInterface::class);
-        $this->query = new GetParkingDefaultTariffQuery($this->tariffRepository, $this->outboxRepository);
+        $this->eventStatusRepository = Mockery::mock(TariffEventStatusRepositoryInterface::class);
+        $this->query = new GetParkingDefaultTariffQuery($this->tariffRepository, $this->eventStatusRepository);
     }
 
     public function test_default_tariff_comes_with_last_event_status(): void
     {
         $tariff = $this->tariff();
-        $event = new OutboxTariffEvent();
-        $event->status = OutboxTariffEventStatusEnum::AWAITING_RETRY;
 
         $this->tariffRepository->shouldReceive('getDefaultByParkingId')->once()->with(self::PARKING_ID)->andReturn($tariff);
-        $this->outboxRepository->shouldReceive('getLatestByTariffId')->once()->with(self::TARIFF_ID)->andReturn($event);
+        $this->eventStatusRepository->shouldReceive('getLatestStatusByTariffId')
+            ->once()
+            ->with(self::TARIFF_ID)
+            ->andReturn(OutboxTariffEventStatusEnum::AWAITING_RETRY);
 
         $result = $this->query->execute(self::PARKING_ID);
 
@@ -64,7 +64,7 @@ class GetParkingDefaultTariffQueryTest extends TestCase
         $tariff = $this->tariff();
 
         $this->tariffRepository->shouldReceive('getDefaultByParkingId')->once()->with(self::PARKING_ID)->andReturn($tariff);
-        $this->outboxRepository->shouldReceive('getLatestByTariffId')->once()->with(self::TARIFF_ID)->andReturnNull();
+        $this->eventStatusRepository->shouldReceive('getLatestStatusByTariffId')->once()->with(self::TARIFF_ID)->andReturnNull();
 
         $result = $this->query->execute(self::PARKING_ID);
 
@@ -76,7 +76,7 @@ class GetParkingDefaultTariffQueryTest extends TestCase
     public function test_parking_without_default_tariff_returns_null_and_skips_events(): void
     {
         $this->tariffRepository->shouldReceive('getDefaultByParkingId')->once()->with(self::PARKING_ID)->andReturnNull();
-        $this->outboxRepository->shouldNotReceive('getLatestByTariffId');
+        $this->eventStatusRepository->shouldNotReceive('getLatestStatusByTariffId');
 
         $this->assertNull($this->query->execute(self::PARKING_ID));
     }

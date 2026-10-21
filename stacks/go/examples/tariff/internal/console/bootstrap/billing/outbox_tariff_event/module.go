@@ -6,10 +6,11 @@ import (
 	postgresDI "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/di"
 	rabbitDI "git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/di"
 
+	outboxconfig "example.com/parking-service/internal/app/bootstrap/billing/outbox_tariff_event"
 	outboxrabbit "example.com/parking-service/internal/infrastructure/rabbit/billing/outbox_tariff_event"
 )
 
-// Module Повтор outbox-событий тарифов в консольном приложении; нужны PostgresKernel и RabbitKernel с EnablePublisher
+// Module Консольная сборка outbox-событий тарифов: команда повтора и сервисы для неё; нужны PostgresKernel и RabbitKernel с EnablePublisher
 type Module struct {
 	// Console Ядро, в которое добавляется команда; до его Start
 	Console *consoleapp.ConsoleKernel
@@ -39,7 +40,7 @@ func (m *Module) Init(a *app.App) error {
 		return err
 	}
 
-	maxAttempts, err := LoadMaxAttempts()
+	maxAttempts, err := outboxconfig.LoadMaxAttempts()
 	if err != nil {
 		return err
 	}

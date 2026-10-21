@@ -13,3 +13,8 @@ const (
 	// StatusAwaitingRetry Отправка не удалась; повторит консольная команда по расписанию
 	StatusAwaitingRetry
 )
+
+const (
+	// RoutingKeyTariffCreated Тариф создан
+	RoutingKeyTariffCreated = "tariff.created"
+)
