@@ -1,0 +1,12 @@
+diff --git a/parking_app/Infrastructure/Postgres/Billing/Tariffs/Repositories/TariffRepository.php b/parking_app/Infrastructure/Postgres/Billing/Tariffs/Repositories/TariffRepository.php
+index 54c8557..44bd7fb 100644
+--- a/parking_app/Infrastructure/Postgres/Billing/Tariffs/Repositories/TariffRepository.php
++++ b/parking_app/Infrastructure/Postgres/Billing/Tariffs/Repositories/TariffRepository.php
+@@ -203,7 +203,6 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
+     public function unsetDefault(int $id): void
+     {
+         $this->getQuery()
+-            ->whereKey($id)
+             ->where('is_default', true)
+             ->update(['is_default' => false]);
+     }

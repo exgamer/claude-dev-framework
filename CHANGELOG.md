@@ -4,6 +4,7 @@
 
 ## 2026-10-21
 ### Добавлено
+- Команда `/dev-fix` — баг-фикс: падающий тест до правки → причина → исправление причины → тест остаётся; проверка «тест падал до правки» на копии кода до правки, независимое ревью (теги `bugfix-no-failing-test`, `bugfix-symptom-patched`, `bugfix-scope-creep`); миграция, новый контракт или больше модуля — в `/dev`; `--step`, `--hotfix`. A/B баг-фикса — `tools/ab/ab.py prepare --task fix`.
 - Теги находок, которых не было в каталогах: `request-body-not-strict`, `missing-body-limit`, `url-not-by-scheme`, `swagger-status-mismatch`, `list-params-contract`, `too-many-params`, `design-not-matching-code`, Go — `mapper-missing-nil-check`, `constants-in-service-file` (его ловит анализатор фреймворка); пункты памяток Go 4c, 4d, 51 и PHP 54, 55.
 - Go: форма валидатора значений входа — многих полей карта ошибок, одного поля сразу 422 (`go-sdk/domain.md`); список из нескольких хранилищ отдаёт пагинацию хелпера SDK без пересчёта (`go-sdk/infra/postgres.md`).
 - Запрет глушения проверок в диффе: новые `//nolint`, `@phpstan-ignore*`, пропуск теста, исключение из покрытия, ослабление `.golangci.yml`/`phpstan*.neon` без причины комментарием (у пропуска теста причина — и в сообщении, в т. ч. `message: '…'` и `fmt.Sprintf("…")`) — тег `check-silenced` (пункты памятки Go 50, PHP 53); `lint.py … --base` ловит их в добавленных строках (PHP с `--sub` — только в подпроекте).

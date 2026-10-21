@@ -2,15 +2,18 @@
 """A/B фреймворка на написании кода: та же задача на прежней и текущей версии — не стало ли хуже.
 
 Запуск из корня репозитория:
-  python3 tools/ab/ab.py prepare --rev <ревизия «до»> [--stack go|php|both]   — рабочая папка, проекты, задача
+  python3 tools/ab/ab.py prepare --rev <ревизия «до»> [--stack go|php|both] [--task archive|fix]
+                                                                               — рабочая папка, проекты, задача
   python3 tools/ab/ab.py diffs <папка>                                         — слепые диффы для судьи
   python3 tools/ab/ab.py cleanup <папка>                                       — удалить проекты и копии в контейнере
 
 Что делает prepare:
 - «до» — `git archive <rev>` во временную папку (`old/`), «после» — рабочее дерево репозитория (`new` = этот репозиторий);
 - на стек — два одинаковых проекта из эталона текущей версии (`stacks/go/examples/tariff`, PHP — стенд
-  `tools/php-check` в контейнере, он уже с vendor) с задачей `tools/ab/task/<stack>/` в `docs/tasks/archive-tariff/`
-  и коммитом `base`; PHP-проекты — в каталоге, смонтированном в PHP-контейнер (`tools/lint/php_container.py`);
+  `tools/php-check` в контейнере, он уже с vendor) с задачей в `docs/tasks/<ключ>/` и коммитом `base`: `--task archive`
+  (по умолчанию) — фича «архивация тарифа», `tools/ab/task/<stack>/`, ключ `archive-tariff`; `--task fix` — баг-фикс,
+  `tools/ab/task-fix/<stack>/`, ключ `fix-default-tariff`: `bug.patch` оттуда закладывает в проект известный баг до
+  коммита `base`, `bug.md` — только симптом; PHP-проекты — в каталоге, смонтированном в PHP-контейнер (`tools/lint/php_container.py`);
 - печатает пути, базовые коммиты и поручения агентам (`tools/ab/prompts.md`) с подставленными значениями.
 Задача A/B не должна уже быть в эталоне (архивация тарифа: `archived_at`, `/archive`) — иначе смените задачу в `task/`.
 Агентов запускает тот, кто проверяет (`skills/dev-rule/SKILL.md`, Шаг 3а): разработчик → ревью той же версии → судья.
@@ -44,11 +47,18 @@ def commit(path: Path, msg: str) -> str:
     return sh(["git", "rev-parse", "--short", "HEAD"], cwd=path)
 
 
-def add_task(project: Path, stack: str):
-    dst = project / "docs" / "tasks" / "archive-tariff"
+TASKS = {"archive": ("task", "archive-tariff"), "fix": ("task-fix", "fix-default-tariff")}
+
+
+def add_task(project: Path, stack: str, task: str):
+    src = ROOT / "tools" / "ab" / TASKS[task][0] / stack
+    dst = project / "docs" / "tasks" / TASKS[task][1]
     dst.mkdir(parents=True, exist_ok=True)
-    for f in (ROOT / "tools" / "ab" / "task" / stack).glob("*.md"):
+    for f in src.glob("*.md"):
         shutil.copy(f, dst / f.name)
+    patch = src / "bug.patch"
+    if patch.exists():
+        sh(["git", "apply", str(patch)], cwd=project)
 
 
 def mounted_dir(container: str, explicit: str | None) -> tuple[Path, str]:
@@ -73,14 +83,14 @@ def prepare(a):
     old.mkdir()
     archive = subprocess.run(["git", "archive", a.rev], cwd=ROOT, capture_output=True, check=True).stdout
     subprocess.run(["tar", "-x", "-C", str(old)], input=archive, check=True)
-    state = {"work": str(work), "rev": a.rev, "frameworks": {"old": str(old), "new": str(ROOT)}, "projects": {}}
+    state = {"work": str(work), "rev": a.rev, "task": a.task, "key": TASKS[a.task][1], "frameworks": {"old": str(old), "new": str(ROOT)}, "projects": {}}
     stacks = ["go", "php"] if a.stack == "both" else [a.stack]
     if "go" in stacks:
         for v in ("old", "new"):
             p = work / f"go-{v}"
             shutil.copytree(ROOT / "stacks" / "go" / "examples" / "tariff", p)
             sh(["git", "init", "-q"], cwd=p)
-            add_task(p, "go")
+            add_task(p, "go", a.task)
             state["projects"][f"go-{v}"] = {"path": str(p), "base": commit(p, "base")}
     if "php" in stacks:
         container = php_container.resolve(None, a.container)
@@ -96,14 +106,14 @@ def prepare(a):
             sh(["docker", "exec", container, "sh", "-c", f"mkdir -p {cp} && cp -R {STAND}/. {cp}/ && rm -rf {cp}/vendor.prev"])
             (p / ".gitignore").write_text("vendor/\n.phpstan/\n.phpunit.result.cache\n")
             sh(["git", "init", "-q"], cwd=p)
-            add_task(p, "php")
+            add_task(p, "php", a.task)
             state["projects"][f"php-{v}"] = {"path": str(p), "container_path": cp, "container": container,
                                              "base": commit(p, "base")}
     (work / "state.json").write_text(json.dumps(state, ensure_ascii=False, indent=2))
     print(f"папка A/B: {work}")
     for k, v in state["projects"].items():
         print(f"  {k}: {v['path']} (base {v['base']}{', контейнер ' + v['container'] + ':' + v['container_path'] if 'container' in v else ''})")
-    print(f"фреймворк «до»: {old} ({a.rev}); «после»: {ROOT}")
+    print(f"фреймворк «до»: {old} ({a.rev}); «после»: {ROOT}; задача: {a.task} (ключ {TASKS[a.task][1]})")
     print(f"поручения агентам — {ROOT / 'tools' / 'ab' / 'prompts.md'}; затем: python3 tools/ab/ab.py diffs {work}")
 
 
@@ -159,6 +169,8 @@ def main():
     pr = sub.add_parser("prepare")
     pr.add_argument("--rev", required=True, help="ревизия фреймворка «до» (обычно HEAD или прошлый коммит)")
     pr.add_argument("--stack", choices=["go", "php", "both"], default="both")
+    pr.add_argument("--task", choices=list(TASKS), default="archive",
+                    help="archive — фича «архивация тарифа»; fix — баг-фикс заложенного бага (правки ролей баг-фикса)")
     pr.add_argument("--container", help="PHP-контейнер (по умолчанию — tools/lint/php_container.py)")
     pr.add_argument("--php-root", help="каталог хоста с PHP-проектами, смонтированный в контейнер (если не определяется сам)")
     for name in ("diffs", "cleanup"):

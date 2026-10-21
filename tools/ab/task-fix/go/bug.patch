@@ -1,0 +1,13 @@
+diff --git a/internal/infrastructure/postgres/billing/tariff/mapper.go b/internal/infrastructure/postgres/billing/tariff/mapper.go
+index 1fb7076..1d876ca 100644
+--- a/internal/infrastructure/postgres/billing/tariff/mapper.go
++++ b/internal/infrastructure/postgres/billing/tariff/mapper.go
+@@ -18,7 +18,7 @@ func tariffToEntity(model *tariff) *tariffdomain.Tariff {
+ 		Currency:     common.Currency(model.Currency),
+ 		GraceMinutes: model.GraceMinutes,
+ 		Price:        model.Price,
+-	}, model.IsDefault, model.IsActive)
++	}, model.IsActive, model.IsDefault)
+ }
+ 
+ func tariffsToEntities(models []*tariff) []*tariffdomain.Tariff {
