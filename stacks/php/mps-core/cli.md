@@ -71,7 +71,7 @@ class YourActionConsoleCommand extends Command
             return self::INVALID;
         }
 
-        $command->execute((int) $id, null);   // консоль без пользователя: скоуп null явно (architecture/layers.md, «Принадлежность записи скоупу»)
+        $command->execute((int) $id, null);   // консоль без пользователя: скоуп null явно (architecture/layers.md, «Принадлежность записи скоупу — два случая»)
 
         return self::SUCCESS;
     }

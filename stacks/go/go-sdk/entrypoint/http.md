@@ -56,7 +56,7 @@
 
 ## request.go
 
-Обязателен embed `validation.Request`; все правила — в теге `binding` (валидатор gin, `SetTagName("binding")`; тег `validate` `ValidateRequest*` не читает — правило в нём молча не проверяется, тег находки `request-missing-bounds`; проверено тестом эталона `TestHandler_Index_PageBound`); границы — по `regulations/rest-api.md`, «Валидация входа»: `*_id` — `gt=0`, строки — `max`, числа — верхняя граница, enum — `oneof`, `page` — `lte=10000` (больше — 422), `per_page` — `lte=100`. `page` 0/не передан → 1 (SDK, `uint` 0 = «не передан»), `per_page` не передан → 30 (`../infra/postgres.md`, «Пагинация»):
+Обязателен embed `validation.Request`; все правила — в теге `binding` (валидатор gin, `SetTagName("binding")`; тег `validate` `ValidateRequest*` не читает — правило в нём молча не проверяется, тег находки `validate-tag-ignored`; проверено тестом эталона `TestHandler_Index_PageBound`); границы — по `regulations/rest-api.md`, «Валидация входа»: `*_id` — `gt=0`, строки — `max`, числа — верхняя граница, enum — `oneof`, `page` — `lte=10000` (больше — 422), `per_page` — `lte=100`. `page` 0/не передан → 1 (SDK, `uint` 0 = «не передан»), `per_page` не передан → 30 (`../infra/postgres.md`, «Пагинация»):
 
 ```go
 // indexRequest Фильтр списка тарифов
@@ -97,6 +97,8 @@ type tariffResponse struct {
 ```
 
 ## mapper.go
+
+Request — в маппер по значению; маппер на `nil` — `../infra.md`, «Правила».
 
 ```go
 func createRequestToParams(request createRequest) *tariffworkflow.CreateTariffParams {

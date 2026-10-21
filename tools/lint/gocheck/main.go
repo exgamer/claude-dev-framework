@@ -175,6 +175,13 @@ func checkFile(fset *token.FileSet, root, rel string) []finding {
 			}
 		}
 	}
+	if isDomainHandlerFile(rel) {
+		for _, decl := range file.Decls {
+			if g, ok := decl.(*ast.GenDecl); ok && g.Tok == token.CONST {
+				out = append(out, finding{pos(g.Pos()), "константа в файле Service/Command/Query — в enum.go модуля (constants-in-service-file)"})
+			}
+		}
+	}
 	skip := map[*ast.BasicLit]bool{}
 	for _, imp := range file.Imports {
 		skip[imp.Path] = true
@@ -216,6 +223,18 @@ func checkFile(fset *token.FileSet, root, rel string) []finding {
 	})
 
 	return out
+}
+
+// isDomainHandlerFile: файл Service, Command или Query модуля домена (stacks/go/structure.md) — константы пакетного уровня
+// в нём не объявляются, их место — enum.go модуля (stacks/go/conventions.md п. 13). Консольный {module}_command.go
+// точки входа — не домен.
+func isDomainHandlerFile(rel string) bool {
+	base := filepath.Base(rel)
+	if !strings.Contains("/"+rel, "/internal/domains/") || strings.HasSuffix(base, "_test.go") {
+		return false
+	}
+
+	return base == "service.go" || strings.HasSuffix(base, "_service.go") || strings.HasSuffix(base, "_command.go") || strings.HasSuffix(base, "_query.go")
 }
 
 // artifactRef — первая ссылка на артефакт задачи в тексте; id — шаблон ID для этого вида текста (nil — только путь и раздел).

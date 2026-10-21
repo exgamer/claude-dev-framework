@@ -204,7 +204,7 @@ if errors.Is(err, ErrDefaultTariffTaken) { // параллельную смен�
 ## Пагинация
 
 - `SetTimeout(n)` — `n` секунд числом (`SetTimeout(10)`): тип параметра `time.Duration`, но хелпер сам умножает его на `time.Second`, поэтому `10*time.Second` нельзя (см. «Правила»); без вызова — те же 10 с.
-- `per_page` не передан (0) → умолчание хелпера 30 (`regulations/rest-api.md`, «Формат ответа»): `SetPerPage(0)` его затирает, и SDK подставляет 20 — поэтому `SetPerPage` только при `PerPage > 0` (или 30 в маппере запроса). `page` 0/не передан → 1 (SDK).
+- `per_page` не передан (0) → умолчание хелпера 30 (`regulations/rest-api.md`, «Формат ответа»): `SetPerPage(0)` его затирает, и SDK подставляет 20 — поэтому `SetPerPage` только при `PerPage > 0` (или 30 в маппере запроса). `page` 0/не передан → 1 (SDK; до него — маппер точки входа, `regulations/rest-api.md`, «Валидация входа»).
 - Пустой скоуп — явное `WHERE FALSE`, а не `IN ?` с пустым списком.
 
 ```go
@@ -244,4 +244,14 @@ func (r *PostgresRepository) Paginated(ctx context.Context, search *tariffdomain
 		Pagination: paginated.Pagination,
 	}, nil
 }
+```
+
+**Список из нескольких хранилищ** (тарифы из Postgres + данные к ним из другого репозитория или внешней системы): страницу и `*pagination.Pagination` считает хелпер SDK в репозитории главного хранилища; репозиторий отдаёт их в DTO домена `{Items, Pagination}` (как `pagination.Paginated` выше), домен дополняет элементы данными других хранилищ и `Pagination` не трогает, маппер точки входа кладёт его в ответ как есть. Пересчитывать пагинацию в маппере или домене (`total`, `last_page`, `offset` заново) — нет: значения SDK — контракт клиентов (`regulations/rest-api.md`, «Формат ответа»), второй расчёт с ним расходится.
+
+```go
+// плохо: маппер собирает пагинацию заново
+Pagination: &pagination.Pagination{TotalRecords: total, Page: search.Page, Limit: search.PerPage},
+
+// хорошо: блок хелпера SDK из репозитория — без изменений
+Pagination: paginated.Pagination,
 ```

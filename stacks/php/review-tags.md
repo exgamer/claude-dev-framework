@@ -41,7 +41,7 @@
 | `api-response-not-first` | [ОШИБКА] | `api.response` не первым в middleware группы маршрутов: отказы middleware перед ним (401/403) уходят без `success/data` | `conventions.md` п. 20 |
 | `route-id-constrained` | [ОШИБКА] | Ограничение параметра-id в пути маршрута (`whereNumber('id')`, `where('id', …)`, `Route::pattern('id', …)`): `0`/`-1`/`abc` дают 404 вместо 422; в существующем коде — [ВНИМАНИЕ] (унаследованное) | `conventions.md` п. 20 |
 | `route-middleware-not-aliased` | [ВНИМАНИЕ] | Свой middleware в маршруте подключён `::class`, а не алиасом из `bootstrap/app.php` | `conventions.md` п. 20 |
-| `controller-missing-swagger` | [ОШИБКА] | Эндпоинт без Swagger-аннотации, без `500` в ответах, без кода, который отдаёт middleware его маршрута (`403` у `permission:…`), или `404` не по `conventions.md` п. 18 (нет у поиска по ID или лишний у `index`/`create`) | `conventions.md` п. 18; `regulations/rest-api.md`, «Статусы» |
+| `controller-missing-swagger` | [ОШИБКА] | Эндпоинт без Swagger-аннотации (нет OpenAPI-атрибутов на методе контроллера); Swagger не совпадает с тем, что отдаёт эндпойнт (пропущенный или лишний код ответа) — `swagger-status-mismatch` | `conventions.md` п. 18; `regulations/rest-api.md`, «Статусы» |
 | `controller-auth-via-facade` | [ОШИБКА] | `Auth::id()`/`auth()` в глубине сервиса вместо `$request->user()` в контроллере | `conventions.md` п. 19a |
 | `env-outside-config` | [ОШИБКА] | `env()` вне `config/*.php` и `config.php` модуля: после `config:cache` возвращает `null` — в коде `config()` | `checklist.md` п. 51 |
 | `debug-output-left` | [ОШИБКА] | Отладочный вывод в коде (`dd()`, `dump()`, `var_dump()`, `ray()`, `->dd()`/`->dump()` у коллекции или запроса) | `checklist.md` п. 52 |

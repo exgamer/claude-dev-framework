@@ -26,7 +26,22 @@
 - Маппинг между инфра-моделью и доменной сущностью — только через `mapper.go`; прямых зависимостей структур между слоями нет
 - Доменный слой не знает о существовании инфра-слоя
 - Может использовать сущности и константы доменного слоя (`entity`, `enum.go`)
-- **Nil-check в каждом маппере обязателен**: если входной аргумент `nil` — сразу `return nil`, до обращения к полям
+- **Маппер на `nil`** (тег `mapper-missing-nil-check`) — для мапперов всех слоёв (инфраструктура, точка входа): вход — указатель, выход — указатель: на `nil` сразу `return nil`, до обращения к полям; выход — значение: на `nil` — нулевое значение типа (`return tariffData{}`), выход-коллекция — пустая коллекция (`patchToColumns` эталона — `map[string]any{}`); вход — значение (Request в маппер точки входа передаётся по значению: `indexRequestToSearch(request indexRequest, …)`) — проверка не нужна, `nil` прийти не может. Почему: «не найдено» репозитория — `nil, nil`, маппер получает `nil` в обычном сценарии, обращение к полю — паника и 500.
+  ```go
+  // плохо: на nil — паника
+  func tariffToData(tariff *tariffdomain.Tariff) *tariffData {
+  	return &tariffData{ID: tariff.ID}
+  }
+
+  // хорошо
+  func tariffToData(tariff *tariffdomain.Tariff) *tariffData {
+  	if tariff == nil {
+  		return nil
+  	}
+
+  	return &tariffData{ID: tariff.ID}
+  }
+  ```
 - **Контракт репозитория** (только запросы, «не найдено» — `nil, nil`, без `FindOrCreate`, без бизнес-решений, таймаут на каждый запрос) — общее правило `architecture/layers.md`, «Правила слоёв». В Go: `ErrRecordNotFound` → `nil, nil`; таймаут — `context.WithTimeout(ctx, 10*time.Second)` в каждом методе (`infra/postgres.md`); пакетный `ON CONFLICT` — метод с именем по действию (`UpsertBatch`)
 
 ## Именование файлов

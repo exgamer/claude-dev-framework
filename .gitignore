@@ -26,3 +26,6 @@ tools/lint/.real-projects.json
 
 # Локальные настройки Claude Code
 .claude/settings.local.json
+
+# Бинарник анализатора после ручного `go build` (lint.py собирает свой в кеш вне репозитория)
+tools/lint/gocheck/gocheck

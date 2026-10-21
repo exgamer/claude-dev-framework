@@ -8,11 +8,14 @@ import (
 	tariffworkflow "example.com/parking-service/internal/workflows/billing/tariff"
 )
 
+// indexRequestToSearch page 0 или не передан — первая страница: (page-1)*per_page по uint при 0 переполняется
 func indexRequestToSearch(request indexRequest, scope tariffdomain.ParkingScope) *tariffdomain.Search {
+	page := max(request.Page, 1)
+
 	return &tariffdomain.Search{
 		ParkingID: request.ParkingID,
 		Scope:     scope,
-		Page:      request.Page,
+		Page:      page,
 		PerPage:   request.PerPage,
 	}
 }

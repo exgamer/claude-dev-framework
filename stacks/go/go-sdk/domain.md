@@ -75,13 +75,40 @@ func (p *Product) Deactivate() error {
 ```go
 package product
 
-// Search Фильтр списка: Page 0 → 1, PerPage 0 → 30 (умолчание хелпера пагинации SDK)
+// Search Фильтр списка: Page ≥ 1 (0 приводит маппер точки входа), PerPage 0 → 30 (умолчание хелпера пагинации SDK)
 type Search struct {
 	ID         uint
 	Name       string
 	CategoryID uint
 	Page       uint
 	PerPage    uint
+}
+```
+
+## {entity}_validator.go — значения входа (O-18)
+
+Проверки значений DTO без данных хранилища (диапазоны, связи полей); место — `regulations/entity.md` (O-26). Форма функции — по числу полей:
+
+- **Многих полей** — возвращает карту ошибок по полям (`map[string]any`, пустая — корректно), исключение бросает вызывающий: ему нужны все ошибки сразу, а не первая. Так же — экспортируемый валидатор, который вызывает workflow (эталон — `ValidateTariff`, `ValidatePatch`).
+- **Одного поля** (неэкспортируемый, вызывается в своём модуле) — сразу готовая 422: собирать карту из одного ключа и проверять её длину у вызывающего — лишний шаг.
+
+```go
+// плохо: одно поле — карта, которую вызывающий снова проверяет и оборачивает
+func validateGrace(minutes uint) map[string]any {
+	if minutes > MaxGraceMinutes {
+		return map[string]any{"grace_minutes": "доп. время не больше суток"}
+	}
+
+	return nil
+}
+
+// хорошо
+func validateGrace(minutes uint) error {
+	if minutes > MaxGraceMinutes {
+		return exception.NewValidationException(map[string]any{"grace_minutes": "доп. время не больше суток"}, false)
+	}
+
+	return nil
 }
 ```
 

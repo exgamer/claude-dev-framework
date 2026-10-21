@@ -10,7 +10,7 @@
 - `routes:no-id-constraint` — ограничение параметра-id в пути (`whereNumber`/`where`/`whereIn`/`whereAlphaNumeric`/
   `whereUuid`/`whereUlid` по `id`, `*_id`, `*Id`; `Route::pattern(s)`) — id ≤ 0 и не число дают 404 вместо 422 (тег `route-id-constrained`);
 - `routes:permission-403` — маршрут под `permission:…` (свой или группы) на методе контроллера `[X::class, 'метод']`:
-  в OpenAPI-атрибутах метода есть ответ 403 (тег `controller-missing-swagger`).
+  в OpenAPI-атрибутах метода есть ответ 403 (тег `swagger-status-mismatch`).
 С `--base` — только находки, задетые добавленными строками диффа (`git diff -U0 REV`, новые файлы — целиком): строка
 ограничения id, цепочка группы/маршрута для `api.response`, цепочка маршрута, объемлющих групп или атрибуты метода
 контроллера для 403; удалённые строки (убранный `'api.response'`, удалённый атрибут 403) — не видны;
@@ -145,7 +145,7 @@ def check_403(sub: Path, root: str, routes: Path, src: Source, st: dict, own: li
         + [(routes, src.line(g["pos"]), src.line(g["chain_end"])) for g in encl]
     return (ctrl, line, f"маршрут под {next(m for m in own + [g for mw in groups for g in mw] if m.startswith('permission:'))} "
             f"({routes.name}:{src.line(st['pos'])}) — в OpenAPI-атрибутах {ctrl.stem}::{method}() нет ответа 403 "
-            "(controller-missing-swagger)", spans)
+            "(swagger-status-mismatch)", spans)
 
 
 def check(sub: Path, root: str) -> tuple[list[tuple], list[str]]:

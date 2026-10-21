@@ -186,7 +186,7 @@ ROUTE_CASES = [  # (имя, файл в parking_app, было, стало, ож�
     ("where на id в пути", "Entrypoints/Integration/Billing/routes.php", "->name('parking-tariffs.index');", "->where('id', '[0-9]+')->name('parking-tariffs.index');",
      "route-id-constrained"),
     ("Route::pattern для id", "Entrypoints/Integration/Billing/routes.php", "Route::middleware([", "Route::pattern('id', '[0-9]+');\n\nRoute::middleware([", "route-id-constrained"),
-    ("нет 403 у маршрута под permission:", "Entrypoints/Admin/Billing/Tariffs/Http/Controllers/TariffController.php", "response: 403", "response: 422", "controller-missing-swagger"),
+    ("нет 403 у маршрута под permission:", "Entrypoints/Admin/Billing/Tariffs/Http/Controllers/TariffController.php", "response: 403", "response: 422", "swagger-status-mismatch"),
     ("разрешено: whereNumber на параметре не id", "Entrypoints/Admin/Billing/routes.php", "->name('tariffs.view');", "->whereNumber('version')->name('tariffs.view');", None),
     ("разрешено: эталон", "Entrypoints/Admin/Billing/routes.php", "", "", None),
 ]
@@ -199,7 +199,7 @@ ROUTE_BASE_CASES = [  # (имя, файл в parking_app, было: (что за
     ("--base: новый whereNumber на id", "Entrypoints/Integration/Billing/routes.php", ("", ""), OLD_ID, "route-id-constrained"),
     ("разрешено: --base: старый whereNumber в изменённом routes.php", "Entrypoints/Integration/Billing/routes.php", OLD_ID, RENAME, None),
     ("--base: permission: добавлен в существующую группу", "Entrypoints/Integration/Billing/routes.php", ("", ""), GROUP_PERMISSION,
-     "controller-missing-swagger"),
+     "swagger-status-mismatch"),
 ]
 
 
