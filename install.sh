@@ -86,7 +86,13 @@ if [ -f "$PROJECT/go.mod" ]; then
 fi
 if [ -f "$PROJECT/composer.json" ]; then
   if command -v docker >/dev/null 2>&1; then
-    echo "lint    PHP: инструменты фреймворка (phpstan, phpat, disallowed-calls) поставит tools/lint/lint.py php при первом запуске — в PHP-контейнер проекта, в /tmp/df-lint, не в проект"
+    # имя контейнера у каждого разработчика своё: найти по монтированию проекта или спросить, запомнить у разработчика
+    if container="$(python3 "$DF_SRC/tools/lint/php_container.py" project "$PROJECT")"; then
+      echo "lint    PHP-контейнер проекта: $container (запомнен в tools/lint/.php-containers.json, сменить — PHP_CONTAINER или удалить строку)"
+    else
+      echo "lint    PHP-контейнер проекта не выбран — tools/lint/lint.py php спросит при первом запуске (или --container <имя>)"
+    fi
+    echo "        инструменты фреймворка (phpstan, phpat, disallowed-calls) lint.py поставит при первом запуске — в контейнер, в /tmp/df-lint, не в проект"
   else
     echo "lint    PHP: нужен docker с PHP-контейнером проекта — в нём tools/lint/lint.py php гоняет правила фреймворка"
   fi

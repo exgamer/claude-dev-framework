@@ -11,7 +11,7 @@ tools/php-check/run.sh             # прогон; vendor ставится са�
 
 Путь к `auth.json` с токеном — в `tools/php-check/.auth-path` (одна строка, `~` допустим; файл в `.gitignore`) или в `MPS_AUTH_JSON`. Claude Code запускает `--install` только после подтверждения пользователя: правило `ask` в `.claude/settings.local.json` (локально, в git не попадает).
 
-- `PHP_CONTAINER` — запущенный контейнер с PHP >= 8.3 и composer (по умолчанию `php-8.5`).
+- `PHP_CONTAINER` — запущенный контейнер с PHP >= 8.3 и composer. Не задан — запомненный контейнер стенда; первый раз спросит из запущенных и запомнит в `tools/lint/.php-containers.json` (у разработчика, в git не попадает).
 - `COMPOSER_AUTH`, `MPS_AUTH_JSON` или `.auth-path` — `gitlab-token` для `git.mpinnovations.kz` (пакеты `mps/core`, `mps/utils`, `mps/elastic-query`). Нужен только при установке vendor: при первом запуске и после правки `composer.json`. В файлы стенда токен не пишется, в контейнер передаётся через окружение `docker exec`, не аргументом.
 - `TESTS_ONLY=1` / `PHPSTAN_ONLY=1` — только одна проверка.
 - Код возврата: `0` — всё прошло, `1` — упали тесты или phpstan, `2` — не готово окружение (контейнер не запущен, нет токена для установки vendor).

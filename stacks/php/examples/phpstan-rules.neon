@@ -7,6 +7,10 @@ services:
         tags:
             - phpat.test
 
+rules:
+    # встроенное исключение PHP (new, throw_if/throw_unless) вне тестов и миграций — только исключения ядра (conventions.md п. 13)
+    - Tests\Architecture\GenericExceptionRule
+
 parameters:
     # Хранилище — только через Infrastructure (architecture/layers.md): фасад DB вне Infrastructure, миграций и тестов —
     # находка; запрещён сам фасад, т. к. вызов DB::transaction() идёт через __callStatic и запрет метода его не видит.

@@ -59,6 +59,38 @@ def resolve(src, token, known):
     return None
 
 
+def stack_near(src, line="", pos=0):
+    """Стек ссылки: ближайшая метка «PHP»/«Go» перед ней в строке, иначе стек документа."""
+    labels = re.findall(r"\b(PHP|Go)\s*(?:—|:)", line[:pos])  # явная метка «PHP —» / «Go:» перед ссылкой
+    if labels:
+        return labels[-1].lower()
+    parts = src.split("/")
+    if parts[0] == "stacks" and len(parts) > 1:
+        return parts[1]
+    if src.startswith(("skills/dev-go", "agents/df-go")):
+        return "go"
+    if src.startswith(("skills/dev-php", "agents/df-php")):
+        return "php"
+    return None
+
+
+def resolve_loose(src, token, known, line="", pos=0):
+    """resolve + голое имя или хвост пути (`subagent.md`, `go-sdk/app.md`): единственный файл с таким хвостом;
+    несколько — по стеку ссылки (stack_near); иначе неоднозначно — None."""
+    bare = token
+    for prefix in ("{DF}/", "~/.claude/dev-framework/"):
+        bare = bare.removeprefix(prefix)
+    near = os.path.normpath(os.path.join(os.path.dirname(src), bare))
+    if near in known:
+        return near
+    same = sorted(f for f in known if f == bare or f.endswith("/" + bare))
+    if len(same) > 1 and not token.startswith(("{DF}/", "~/")):  # одно имя в двух стеках: base-пути resolve выбрали бы Go
+        stack = stack_near(src, line, pos)
+        pick = [f for f in same if stack and f.startswith(f"stacks/{stack}/")]
+        return pick[0] if len(pick) == 1 else None
+    return resolve(src, token, known) or (same[0] if len(same) == 1 else None)
+
+
 def main():
     files = repo_files()
     known = set(files)

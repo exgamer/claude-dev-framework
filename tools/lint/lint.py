@@ -8,7 +8,7 @@
 
   lint.py go <проект> [--base REV]   — прогон; --base — только новое относительно ревизии (дифф задачи)
   lint.py go <проект> --render       — напечатать собранный конфиг (для сверки и чтения)
-  lint.py php <проект> --sub <подпроект> [--container NAME] [--base REV]
+  lint.py php <проект> --sub <подпроект> [--container NAME] [--base REV]  (контейнер не задан — найдёт по монтированию или спросит и запомнит)
                                      — PHP: phpstan фреймворка в PHP-контейнере проекта, только правила фреймворка
 
 Go: `golangci-lint` v2 на машине (ставится один раз, отдельно от проекта). PHP: инструменты фреймворка (phpstan, phpat,
@@ -23,6 +23,9 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+import php_container  # noqa: E402
 
 CACHE = Path.home() / ".cache" / "dev-framework-lint"
 
@@ -93,8 +96,12 @@ def domains_of(project: Path):
 
 def render_go(project: Path) -> str:
     mod, domains = module_of(project), domains_of(project)
+    # internal/domains/common — общий модуль проекта внутри domains (не домен): его знает любой домен, он — ни одного
+    shared = "common" in domains
+    domains = [d for d in domains if d != "common"]
     out = [HEADER]
-    out.append('        domain-no-infra:\n          files:\n            - "**/internal/domains/**"\n          deny:\n')
+    out.append('        domain-no-infra:\n          files:\n            - "**/internal/domains/**"\n'
+               '            - "!$test" # правило — о коде пакета, тесты памятка не ограничивает\n          deny:\n')
     for sub, desc in [("infrastructure", "домен не знает инфраструктуру — порт в домене, адаптер в infrastructure"),
                       ("entrypoints", "домен не знает точки входа"), ("workflows", "домен не вызывает workflow"),
                       ("app", "домен не знает сборку")]:
@@ -105,15 +112,22 @@ def render_go(project: Path) -> str:
     if len(domains) > 1:
         out.append("        # Домены проекта не импортируют друг друга — по правилу на каждый домен (список доменов — internal/domains/*)\n")
         for d in domains:
-            out.append(f'        {d}-no-other-domains:\n          files:\n            - "**/internal/domains/{d}/**"\n          deny:\n')
+            out.append(f'        {d}-no-other-domains:\n          files:\n            - "**/internal/domains/{d}/**"\n'
+                       '            - "!$test"\n          deny:\n')
             for other in domains:
                 if other != d:
                     out.append(deny(f"{mod}/internal/domains/{other}", "чужой домен — через workflow или internal/common"))
+    if shared and domains:
+        out.append('        domains-common-no-domains:\n          files:\n            - "**/internal/domains/common/**"\n'
+                   '            - "!$test"\n          deny:\n')
+        for other in domains:
+            out.append(deny(f"{mod}/internal/domains/{other}", "общий модуль домены не знает — то же правило, что internal/common (common-with-logic)"))
     out.append('        workflow-no-workflow:\n          files:\n            - "**/internal/workflows/**"\n'
                '            - "!$test" # внешний тест workflow импортирует сам workflow\n          deny:\n')
     out.append(deny(f"{mod}/internal/workflows", "workflow не вызывает другой workflow"))
     out.append(deny(f"{mod}/internal/infrastructure", "workflow берёт интерфейсы доменов, не инфраструктуру"))
-    out.append('        entrypoint-no-infra:\n          files:\n            - "**/internal/entrypoints/**"\n          deny:\n')
+    out.append('        entrypoint-no-infra:\n          files:\n            - "**/internal/entrypoints/**"\n'
+               '            - "!$test"\n          deny:\n')
     out.append(deny(f"{mod}/internal/infrastructure", "точка входа — через сервис/workflow, инфраструктура собирается в bootstrap"))
     out.append(deny(f"{mod}/internal/app", "точка входа не знает сборку"))
     out.append('        common-no-internal:\n          files:\n            - "**/internal/common/**"\n'
@@ -124,6 +138,50 @@ def render_go(project: Path) -> str:
     return "".join(out)
 
 
+GOCHECK_SRC = Path(__file__).resolve().parent / "gocheck"
+
+
+def gocheck_binary() -> Path:
+    """Анализатор фреймворка (tools/lint/gocheck, только stdlib) — собирается в кеш один раз на версию исходника."""
+    tag = hashlib.sha1((GOCHECK_SRC / "main.go").read_bytes()).hexdigest()[:10]
+    binary = CACHE / f"gocheck-{tag}"
+    if not binary.exists():
+        CACHE.mkdir(parents=True, exist_ok=True)
+        env = dict(os.environ, GOFLAGS="-mod=mod", GOPROXY="off", GOWORK="off")
+        r = subprocess.run(["go", "build", "-o", str(binary), "."], cwd=GOCHECK_SRC, env=env, capture_output=True, text=True)
+        if r.returncode:
+            sys.exit("не собрался tools/lint/gocheck:\n" + r.stderr)
+    return binary
+
+
+def changed_go_files(project: Path, base) -> list[str]:
+    """Изменённые и новые .go; неверная ревизия или не git — ошибка (код 2), а не «изменённых нет»."""
+    d = subprocess.run(["git", "diff", "--name-only", "--diff-filter=ACMR", base, "--", "*.go"], cwd=project,
+                       capture_output=True, text=True)
+    if d.returncode:
+        print(f"gocheck: git diff {base} не выполнился — {d.stderr.strip()}", flush=True)
+        sys.exit(2)
+    diff = d.stdout.split()
+    new = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", "*.go"], cwd=project,
+                         capture_output=True, text=True).stdout.split()
+    prefix = subprocess.run(["git", "rev-parse", "--show-prefix"], cwd=project, capture_output=True, text=True).stdout.strip()
+    return sorted({f.removeprefix(prefix) for f in diff} | set(new))
+
+
+def run_gocheck(project: Path, base) -> int:
+    cmd = [str(gocheck_binary()), str(project)]
+    if base:
+        files = changed_go_files(project, base)
+        if not files:
+            print("gocheck: изменённых .go нет", flush=True)
+            return 0
+        cmd += files
+    print(f"$ gocheck {project}{' (' + str(len(cmd) - 2) + ' изменённых файлов)' if base else ''}", flush=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    sys.stdout.write(r.stdout + r.stderr)
+    return r.returncode
+
+
 def run_go(project: Path, base):
     cfg_dir = CACHE / (project.name + "-" + hashlib.sha1(str(project).encode()).hexdigest()[:8])
     cfg_dir.mkdir(parents=True, exist_ok=True)
@@ -132,7 +190,9 @@ def run_go(project: Path, base):
     cmd = ["golangci-lint", "run", "--config", str(cfg)]
     if base:
         cmd += ["--new-from-rev", base]
-    print(f"домены (правила «домен не импортирует другой»): {', '.join(domains_of(project)) or 'нет internal/domains'}", flush=True)
+    found = domains_of(project)
+    shared = " (internal/domains/common — общий модуль, не домен)" if "common" in found else ""
+    print(f"домены (правила «домен не импортирует другой»): {', '.join(d for d in found if d != 'common') or 'нет internal/domains'}{shared}", flush=True)
     print(f"конфиг: {cfg}\n$ {' '.join(cmd + ['./...'])}", flush=True)
     env = dict(os.environ, PWD=str(project))  # $PWD — алиас-симлинк проекта даёт ложный «0 issues»
     res = subprocess.run(cmd + ["./..."], cwd=project, env=env, capture_output=True, text=True)
@@ -144,7 +204,9 @@ def run_go(project: Path, base):
         res = subprocess.run(cmd + ["--tests=false", "./..."], cwd=project, env=env, capture_output=True, text=True)
         out = res.stdout + res.stderr
     sys.stdout.write(out)
-    return res.returncode
+    # правила без линтера в golangci (имена файлов, теги validate, SetTimeout пагинатора) — свой анализатор по AST
+    own = run_gocheck(project, base)  # и при находках golangci — иначе находки gocheck прятались бы за ними
+    return res.returncode or own
 
 
 PHP_TOOLS = "/tmp/df-lint"
@@ -226,6 +288,7 @@ parameters:
     docker(container, f"mkdir -p {work}/cache")
     docker(container, f"mkdir -p {PHP_TOOLS}/rules/P{tag}")
     docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/LayersArchitecture.php", php_rules.render_arch(ns, root, domains))
+    docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/{php_rules.EXCEPTION_RULE}.php", php_rules.render_exception_rule(ns))
     docker(container, f"cat > {work}/rules.neon", php_rules.render_neon(ns + "\\LayersArchitecture"))
     docker(container, f"cat > {work}/phpstan.neon", neon)
     files = []
@@ -238,11 +301,46 @@ parameters:
             print(f"нет изменённых PHP-файлов в {sub} относительно {base}")
             return 0
     cmd = f"cd {cpath} && php -d memory_limit=2G {PHP_TOOLS}/vendor/bin/phpstan analyse -c {work}/phpstan.neon --no-progress " + " ".join(files)
-    print(f"домены (правила «домен не знает другие»): {', '.join(domains) or 'нет ' + sub + '/Domains'}", flush=True)
+    shared = f" ({sub}/Domains/Common — общий модуль, не домен)" if "Common" in domains else ""
+    print(f"домены (правила «домен не знает другие»): {', '.join(d for d in domains if d != 'Common') or 'нет ' + sub + '/Domains'}{shared}", flush=True)
     print(f"правила: {container}:{work}\n$ {cmd}", flush=True)
     r = docker(container, cmd + " 2>&1")
     sys.stdout.write("\n".join(l for l in r.stdout.splitlines() if "Deprecated: PHP Startup" not in l) + "\n")
     return r.returncode
+
+
+RULES_TABLE = Path(__file__).resolve().parent.parent / "check" / "lint-proof" / "RULES.md"
+
+
+def remainder(stack: str) -> str:
+    """Остаток по правилам стека из RULES.md — что прогон не видит: ревьюеру не нужно открывать таблицу целиком."""
+    section, lines = None, []
+    for line in RULES_TABLE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            section = line[3:].split(" ")[0]
+            continue
+        if section != stack or not line.startswith("| ") or line.startswith("| Правило") or line.startswith("|---"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split(" | ")]
+        if len(cells) == 7:
+            lines.append(f"- {cells[0]} — {cells[1]}, правило `{cells[2]}`: {cells[4]}")  # источник — какой пункт памятки
+    return ("Остаток — проверить глазами (что прогон не видит; находка прогона — тег из строки её правила, уровень — по каталогу; "
+            "пункты памятки не из этого списка — целиком):\n" + "\n".join(lines) + "\n")
+
+
+def finished(stack: str, output: str) -> bool:
+    """Прогон дошёл до конца (с находками или без), а не упал."""
+    if stack == "Go":
+        # typecheck вне тестов — код не разобран, остальные линтеры пакет пропустили; тесты — повтор с --tests=false
+        broken = [l for l in output.splitlines() if "(typecheck)" in l and "_test.go:" not in l]
+        diff_failed = "Can't process results by diff processor" in output  # --new-from-rev не применился
+        # gocheck — итоговая строка обязательна: упал (нет прав, не собрался) — анализ не полный
+        own = re.search(r"^gocheck: (файлов: \d+; находок: \d+|изменённых \.go нет)$", output, re.M)
+        return bool(re.search(r"^\d+ issues?[.:]", output, re.M)) and "level=error" not in output and not broken \
+            and not diff_failed and bool(own)
+    if "Result is incomplete" in output:  # phpstan: синтаксическая ошибка в файле — правила по нему не отработали
+        return False
+    return bool(re.search(r"\[OK\] No errors|Found [\d+]+ errors?|нет изменённых PHP-файлов", output))
 
 
 def main():
@@ -253,16 +351,62 @@ def main():
     p.add_argument("--render", action="store_true", help="только напечатать собранный конфиг (go)")
     p.add_argument("--sub", help="php: каталог подпроекта (psr-4 из composer.json проекта), например parking_app")
     p.add_argument("--no-install", action="store_true", help="php: не ставить инструменты (агент ревью — без сети): нет — «не запускался», код 2")
-    p.add_argument("--container", default=os.environ.get("PHP_CONTAINER", "php-8.5"), help="php: контейнер с PHP проекта")
+    p.add_argument("--container", help="php: контейнер с PHP проекта (по умолчанию — найдёт или спросит, tools/lint/php_container.py)")
     a = p.parse_args()
+    if a.render:
+        sys.stdout.write(render_go(Path(a.project).expanduser().resolve()))
+        return 0
+    tee = Tee(sys.stdout)
+    sys.stdout = tee
+    try:
+        code = run(a)
+    finally:
+        sys.stdout = tee.out
+    stack = "Go" if a.stack == "go" else "PHP"
+    if finished(stack, tee.text()):
+        sys.stdout.write("\n" + remainder(stack))
+        if "--tests=false" in tee.text():
+            sys.stdout.write("тесты проекта не компилируются — прогон шёл без тестов: тесты задачи по правилам списка — глазами целиком\n")
+    else:
+        sys.stdout.write("\nпрогон не дошёл до конца — остатка нет: пункты памятки проверяются целиком\n")
+    return code
+
+
+class Tee:
+    """Копия вывода прогона — чтобы понять, дошёл ли он до конца."""
+
+    def __init__(self, out):
+        self.out, self.parts = out, []
+
+    def write(self, s):
+        self.parts.append(s)
+        return self.out.write(s)
+
+    def flush(self):
+        self.out.flush()
+
+    def text(self):
+        return "".join(self.parts)
+
+
+def check_base(project: Path, base):
+    """--base — существующая ревизия git проекта; иначе дифф не применяется и инструмент молча проверяет не то."""
+    if base and subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}"], cwd=project,
+                               capture_output=True).returncode:
+        print(f"--base {base}: нет такой ревизии в git проекта {project} — прогон не выполнен", flush=True)
+        sys.exit(2)
+
+
+def run(a):
     project = Path(a.project).expanduser().resolve()
+    check_base(project, a.base)
     if a.stack == "php":
         if not a.sub:
             sys.exit("php: нужен --sub <каталог подпроекта>")
-        return run_php(project, a.sub, a.container, a.base, a.no_install)
-    if a.render:
-        sys.stdout.write(render_go(project))
-        return 0
+        container = php_container.resolve(project, a.container)
+        if not container:
+            sys.exit(php_container.hint(project))
+        return run_php(project, a.sub, container, a.base, a.no_install)
     return run_go(project, a.base)
 
 

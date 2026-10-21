@@ -2,7 +2,8 @@
 # Прогон PHP-эталона stacks/php/examples в docker-контейнере с PHP: phpunit, затем phpstan.
 #
 # Переменные:
-#   PHP_CONTAINER  — имя запущенного контейнера с PHP >= 8.3 и composer (по умолчанию php-8.5)
+#   PHP_CONTAINER  — имя запущенного контейнера с PHP >= 8.3 и composer; не задано — запомненный контейнер стенда,
+#                    первый раз спросит и запомнит (tools/lint/php_container.py, у каждого разработчика свой)
 #   COMPOSER_AUTH  — JSON авторизации composer с gitlab-token для git.mpinnovations.kz
 #   MPS_AUTH_JSON  — или путь на хосте к auth.json с этим токеном (берётся, если COMPOSER_AUTH пуст);
 #                    не задан — путь из tools/php-check/.auth-path (одна строка, в git не попадает)
@@ -13,7 +14,7 @@
 # vendor живёт в контейнере (/tmp/df-php-check) и переиспользуется между прогонами.
 set -euo pipefail
 
-CONTAINER="${PHP_CONTAINER:-php-8.5}"
+CONTAINER="$(python3 "$(dirname "$0")/../lint/php_container.py" stand)" || exit 2
 WORKDIR=/tmp/df-php-check
 HERE="$(cd "$(dirname "$0")" && pwd)"
 EXAMPLES="$HERE/../../stacks/php/examples"
@@ -23,7 +24,7 @@ FORCE_INSTALL=
 dexec() { docker exec "$CONTAINER" sh -c "$1"; }
 
 docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true \
-    || { echo "Контейнер $CONTAINER не запущен (PHP_CONTAINER=...)" >&2; exit 2; }
+    || { echo "Контейнер $CONTAINER не запущен (PHP_CONTAINER=<имя>)" >&2; exit 2; }
 
 OWNER="$(docker exec "$CONTAINER" id -u):$(docker exec "$CONTAINER" id -g)"
 

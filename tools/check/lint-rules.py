@@ -20,13 +20,14 @@ import tags as tagcheck  # noqa: E402
 TABLE = "tools/check/lint-proof/RULES.md"
 STACKS = {
     "Go": {
-        "configs": ["stacks/go/examples/tariff/.golangci.yml"],
+        "configs": ["stacks/go/examples/tariff/.golangci.yml", "tools/lint/gocheck/main.go"],
         "proof": "tools/check/lint-proof/go.py",
-        "runs": {"skills/dev-rule/SKILL.md": "golangci-lint run", "approaches/process/self-check.md": "tools/lint/lint.py",
+        "runs": {"skills/dev-rule/SKILL.md": "tools/lint/lint.py go", "approaches/process/self-check.md": "tools/lint/lint.py",
                  "approaches/process/review.md": "tools/lint/lint.py"},
     },
     "PHP": {
-        "configs": ["stacks/php/examples/phpstan-rules.neon", "stacks/php/examples/tests/Architecture/LayersArchitecture.php"],
+        "configs": ["stacks/php/examples/phpstan-rules.neon", "stacks/php/examples/tests/Architecture/LayersArchitecture.php",
+                    "stacks/php/examples/tests/Architecture/GenericExceptionRule.php"],
         "proof": "tools/check/lint-proof/php.py",
         "runs": {"skills/dev-rule/SKILL.md": "php-check/run.sh", "tools/php-check/run.sh": "phpstan analyse",
                  "approaches/process/self-check.md": "tools/lint/lint.py", "approaches/process/review.md": "tools/lint/lint.py"},
@@ -60,12 +61,14 @@ def config_rules(stack):
         enabled = set(re.findall(r"^    - ([a-z0-9]+)", text, re.M))
         rules |= {e for e in enabled if e in ("forbidigo", "nlreturn")}
         rules |= {f"revive:{r}" for r in re.findall(r"- name: ([a-z0-9-]+)", text)}
+        rules |= {f"gocheck:{t}" for t in re.findall(r"\(([a-z0-9-]+)\)\"", read(STACKS["Go"]["configs"][1]))}
         return rules
     neon = read(STACKS["PHP"]["configs"][0])
     arch = read(STACKS["PHP"]["configs"][1])
     rules = set(re.findall(r"public function (test_[a-z0-9_]+)\(", arch))
     rules |= {f"disallowed:{c}" for c in re.findall(r"class: '([^']+)'", neon) if "\\" in c and "Tests\\" not in c}
     rules |= {f"disallowed:{f}" for f in re.findall(r"- '([a-z_]+\(\))'", neon)}
+    rules |= {f"rule:{r}" for r in re.findall(r"^    - [\w\\]+\\(\w+Rule)$", neon, re.M)}
     return rules
 
 
@@ -122,6 +125,32 @@ def main():
         problems.append("PHP: tests/Architecture/LayersArchitecture.php эталона не совпадает с выводом tools/lint/php_rules.py")
     if php_rules.render_neon("Tests\\Architecture\\LayersArchitecture") != read(STACKS["PHP"]["configs"][0]):
         problems.append("PHP: phpstan-rules.neon эталона не совпадает с выводом tools/lint/php_rules.py")
+    if php_rules.render_exception_rule("Tests\\Architecture") != read(STACKS["PHP"]["configs"][2]):
+        problems.append("PHP: tests/Architecture/GenericExceptionRule.php эталона не совпадает с выводом tools/lint/php_rules.py")
+    # Ревьюер берёт остаток из вывода lint.py, не из таблицы: каждая строка таблицы — в его списке
+    import lint  # noqa: E402
+    # «Дошёл до конца» — по итогу инструмента; форматы итога, встреченные на проектах (иначе остаток молча не печатается
+    # или печатается после падения)
+    for stack, text, want in [
+        ("Go", "0 issues.\ngocheck: файлов: 3; находок: 0", True), ("Go", "12 issues:\n* depguard: 5\ngocheck: файлов: 3; находок: 1", True),
+        ("Go", "1 issue.\ngocheck: изменённых .go нет", True),
+        ("Go", "0 issues.\nopen _x: permission denied", False),
+        ("Go", "x.go:1:2: expected ';' (typecheck)\n1 issues:\ngocheck: файлов: 3; находок: 0", False),
+        ("Go", "a_test.go:3:4: undefined: x (typecheck)\n0 issues.\ngocheck: файлов: 3; находок: 0", True),
+        ("Go", "level=error msg=\"Running error\"\ngocheck: файлов: 3; находок: 0", False),
+        ("Go", "level=warning msg=\"[runner] Can't process results by diff processor: x\"\n0 issues.\ngocheck: файлов: 3; находок: 0", False),
+        ("Go", "gocheck: файлов: 3; находок: 0", False),
+        ("PHP", " [OK] No errors", True), ("PHP", " [ERROR] Found 2 errors", True), ("PHP", " [ERROR] Found 1000+ errors", True),
+        ("PHP", "Result is incomplete because of severe errors.\n [ERROR] Found 1 error", False),
+        ("PHP", "PHP Fatal error: Allowed memory size", False),
+    ]:
+        if lint.finished(stack, text) != want:
+            problems.append(f"lint.py finished({stack}, {text[:40]!r}) — не {want}")
+    for stack in STACKS:
+        n_rows = sum(1 for st, _ in rows if st == stack)
+        n_out = lint.remainder(stack).count("\n- ")
+        if n_out != n_rows:
+            problems.append(f"{stack}: lint.py печатает остаток по {n_out} правилам, в таблице {n_rows}")
     for stack in STACKS:
         for r in sorted(config_rules(stack) - seen_rules[stack]):
             problems.append(f"{stack}: правило конфига «{r}» без строки в {TABLE}")

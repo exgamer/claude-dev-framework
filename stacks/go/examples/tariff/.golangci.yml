@@ -20,6 +20,7 @@ linters:
         domain-no-infra:
           files:
             - "**/internal/domains/**"
+            - "!$test" # правило — о коде пакета, тесты памятка не ограничивает
           deny:
             - pkg: "example.com/parking-service/internal/infrastructure"
               desc: "домен не знает инфраструктуру — порт в домене, адаптер в infrastructure"
@@ -39,6 +40,7 @@ linters:
         billing-no-other-domains:
           files:
             - "**/internal/domains/billing/**"
+            - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/domains/handbook"
               desc: "чужой домен — через workflow или internal/common"
@@ -47,6 +49,7 @@ linters:
         handbook-no-other-domains:
           files:
             - "**/internal/domains/handbook/**"
+            - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/domains/billing"
               desc: "чужой домен — через workflow или internal/common"
@@ -55,6 +58,7 @@ linters:
         identity-no-other-domains:
           files:
             - "**/internal/domains/identity/**"
+            - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/domains/billing"
               desc: "чужой домен — через workflow или internal/common"
@@ -72,6 +76,7 @@ linters:
         entrypoint-no-infra:
           files:
             - "**/internal/entrypoints/**"
+            - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/infrastructure"
               desc: "точка входа — через сервис/workflow, инфраструктура собирается в bootstrap"

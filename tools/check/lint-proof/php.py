@@ -6,10 +6,14 @@
     python3 tools/check/lint-proof/php.py [PHP_CONTAINER]
 Нарушение кладётся файлом в рабочую копию стенда в контейнере, анализируется только этот файл, файл удаляется.
 """
+import os
 import subprocess
 import sys
 
-CONTAINER = sys.argv[1] if len(sys.argv) > 1 else "php-8.5"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lint"))
+import php_container  # noqa: E402
+
+CONTAINER = php_container.resolve(None, sys.argv[1] if len(sys.argv) > 1 else None) or sys.exit(php_container.hint())
 WORKDIR = "/tmp/df-php-check"
 R = "App\\ParkingApp"
 CASES = [  # (имя, путь в parking_app, код класса, ожидаемый идентификатор или None — нарушения быть не должно)
@@ -57,6 +61,27 @@ CASES = [  # (имя, путь в parking_app, код класса, ожидае
      None),
     ("разрешено: фасад DB в миграции", "Infrastructure/Postgres/Billing/Providers/database/migrations/zz_v.php",
      "return new class () { public function up(): void { \\Illuminate\\Support\\Facades\\DB::statement('select 1'); } };",
+     None),
+    ("new RuntimeException в сервисе", "Domains/Billing/Modules/Tariffs/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(): void {{ throw new \\RuntimeException('x'); }} }}",
+     "devFramework.exceptionNotDomainType"),
+    ("new Exception через use", "Workflows/ZzV.php",
+     f"namespace {R}\\Workflows;\nuse Exception;\nfinal class ZzV {{ public function f(): void {{ throw new Exception('x'); }} }}",
+     "devFramework.exceptionNotDomainType"),
+    ("new InvalidArgumentException", "Domains/Billing/Modules/Tariffs/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(): void {{ throw new \\InvalidArgumentException('x'); }} }}",
+     "devFramework.exceptionNotDomainType"),
+    ("throw_if со встроенным исключением", "Domains/Billing/Modules/Tariffs/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(bool $b): void {{ throw_if($b, \\LogicException::class, 'x'); }} }}",
+     "devFramework.exceptionNotDomainType"),
+    ("разрешено: исключение ядра", "Domains/Billing/Modules/Tariffs/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nuse MPS\\Core\\Exceptions\\NotFoundAppException;\nfinal class ZzV {{ public function f(): void {{ throw new NotFoundAppException('x'); }} }}",
+     None),
+    ("разрешено: catch Exception", "Domains/Billing/Modules/Tariffs/ZzV.php",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(): void {{ try {{ $this->g(); }} catch (\\Exception $e) {{ unset($e); }} }} private function g(): void {{}} }}",
+     None),
+    ("разрешено: new Exception в тестах", "../tests/Unit/ZzV.php",
+     "namespace Tests\\Unit;\nfinal class ZzV { public function f(): \\Exception { return new \\Exception('x'); } }",
      None),
     ("разрешено: фасад DB в тестах", "../tests/Unit/ZzV.php",
      "namespace Tests\\Unit;\nfinal class ZzV { public function f(): void { \\Illuminate\\Support\\Facades\\DB::table('x'); } }",

@@ -33,9 +33,29 @@ CASES = [  # (имя, путь файла, код, что должно быть 
  ("разрешено: имя с подчёркиванием", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc zzF() int {\n\tmax_value := 1\n\n\treturn max_value\n}\n', None),
  ("разрешено: внешний тест workflow импортирует workflow", "internal/workflows/billing/tariff/zz_v_test.go", f'package tariff_test\nimport _ "{M}/internal/workflows/billing/tariff"\n', None),
  ("Url вместо URL", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc ZzF() string {\n\tbaseUrl := "x"\n\n\treturn baseUrl\n}\n', "var-naming"),
+ ("SetTimeout пагинатора с time.Second", "internal/infrastructure/postgres/billing/tariff/zz_v.go", 'package tariff\nimport (\n\t"time"\n\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/helpers"\n)\nfunc zzF(h *helpers.GormPaginatedHelper[int]) {\n\th.SetTimeout(10 * time.Second)\n}\n', "paginator-timeout-units"),
+ ("разрешено: SetTimeout пагинатора числом", "internal/infrastructure/postgres/billing/tariff/zz_v.go", 'package tariff\nimport "git.mpinnovations.kz/mps/go-packages/gosdk-db-core/pkg/query/helpers"\nfunc zzF(h *helpers.GormPaginatedHelper[int]) {\n\th.SetTimeout(10)\n}\n', None),
+ ("validate без binding в запросе", "internal/entrypoints/admin/http/billing/tariff/zz_v.go", 'package tariff\ntype zzRequest struct {\n\tName string `json:"name" validate:"required,max=255"`\n}\n\nvar _ = zzRequest{}\n', "validate-tag-ignored"),
+ ("validate расходится с binding", "internal/entrypoints/admin/http/billing/tariff/zz_v.go", 'package tariff\ntype zzRequest struct {\n\tName string `json:"name" binding:"required" validate:"required,max=255"`\n}\n\nvar _ = zzRequest{}\n', "validate-tag-ignored"),
+ ("разрешено: validate совпадает с binding", "internal/entrypoints/admin/http/billing/tariff/zz_v.go", 'package tariff\ntype zzRequest struct {\n\tName string `json:"name" binding:"required" validate:"required"`\n}\n\nvar _ = zzRequest{}\n', None),
+ ("файл ports.go", "internal/domains/billing/tariff/ports.go", 'package tariff\n', "interface-file-generic-name"),
+ ("файл utils.go", "internal/domains/billing/tariff/utils.go", 'package tariff\n', "file-named-by-abstraction"),
+ ("разрешено: тест домена импортирует gorm", "internal/domains/billing/tariff/zz_v_test.go", 'package tariff\nimport (\n\t"testing"\n\n\t"gorm.io/gorm"\n)\nfunc TestZz(t *testing.T) {\n\tvar _ *gorm.DB\n}\n', None),
  ("Id вместо ID", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc ZzF() int {\n\tparkingId := 1\n\n\treturn parkingId\n}\n', "var-naming"),
 ]
 env = dict(os.environ, GOFLAGS="-mod=mod", GOPROXY="off", GOSUMDB="off", GOPRIVATE="", GONOPROXY="")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lint"))
+import lint  # noqa: E402  — анализатор фреймворка gocheck: правила без линтера в golangci
+
+GOCHECK = str(lint.gocheck_binary())
+
+
+def run_all(cwd):
+    """golangci-lint + gocheck, как lint.py go: последняя строка — итог golangci («0 issues.»), если gocheck чист."""
+    g = subprocess.run(["golangci-lint", "run", "./..."], cwd=cwd, env=env, capture_output=True, text=True)
+    c = subprocess.run([GOCHECK, cwd], capture_output=True, text=True)
+    own = [l for l in c.stdout.splitlines() if not l.startswith("gocheck:")]
+    return "\n".join(own) + "\n" + g.stdout + g.stderr
 work = tempfile.mkdtemp(prefix="lintproof-")
 dst = os.path.join(work, "tariff")
 shutil.copytree(SRC, dst)
@@ -44,8 +64,7 @@ for name, path, code, expect in CASES:
     full = os.path.join(dst, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
     open(full, "w").write(code)
-    out = subprocess.run(["golangci-lint", "run", "./..."], cwd=dst, env=env, capture_output=True, text=True)
-    text = out.stdout + out.stderr
+    text = run_all(dst)
     if expect is None:  # разрешённое правилами: замечаний быть не должно (zzsub создаётся предыдущим случаем)
         ok = "zz_v" not in text and text.strip().splitlines()[-1] == "0 issues."
         fails += not ok
@@ -57,7 +76,7 @@ for name, path, code, expect in CASES:
         if os.path.isdir(sub):
             shutil.rmtree(sub)
         continue
-    ok = expect in text and "zz_v.go" in text
+    ok = expect in text and os.path.basename(path) in text
     # Цикл импорта — нарушение ловит сборка; только он, иная ошибка (опечатка в пути) — не «поймано»
     cycle = False
     if not ok:
@@ -68,8 +87,8 @@ for name, path, code, expect in CASES:
     os.remove(full)
     if not os.listdir(os.path.dirname(full)):
         os.rmdir(os.path.dirname(full))
-clean = subprocess.run(["golangci-lint", "run", "./..."], cwd=dst, env=env, capture_output=True, text=True)
-last = (clean.stdout + clean.stderr).strip().splitlines()[-1]
+clean = run_all(dst)
+last = clean.strip().splitlines()[-1] if clean.startswith("\n") else "gocheck: " + clean.splitlines()[0]
 print("чистый эталон:", last)
 fails += last != "0 issues."
 shutil.rmtree(work)

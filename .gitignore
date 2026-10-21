@@ -18,5 +18,8 @@ tools/graph/corpus/
 # Стенд PHP-эталона: путь к auth.json с токеном — локальный
 tools/php-check/.auth-path
 
+# PHP-контейнеры разработчика (tools/lint/php_container.py): у каждого свои имена
+tools/lint/.php-containers.json
+
 # Локальные настройки Claude Code
 .claude/settings.local.json

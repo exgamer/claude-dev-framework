@@ -139,7 +139,7 @@ tools/sdk-ref/   генераторы справочников SDK/ядра из
 tools/graph/     граф правил (graphify) для /dev-rule: найти все места темы, проверить правку, сверка на противоречия
 tools/php-check/ прогон PHP-эталона: phpunit + phpstan в docker (run.sh)
 tools/lint/      механические правила фреймворка на проекте конфигом фреймворка, без файлов в проекте (lint.py go|php, tools/lint/README.md)
-tools/check/     проверки фреймворка после правки: битые ссылки и орфаны (links.py), теги и уровни (tags.py), правила анализаторов не потерялись и вызываются (lint-rules.py, таблица tools/check/lint-proof/RULES.md), доказательства (lint-proof/); весь набор — /dev-rule, Шаг 3а и /dev-rule audit
+tools/check/     проверки фреймворка после правки: битые ссылки и орфаны (links.py), ссылки на несуществующие пункты и разделы (refs.py), формат журнала и бэклога (tables.py), синтаксис блоков кода go/php (codeblocks.py), кандидаты в дубли (dups.py), теги и уровни (tags.py), цепочки загрузки ролей и их разница с HEAD (roles.py), правила анализаторов не потерялись и вызываются (lint-rules.py, таблица tools/check/lint-proof/RULES.md), доказательства (lint-proof/); весь набор — /dev-rule, Шаг 3а и /dev-rule audit
 install.sh       симлинки: фреймворк в ~/.claude, скиллы и агенты — в .claude проекта
 ```
 

@@ -19,6 +19,10 @@ def regex_root(root: str) -> str:
 
 def render_arch(namespace: str, root: str, domains: list[str]) -> str:
     rr = regex_root(root)
+    # Domains/Common — общий модуль проекта внутри Domains (старая раскладка), не домен: его знает любой домен,
+    # а сам он не знает ни доменов, ни внешних слоёв
+    shared = "Common" in domains
+    domains = [d for d in domains if d != "Common"]
     out = [f"""<?php
 
 declare(strict_types=1);
@@ -72,6 +76,20 @@ final class LayersArchitecture
             ->because('чужой домен — через workflow или Common');
     }}
 """)
+    if shared and domains:
+        targets = "\n".join(f"                Selector::inNamespace(self::ROOT . '\\Domains\\{o}')," for o in domains)
+        out.append(f"""
+    public function test_domains_common_has_no_domain_dependencies(): Rule
+    {{
+        return PHPat::rule()
+            ->classes(Selector::inNamespace(self::ROOT . '\\Domains\\Common'))
+            ->shouldNotDependOn()
+            ->classes(
+{targets}
+            )
+            ->because('Domains/Common — общий модуль проекта: его знают домены, сам он доменов не знает — то же правило, что Common/ (common-with-logic)');
+    }}
+""")
     layers = "\n".join(f"                Selector::inNamespace(self::ROOT . '\\{l}')," for l in LAYERS)
     out.append(f"""
     public function test_common_has_no_layer_dependencies(): Rule
@@ -115,6 +133,84 @@ final class LayersArchitecture
     return "".join(out)
 
 
+EXCEPTION_RULE = "GenericExceptionRule"
+
+
+def render_exception_rule(namespace: str) -> str:
+    """Своё правило phpstan: встроенное исключение PHP (`\\Exception`, `\\RuntimeException`, `\\InvalidArgumentException`,
+    `\\Error`…) через `new` или `throw_if`/`throw_unless(…, X::class)` в коде приложения — только исключения ядра
+    (`stacks/php/conventions.md` п. 13). Запрет класса через disallowed-calls задел бы и `catch (\\Exception $e)`."""
+    return f"""<?php
+
+declare(strict_types=1);
+
+namespace {namespace};
+
+use PhpParser\\Node;
+use PhpParser\\Node\\Expr\\ClassConstFetch;
+use PhpParser\\Node\\Expr\\FuncCall;
+use PhpParser\\Node\\Expr\\New_;
+use PhpParser\\Node\\Name;
+use PHPStan\\Analyser\\Scope;
+use PHPStan\\Reflection\\ReflectionProvider;
+use PHPStan\\Rules\\Rule;
+use PHPStan\\Rules\\RuleErrorBuilder;
+
+/**
+ * Собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
+ * Тег exception-not-domain-type: бросать только исключения ядра (*AppException), не встроенные исключения PHP.
+ * Тесты и миграции не проверяются.
+ *
+ * @implements Rule<Node\\Expr>
+ */
+final class {EXCEPTION_RULE} implements Rule
+{{
+    public function __construct(private readonly ReflectionProvider $reflection)
+    {{
+    }}
+
+    public function getNodeType(): string
+    {{
+        return Node\\Expr::class;
+    }}
+
+    public function processNode(Node $node, Scope $scope): array
+    {{
+        $file = str_replace('\\\\', '/', $scope->getFile());
+        if (str_contains($file, '/tests/') || str_contains($file, '/database/migrations/')) {{
+            return [];
+        }}
+        $name = null;
+        if ($node instanceof New_ && $node->class instanceof Name) {{
+            $name = $node->class;
+        }} elseif ($node instanceof FuncCall && $node->name instanceof Name
+            && in_array(strtolower($node->name->toString()), ['throw_if', 'throw_unless'], true)
+            && isset($node->args[1]) && $node->args[1] instanceof Node\\Arg
+            && $node->args[1]->value instanceof ClassConstFetch && $node->args[1]->value->class instanceof Name) {{
+            $name = $node->args[1]->value->class;
+        }}
+        if ($name === null) {{
+            return [];
+        }}
+        $class = ltrim($scope->resolveName($name), '\\\\');
+        if (!$this->reflection->hasClass($class)) {{
+            return [];
+        }}
+        $reflection = $this->reflection->getClass($class);
+        if (!$reflection->isBuiltin() || !$reflection->implementsInterface('Throwable')) {{
+            return [];
+        }}
+
+        return [
+            RuleErrorBuilder::message(sprintf('\\\\%s — встроенное исключение PHP; только исключения ядра (NotFoundAppException, ValidationAppException, …) (exception-not-domain-type)', $reflection->getName()))
+                ->identifier('devFramework.exceptionNotDomainType')
+                ->build(),
+        ];
+    }}
+}}
+"""
+
+
 def render_neon(arch_class: str) -> str:
     return f"""# Механические правила памятки для phpstan: собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
 # Нужны пакеты phpat/phpat и spaze/phpstan-disallowed-calls; каждое правило проверено заведомым нарушением.
@@ -124,6 +220,10 @@ services:
         class: {arch_class}
         tags:
             - phpat.test
+
+rules:
+    # встроенное исключение PHP (new, throw_if/throw_unless) вне тестов и миграций — только исключения ядра (conventions.md п. 13)
+    - {arch_class.rsplit(chr(92), 1)[0]}\\{EXCEPTION_RULE}
 
 parameters:
     # Хранилище — только через Infrastructure (architecture/layers.md): фасад DB вне Infrastructure, миграций и тестов —
