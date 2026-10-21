@@ -12,7 +12,7 @@ python3 tools/lint/lint.py go <проект> --render     # напечатать
 
 - Нужен `golangci-lint` v2 на машине — ставится один раз (`brew install golangci-lint`), не в проект.
 - Конфиг — `~/.cache/dev-framework-lint/<проект>/golangci.yml`: модуль из `go.mod`, домены из `internal/domains/*` (по правилу «домен не импортирует другой» на каждый).
-- Затем — анализатор фреймворка `tools/lint/gocheck` (Go, только стандартная библиотека, разбор AST): правила, которых нет в golangci-lint, — `SetTimeout` пагинатора с `time.Second`, тег `validate` без `binding` или с другими правилами в `internal/entrypoints/`, файлы `ports.go`/`interfaces.go`/`dependencies.go`/`types.go`/`const.go`/`utils.go`. Собирается в `~/.cache/dev-framework-lint/` один раз на версию исходника (нужен `go`, сеть не нужна); с `--base` — только изменённые и новые `.go`. `ruleguard` (gocritic) не подошёл: требует собранный пакет `dsl` в старом GOPATH.
+- Затем — анализатор фреймворка `tools/lint/gocheck` (Go, только стандартная библиотека, разбор AST): правила, которых нет в golangci-lint, — `SetTimeout` пагинатора с `time.Second`, тег `validate` без `binding` или с другими правилами в `internal/entrypoints/`, файлы `ports.go`/`interfaces.go`/`dependencies.go`/`types.go`/`const.go`/`constants.go`/`consts.go`/`utils.go`/`helpers.go`/`common.go`/`misc.go`, ссылки на артефакты задачи в комментариях и строках (`R15:`, `design §`, `docs/tasks/`). Собирается в `~/.cache/dev-framework-lint/` один раз на версию исходника (нужен `go`, сеть не нужна); с `--base` — только изменённые и новые `.go`. `ruleguard` (gocritic) не подошёл: требует собранный пакет `dsl` в старом GOPATH.
 - Тесты проекта не компилируются — прогон говорит об этом и анализирует без тестов: одна сломанная заглушка не прячет анализ.
 
 ## PHP
@@ -23,9 +23,24 @@ python3 tools/lint/lint.py php <проект> --sub parking_app [--container <и
 
 - Запуск — в PHP-контейнере проекта: нужен `vendor/autoload.php` проекта. Контейнер — `--container`, `PHP_CONTAINER`, запомненный для проекта или единственный запущенный, в который смонтирован проект; иначе спросит в терминале и запомнит (`tools/lint/php_container.py`, `tools/lint/.php-containers.json` у разработчика, в git не попадает; спрашивает и `install.sh`). Имя контейнера в фреймворке не зашито — у каждого разработчика своё. Путь проекта в контейнере — по его монтированиям.
 - Инструменты фреймворка — phpstan, `phpat/phpat`, `spaze/phpstan-disallowed-calls` (без зависимостей от Laravel) — ставятся один раз в контейнер в `/tmp/df-lint`, не в проект; публичные пакеты, токен не нужен.
-- Правила — под неймспейс подпроекта (`psr-4` из `composer.json`) и его домены (`<sub>/Domains/*`); классы правил (`LayersArchitecture` — phpat, `GenericExceptionRule` — своё правило phpstan на `new \Exception`/`new \RuntimeException`) — в автозагрузке инструментов (`/tmp/df-lint/rules/`).
+- Правила — под неймспейс подпроекта (`psr-4` из `composer.json`) и его домены (`<sub>/Domains/*`); классы правил (`LayersArchitecture` — phpat; свои правила phpstan: `GenericExceptionRule` — `new \Exception`/`new \RuntimeException`, `StatusSetDirectlyRule` — запись `status`/`is_default` мимо перехода, `EloquentRelationRule` — связи в модели) — в автозагрузке инструментов (`/tmp/df-lint/rules/`).
+- Маршруты (`<sub>/Entrypoints/**/routes.php`: `api.response` первым, id в пути без ограничения, `403` в Swagger у маршрута под `permission:`) — `tools/lint/php_routes.py` на хосте после phpstan, без PHP; с `--base` — только находки, задетые добавленными строками диффа (`git diff -U0`; новый файл — целиком): строка ограничения id, цепочка группы или маршрута, атрибуты метода контроллера; старые строки изменённого `routes.php` — не находка задачи.
 - Включены **только правила фреймворка** (`customRulesetUsed`) — проверки phpstan по уровням и ошибки собственного phpstan проекта сюда не смешиваются.
 - `--base` — анализируются только изменённые PHP-файлы подпроекта.
+
+## Глушение проверок в диффе (оба стека)
+
+С `--base` после правил стека `lint.py` запускает `tools/lint/diff_silence.py` (правило — `core/principles.md`, «Честность результата», тег `check-silenced`): в **добавленных строках** диффа и в новых файлах задачи — `//nolint` не в виде `//nolint:<линтер> // причина`, `t.Skip`, `@phpstan-ignore*`, `markTestSkipped`/`markTestIncomplete`, `#[CodeCoverageIgnore]`/`@codeCoverageIgnore` без причины комментарием на той же или предыдущей строке (строка-тег docblock — `* @author …`, `* @return …` — не причина; у пропуска теста причина — и сообщение-строка со словом: `t.Skip("нужен брокер")`, `markTestSkipped('нет ext-intl')`; `t.SkipNow()`, `markTestSkipped()`, `('')` — находка); в `.golangci.yml` — новые записи `disable`, `disabled-checks`, `exclusions`, `exclude*`, `skip-*`, `disable-all: true`/`disabled: true`; в `phpstan*.neon` — понижение `level` относительно ревизии, новые записи `ignoreErrors`, `excludePaths`. Находка — `файл:строка: [check-silenced] …`, итог — строка `silence: файлов: N; находок: M`. С `--sub` (PHP-монорепозиторий) — только файлы подпроекта и `phpstan*.neon*` в корне проекта и подпроекта. Без `--base` не запускается: полный прогон — не дифф, старые заглушки проекта — не находка задачи. Отдельно, без анализаторов: `python3 tools/lint/diff_silence.py <проект> --base <rev> [--sub <подпроект>]`. Доказательство — `tools/check/lint-proof/silence.py` (оба эталона целиком как дифф — 0).
+
+## Прогон на реальных проектах (правка анализаторов)
+
+```bash
+python3 tools/lint/real_projects.py add <go|php> <путь> [--sub X] [--container Y]  # запомнить проект
+python3 tools/lint/real_projects.py list
+python3 tools/lint/real_projects.py run [--range N] [--out <каталог>]
+```
+
+Правка, задевающая анализаторы, проверяется не только на эталонах, но и на реальных проектах разработчика (`skills/dev-rule/SKILL.md`, Шаг 3а): эталоны чисты по построению, шум новой проверки видит только чужой код. `run` — по каждому проекту `lint.py` дважды: полный прогон и `--base` на ревизию N коммитов назад (по умолчанию 20, без merge, по пути подпроекта); вывод — число находок по правилу (golangci — по линтеру, revive — по правилу, gocheck, phpstan — по identifier, routes, silence) и путь полного вывода. Только чтение: HEAD, `git status` и дифф рабочего дерева проекта до и после сравниваются — изменились, ошибка; файлы из `.gitignore` проекта (кеш, `vendor/`) сверка не видит. Список — `tools/lint/.real-projects.json` у разработчика (в git не попадает, путей проектов в фреймворке нет); нет списка — в терминале спросит и запомнит, не в терминале — код 2 с подсказкой `add`.
 
 ## Ограничения
 

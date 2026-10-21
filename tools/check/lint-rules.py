@@ -28,12 +28,20 @@ STACKS = {
     },
     "PHP": {
         "configs": ["stacks/php/examples/phpstan-rules.neon", "stacks/php/examples/tests/Architecture/LayersArchitecture.php",
-                    "stacks/php/examples/tests/Architecture/GenericExceptionRule.php"],
+                    "stacks/php/examples/tests/Architecture/GenericExceptionRule.php",
+                    "stacks/php/examples/tests/Architecture/StatusSetDirectlyRule.php",
+                    "stacks/php/examples/tests/Architecture/EloquentRelationRule.php", "tools/lint/php_routes.py"],
         "proof": "tools/check/lint-proof/php.py",
         "runs": {"skills/dev-rule/SKILL.md": "php-check/run.sh", "tools/php-check/run.sh": "phpstan analyse",
                  "approaches/process/self-check.md": "tools/lint/lint.py", "approaches/process/review.md": "tools/lint/lint.py"},
     },
 }
+
+
+# Глушение проверок в диффе (`silence:go`, `silence:php`) — tools/lint/diff_silence.py, доказательство — свой скрипт (случаи со стеком)
+SILENCE, SILENCE_PROOF = "tools/lint/diff_silence.py", "tools/check/lint-proof/silence.py"
+# Проверка маршрутов PHP (`routes:*`) — tools/lint/php_routes.py: стенд и lint.py вызывают его сами
+ROUTES_RUNS = {"tools/php-check/run.sh": "php_routes.py", "tools/lint/lint.py": "php_routes"}
 
 
 def read(path):
@@ -60,22 +68,28 @@ def config_rules(stack):
         text = read(STACKS["Go"]["configs"][0])
         rules = set(re.findall(r"^        ([a-z0-9-]+):\n          files:", text, re.M))
         enabled = set(re.findall(r"^    - ([a-z0-9]+)", text, re.M))
-        rules |= {e for e in enabled if e in ("forbidigo", "nlreturn")}
+        rules |= {e for e in enabled if e in ("errcheck", "forbidigo", "gci", "nlreturn")}
         rules |= {f"revive:{r}" for r in re.findall(r"- name: ([a-z0-9-]+)", text)}
         rules |= {f"gocheck:{t}" for t in re.findall(r"\(([a-z0-9-]+)\)\"", read(STACKS["Go"]["configs"][1]))}
-        return rules
+        return rules | silence_rules("Go")
     neon = read(STACKS["PHP"]["configs"][0])
     arch = read(STACKS["PHP"]["configs"][1])
     rules = set(re.findall(r"public function (test_[a-z0-9_]+)\(", arch))
     rules |= {f"disallowed:{c}" for c in re.findall(r"class: '([^']+)'", neon) if "\\" in c and "Tests\\" not in c}
     rules |= {f"disallowed:{f}" for f in re.findall(r"- '([a-z_]+\(\))'", neon)}
     rules |= {f"rule:{r}" for r in re.findall(r"^    - [\w\\]+\\(\w+Rule)$", neon, re.M)}
-    return rules
+    rules |= set(re.findall(r"`(routes:[a-z0-9-]+)`", read(STACKS["PHP"]["configs"][5])))
+    return rules | silence_rules("PHP")
+
+
+def silence_rules(stack):
+    return {r for r in re.findall(r"`(silence:[a-z]+)`", read(SILENCE)) if r == f"silence:{stack.lower()}"}
 
 
 def proof_cases(stack):
     text = read(STACKS[stack]["proof"])
-    return set(re.findall(r'^\s*\("([^"]+)",', text, re.M))
+    own = set(re.findall(r'^\s*\("([^"]+)",', text, re.M))
+    return own | set(re.findall(rf'^\s*\("([^"]+)", "{stack.lower()}",', read(SILENCE_PROOF), re.M))
 
 
 def main():
@@ -110,6 +124,8 @@ def main():
                 problems.append(f"{where}: случая «{c}» нет в {STACKS[stack]['proof']}")
         for path in re.findall(r"`([^`]+)`", runs):
             pattern = STACKS[stack]["runs"].get(path)
+            if r_routes := ROUTES_RUNS.get(path) if rule.startswith("routes:") else None:
+                pattern = r_routes  # маршруты — свой скрипт: место запуска вызывает его (или прогон, который его вызывает)
             if not os.path.isfile(path):
                 problems.append(f"{where}: нет файла запуска {path}")
             elif pattern is None or pattern not in read(path):
@@ -127,8 +143,13 @@ def main():
         problems.append("PHP: tests/Architecture/LayersArchitecture.php эталона не совпадает с выводом tools/lint/php_rules.py")
     if php_rules.render_neon("Tests\\Architecture\\LayersArchitecture") != read(STACKS["PHP"]["configs"][0]):
         problems.append("PHP: phpstan-rules.neon эталона не совпадает с выводом tools/lint/php_rules.py")
-    if php_rules.render_exception_rule("Tests\\Architecture") != read(STACKS["PHP"]["configs"][2]):
-        problems.append("PHP: tests/Architecture/GenericExceptionRule.php эталона не совпадает с выводом tools/lint/php_rules.py")
+    for i, (name, code) in enumerate(php_rules.render_own_rules("Tests\\Architecture").items()):
+        if code != read(STACKS["PHP"]["configs"][2 + i]):
+            problems.append(f"PHP: tests/Architecture/{name}.php эталона не совпадает с выводом tools/lint/php_rules.py")
+    if "diff_silence.check(" not in read("tools/lint/lint.py"):
+        problems.append("tools/lint/lint.py не вызывает проверку глушения tools/lint/diff_silence.py при --base")
+    if "php_routes" not in read("tools/lint/lint.py"):
+        problems.append("PHP: tools/lint/lint.py не вызывает проверку маршрутов tools/lint/php_routes.py")
     # Ревьюер берёт остаток из вывода lint.py, не из таблицы: каждая строка таблицы — в его списке
     import lint  # noqa: E402
     # «Дошёл до конца» — по итогу инструмента; форматы итога, встреченные на проектах (иначе остаток молча не печатается

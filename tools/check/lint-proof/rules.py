@@ -17,6 +17,8 @@ CASES = [  # (имя, файл, было, стало, что должно быт
     ("случай доказательства потерян", "tools/check/lint-proof/go.py", '("ctx не первым",', '("zz ctx",', "случая «ctx не первым» нет"),
     ("тег не из каталога", "tools/check/lint-proof/RULES.md", "| `initialism-case` |", "| `zz-missing-tag` |", "zz-missing-tag"),
     ("пустой «Остаток — агенту»", "tools/check/lint-proof/RULES.md", "| пустые строки между логическими блоками, builder по вызову на строку |", "|  |", "пустая колонка"),
+    ("lint.py не вызывает проверку глушения", "tools/lint/lint.py", "diff_silence.check(", "diff_silence.zz(", "не вызывает проверку глушения"),
+    ("случай глушения потерян", "tools/check/lint-proof/silence.py", '("t.Skip без причины",', '("zz skip",', "случая «t.Skip без причины» нет"),
     ("место запуска не вызывает прогон", "skills/dev-rule/SKILL.md", "tools/lint/lint.py go", "tools/lint/lint-zz go", "не вызывает прогон Go"),
 ]
 

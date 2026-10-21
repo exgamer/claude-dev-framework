@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Прогон PHP-эталона stacks/php/examples в docker-контейнере с PHP: phpunit, затем phpstan.
+# Прогон PHP-эталона stacks/php/examples в docker-контейнере с PHP: phpunit, затем phpstan; маршруты — tools/lint/php_routes.py на хосте.
 #
 # Переменные:
 #   PHP_CONTAINER  — имя запущенного контейнера с PHP >= 8.3 и composer; не задано — запомненный контейнер стенда,
@@ -7,7 +7,7 @@
 #   COMPOSER_AUTH  — JSON авторизации composer с gitlab-token для git.mpinnovations.kz
 #   MPS_AUTH_JSON  — или путь на хосте к auth.json с этим токеном (берётся, если COMPOSER_AUTH пуст);
 #                    не задан — путь из tools/php-check/.auth-path (одна строка, в git не попадает)
-#   TESTS_ONLY=1 / PHPSTAN_ONLY=1 — только одна из проверок
+#   TESTS_ONLY=1 / PHPSTAN_ONLY=1 — только phpunit / только phpstan и маршруты
 #
 # --install — поставить vendor заново (нужен токен). Без флага vendor ставится, только если его нет
 # или изменился composer.json. Токен в файлы стенда и в репозиторий не пишется.
@@ -75,5 +75,9 @@ fi
 if [ -z "${TESTS_ONLY:-}" ]; then
     echo "== phpstan"
     dexec "cd $WORKDIR && php -d memory_limit=2G vendor/bin/phpstan analyse --no-progress" 2>&1 | grep -v 'Deprecated: PHP Startup' || STATUS=1
+fi
+if [ -z "${TESTS_ONLY:-}" ]; then
+    echo "== routes"
+    python3 "$HERE/../lint/php_routes.py" "$EXAMPLES/parking_app" 'App\ParkingApp' || STATUS=1
 fi
 exit $STATUS

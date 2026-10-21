@@ -27,7 +27,13 @@ func signedRouter(storageFails bool) (*gin.Engine, *string) {
 	r := gin.New()
 	r.Use(gosdkmiddleware.FormattedResponseMiddleware())
 	r.POST("/tariffs/:id", SignatureAuthMiddleware(newPartnerService(storageFails), testSignatureSettings), func(c *gin.Context) {
-		body, _ := io.ReadAll(c.Request.Body)
+		body, readErr := io.ReadAll(c.Request.Body)
+		if readErr != nil {
+			c.Status(http.StatusInternalServerError)
+
+			return
+		}
+
 		*received = string(body)
 		c.Status(http.StatusOK)
 	})

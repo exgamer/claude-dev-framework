@@ -12,6 +12,9 @@ parameters:
         - parking_app
         - tests
     tmpDir: .phpstan
+    # env() вне config/ и config.php модуля проверяет правило фреймворка (phpstan-rules.neon, disallowed env()) — оно же работает на проектах
+    # через tools/lint/lint.py, где larastan нет; правило larastan считает конфигом config_path() testbench, не config/ эталона
+    noEnvCallsOutsideOfConfig: false
     ignoreErrors:
         # mps-core: CRUDRepository::query() объявлен контрактом Query\Builder, на деле — Eloquent\Builder
         - message: "#^Call to an undefined method Illuminate\\\\Contracts\\\\Database\\\\Query\\\\Builder::whereKey\\(\\)\\.$#"

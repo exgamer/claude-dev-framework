@@ -39,7 +39,13 @@ func (s *scopeRecorder) handler(c *gin.Context) {
 	}
 
 	s.noBody = c.Request.Body == http.NoBody
-	body, _ := io.ReadAll(c.Request.Body)
+	body, readErr := io.ReadAll(c.Request.Body)
+	if readErr != nil {
+		c.Status(http.StatusInternalServerError)
+
+		return
+	}
+
 	s.scope, s.body, s.called = scope, string(body), true
 	c.Status(http.StatusOK)
 }

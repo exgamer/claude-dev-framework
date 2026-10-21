@@ -11,6 +11,7 @@ linters:
   default: none
   enable:
     - depguard # слои и границы доменов
+    - errcheck # ошибка не игнорируется, в т. ч. через _
     - forbidigo # запрещённые вызовы
     - nlreturn # пустая строка перед return/continue/break
     - revive # ctx первым, ID в именах
@@ -139,6 +140,14 @@ linters:
           deny:
             - pkg: "example.com/parking-service/internal"
               desc: "pkg/ — код без домена: internal/** (в т. ч. internal/common) не импортирует; нужен доменный тип — код в слое домена"
+    errcheck:
+      check-blank: true # `_ =` и `v, _ :=` для ошибки — тоже потеря (checklist.md п. 20)
+      # CaptureSoft/CaptureError возвращают ту же, уже отправленную в трекер ошибку — вызов отдельной строкой (conventions.md п. 8, 19)
+      exclude-functions:
+        - git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter.CaptureSoft
+        - git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter.CaptureError
+        - github.com/exgamer/gosdk-core/pkg/errorreporter.CaptureSoft
+        - github.com/exgamer/gosdk-core/pkg/errorreporter.CaptureError
     forbidigo:
       forbid:
         - pattern: '^context\.(Background|TODO)$'
@@ -151,14 +160,29 @@ linters:
         - name: context-as-argument
         - name: var-naming
   exclusions:
+    # std-error-handling: ошибка Close/Flush/os.Remove/печати не проверяется errcheck — отложенное закрытие после чтения
+    # (conventions.md п. 8); закрытие после записи (файл, буферизованный writer) проверяет ревьюер
+    presets: [std-error-handling]
     rules:
+      # main, cmd/, console, app — точки запуска: корневой ctx создаётся здесь (conventions.md п. 1)
       - path: '(^|/)(main\.go|cmd/|internal/console/|internal/app/)'
         linters: [forbidigo]
+      # тесты создают свой ctx — правило о бизнес-коде (conventions.md п. 1)
       - path: '_test\.go$'
         linters: [forbidigo]
       # ctx — правило бизнес-кода (conventions.md п. 1): pkg/ и миграции — не бизнес-код
       - path: '(^|/)(pkg/|internal/migrations/)'
         linters: [forbidigo]
+      # код тестов вне _test.go (structure.md): e2e-обвязка tests/ и общие фейки internal/testsupport/
+      - path: '(^|/)(tests/|internal/testsupport/)'
+        linters: [forbidigo]
       # var-naming — только аббревиатуры (checklist.md п. 34); ALL_CAPS и подчёркивания правило фреймворка не запрещает
       - linters: [revive]
         text: "(don't use ALL_CAPS|don't use an underscore|don't use underscores|should not use underscores)"
+
+formatters:
+  enable:
+    - gci # импорты тремя группами: std / внешние / свои (checklist.md п. 33)
+  settings:
+    gci:
+      sections: [standard, default, localmodule]

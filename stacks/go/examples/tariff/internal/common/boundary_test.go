@@ -65,10 +65,16 @@ func forbiddenImports(root string) ([]string, int, error) {
 		}
 
 		files++
-		relative, _ := filepath.Rel(root, path)
+		relative, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
 
 		for _, spec := range file.Imports {
-			importPath, _ := strconv.Unquote(spec.Path.Value)
+			importPath, unquoteErr := strconv.Unquote(spec.Path.Value)
+			if unquoteErr != nil {
+				return unquoteErr
+			}
 
 			if !isAllowedImport(importPath) {
 				violations = append(violations, relative+": "+importPath)

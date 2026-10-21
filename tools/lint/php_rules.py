@@ -248,6 +248,235 @@ final class {EXCEPTION_RULE} implements Rule
 """
 
 
+STATUS_RULE = "StatusSetDirectlyRule"
+RELATION_RULE = "EloquentRelationRule"
+OWN_RULES = (EXCEPTION_RULE, STATUS_RULE, RELATION_RULE)
+
+_STATUS_RULE_PHP = r"""<?php
+
+declare(strict_types=1);
+
+namespace __NS__;
+
+use PhpParser\Node;
+use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\Assign;
+use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\NullsafeMethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Expr\StaticCall;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
+use PhpParser\Node\Scalar\String_;
+use PHPStan\Analyser\Scope;
+use PHPStan\Rules\Rule;
+use PHPStan\Rules\RuleErrorBuilder;
+use PHPStan\Type\ObjectType;
+use PHPStan\Type\Type;
+
+/**
+ * Собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
+ * Тег status-set-directly: поле состояния (status, is_default) пишет только метод модели или метод репозитория
+ * конкретного перехода — запись свойства модели, setAttribute() и ключ в массиве fill()/update()/create()… у модели,
+ * builder-а или репозитория вне классов модели, *Repository и *Factory (начальный статус при создании —
+ * regulations/entity.md). Тесты и database/ не проверяются.
+ *
+ * @implements Rule<Node\Expr>
+ */
+final class StatusSetDirectlyRule implements Rule
+{
+    private const FIELDS = ['status', 'is_default'];
+
+    private const WRITE_METHODS = [
+        'fill', 'forcefill', 'update', 'updatebyid', 'create', 'forcecreate', 'updateorcreate', 'firstorcreate',
+        'firstornew', 'updateorinsert', 'insert', 'upsert', 'setattribute',
+    ];
+
+    private const STORAGE = [
+        'Illuminate\Database\Eloquent\Model',
+        'Illuminate\Database\Eloquent\Builder',
+        'Illuminate\Database\Eloquent\Relations\Relation',
+        'Illuminate\Database\Query\Builder',
+    ];
+
+    public function getNodeType(): string
+    {
+        return Node\Expr::class;
+    }
+
+    public function processNode(Node $node, Scope $scope): array
+    {
+        $file = str_replace('\\', '/', $scope->getFile());
+        if (str_contains($file, '/tests/') || str_contains($file, '/database/')) {
+            return [];
+        }
+        $class = $scope->getClassReflection();
+        if ($class !== null && ($class->is(self::STORAGE[0]) || str_ends_with($class->getName(), 'Repository')
+            || str_ends_with($class->getName(), 'Factory'))) {
+            return [];
+        }
+        $field = $this->writtenField($node, $scope);
+        if ($field === null) {
+            return [];
+        }
+
+        return [
+            RuleErrorBuilder::message(sprintf('%s записан мимо перехода — только метод модели или метод репозитория конкретного перехода (status-set-directly)', $field))
+                ->identifier('devFramework.statusSetDirectly')
+                ->build(),
+        ];
+    }
+
+    private function writtenField(Node $node, Scope $scope): ?string
+    {
+        if ($node instanceof Assign && $node->var instanceof PropertyFetch && $node->var->name instanceof Identifier) {
+            $name = $node->var->name->toString();
+
+            return in_array($name, self::FIELDS, true) && $this->isStorage($scope->getType($node->var->var)) ? $name : null;
+        }
+        if (!($node instanceof MethodCall || $node instanceof NullsafeMethodCall || $node instanceof StaticCall)
+            || !$node->name instanceof Identifier || !in_array(strtolower($node->name->toString()), self::WRITE_METHODS, true)) {
+            return null;
+        }
+        $receiver = $node instanceof StaticCall
+            ? ($node->class instanceof Name ? new ObjectType($scope->resolveName($node->class)) : null)
+            : $scope->getType($node->var);
+        if ($receiver === null || !$this->isStorage($receiver)) {
+            return null;
+        }
+        $args = array_values(array_filter($node->args, static fn ($a): bool => $a instanceof Node\Arg));
+        if (strtolower($node->name->toString()) === 'setattribute') {
+            $first = $args[0]->value ?? null;
+
+            return $first instanceof String_ && in_array($first->value, self::FIELDS, true) ? $first->value : null;
+        }
+        foreach ($args as $arg) {
+            $found = $this->fieldInArray($arg->value);
+            if ($found !== null) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    private function fieldInArray(Node\Expr $expr): ?string
+    {
+        if (!$expr instanceof Array_) {
+            return null;
+        }
+        foreach ($expr->items as $item) {
+            if ($item->key instanceof String_ && in_array($item->key->value, self::FIELDS, true)) {
+                return $item->key->value;
+            }
+            $nested = $this->fieldInArray($item->value);
+            if ($nested !== null) {
+                return $nested;
+            }
+        }
+
+        return null;
+    }
+
+    private function isStorage(Type $type): bool
+    {
+        foreach (self::STORAGE as $storage) {
+            if ((new ObjectType($storage))->isSuperTypeOf($type)->yes()) {
+                return true;
+            }
+        }
+        foreach ($type->getObjectClassNames() as $name) {
+            if (str_ends_with($name, 'Repository') || str_ends_with($name, 'RepositoryInterface')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+"""
+
+_RELATION_RULE_PHP = r"""<?php
+
+declare(strict_types=1);
+
+namespace __NS__;
+
+use PhpParser\Node;
+use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Identifier;
+use PhpParser\NodeFinder;
+use PHPStan\Analyser\Scope;
+use PHPStan\Node\InClassMethodNode;
+use PHPStan\Rules\Rule;
+use PHPStan\Rules\RuleErrorBuilder;
+use PHPStan\Type\ObjectType;
+
+/**
+ * Собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
+ * Тег model-has-eloquent-relations: в Eloquent-модели нет методов-связей — метод возвращает Relation
+ * (по объявленному типу) или вызывает $this->hasMany()/belongsTo()/… Тесты не проверяются.
+ *
+ * @implements Rule<InClassMethodNode>
+ */
+final class EloquentRelationRule implements Rule
+{
+    private const RELATION_BUILDERS = [
+        'hasone', 'hasmany', 'belongsto', 'belongstomany', 'hasonethrough', 'hasmanythrough',
+        'morphto', 'morphone', 'morphmany', 'morphtomany', 'morphedbymany',
+    ];
+
+    public function getNodeType(): string
+    {
+        return InClassMethodNode::class;
+    }
+
+    public function processNode(Node $node, Scope $scope): array
+    {
+        if (str_contains(str_replace('\\', '/', $scope->getFile()), '/tests/')) {
+            return [];
+        }
+        $class = $node->getClassReflection();
+        if (!$class->is('Illuminate\Database\Eloquent\Model')) {
+            return [];
+        }
+        $method = $node->getMethodReflection();
+        $returns = (new ObjectType('Illuminate\Database\Eloquent\Relations\Relation'))
+            ->isSuperTypeOf($method->getVariants()[0]->getReturnType())->yes();
+        $builds = (new NodeFinder())->findFirst($node->getOriginalNode()->stmts ?? [], static fn (Node $n): bool => $n instanceof MethodCall
+            && $n->var instanceof Variable && $n->var->name === 'this'
+            && $n->name instanceof Identifier && in_array(strtolower($n->name->toString()), self::RELATION_BUILDERS, true)) !== null;
+        if (!$returns && !$builds) {
+            return [];
+        }
+
+        return [
+            RuleErrorBuilder::message(sprintf('%s::%s() — Eloquent-связь в модели; связанные данные — методом репозитория (model-has-eloquent-relations)', $class->getName(), $method->getName()))
+                ->identifier('devFramework.modelHasEloquentRelations')
+                ->build(),
+        ];
+    }
+}
+"""
+
+
+def render_status_rule(namespace: str) -> str:
+    """Своё правило phpstan: запись поля состояния мимо перехода (`stacks/php/checklist.md` п. 15a, O-28)."""
+    return _STATUS_RULE_PHP.replace("__NS__", namespace)
+
+
+def render_relation_rule(namespace: str) -> str:
+    """Своё правило phpstan: Eloquent-связь в модели (`stacks/php/conventions.md`, «Модели и внешние системы»)."""
+    return _RELATION_RULE_PHP.replace("__NS__", namespace)
+
+
+def render_own_rules(namespace: str) -> dict[str, str]:
+    """Свои правила phpstan: имя класса → код."""
+    return {EXCEPTION_RULE: render_exception_rule(namespace), STATUS_RULE: render_status_rule(namespace),
+            RELATION_RULE: render_relation_rule(namespace)}
+
+
 def render_neon(arch_class: str) -> str:
     return f"""# Механические правила памятки для phpstan: собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
 # Нужны пакеты phpat/phpat и spaze/phpstan-disallowed-calls; каждое правило проверено заведомым нарушением.
@@ -261,6 +490,10 @@ services:
 rules:
     # встроенное исключение PHP (new, throw_if/throw_unless) вне тестов и миграций — только исключения ядра (conventions.md п. 13)
     - {arch_class.rsplit(chr(92), 1)[0]}\\{EXCEPTION_RULE}
+    # status/is_default мимо перехода: свойство модели, setAttribute(), ключ в fill()/update()/create()… вне модели и *Repository (checklist.md п. 15a)
+    - {arch_class.rsplit(chr(92), 1)[0]}\\{STATUS_RULE}
+    # Eloquent-связь в модели: метод возвращает Relation или вызывает $this->hasMany()/belongsTo()/… (conventions.md, «Модели и внешние системы»)
+    - {arch_class.rsplit(chr(92), 1)[0]}\\{RELATION_RULE}
 
 parameters:
     # Хранилище — только через Infrastructure (architecture/layers.md): фасад DB вне Infrastructure, миграций и тестов —
@@ -281,6 +514,18 @@ parameters:
                 - '*/Infrastructure/*'
                 - '*/database/migrations/*'
                 - '*/tests/*'
+        -
+            class: 'Illuminate\\Support\\Facades\\Auth'
+            message: 'текущий пользователь — $request->user() в контроллере, в домен и workflow — значением (checklist.md п. 14)'
+            allowExceptIn:
+                - '*/Domains/*'
+                - '*/Workflows/*'
+        -
+            class: 'Auth'
+            message: 'фасад Auth (глобальный алиас Auth): текущий пользователь — $request->user() в контроллере, в домен и workflow — значением (checklist.md п. 14)'
+            allowExceptIn:
+                - '*/Domains/*'
+                - '*/Workflows/*'
     disallowedFunctionCalls:
         -
             function:
@@ -295,4 +540,24 @@ parameters:
                 - '*/commands.php'
                 - '*/database/migrations/*'
                 - '*/tests/*'
+        -
+            function:
+                - 'auth()'
+            message: 'текущий пользователь — $request->user() в контроллере, в домен и workflow — значением (checklist.md п. 14)'
+            allowExceptIn:
+                - '*/Domains/*'
+                - '*/Workflows/*'
+        -
+            function:
+                - 'env()'
+            message: 'env() — только в config/*.php и config.php модуля: после config:cache вне конфигов он возвращает null; в коде — config() (checklist.md п. 51)'
+            allowIn:
+                - '*/config/*'
+                - '*/config.php'
+        -
+            function:
+                - 'dd()'
+                - 'dump()'
+                - 'var_dump()'
+            message: 'отладочный вывод в коде — убрать; диагностика — логгер (checklist.md п. 52)'
 """

@@ -1,6 +1,6 @@
 # php-check — прогон PHP-эталона
 
-Проверяет `stacks/php/examples` по-настоящему: phpunit (unit и feature) и phpstan (larastan, уровень — `stacks/php/conventions.md` п. 23). Запускать после каждой правки PHP-эталона (`skills/dev-rule/SKILL.md`, шаг 3а).
+Проверяет `stacks/php/examples` по-настоящему: phpunit (unit и feature), phpstan (larastan, уровень — `stacks/php/conventions.md` п. 23) и маршруты (`tools/lint/php_routes.py`, на хосте). Запускать после каждой правки PHP-эталона (`skills/dev-rule/SKILL.md`, шаг 3а).
 
 ## Запуск
 
@@ -13,8 +13,8 @@ tools/php-check/run.sh             # прогон; vendor ставится са�
 
 - `PHP_CONTAINER` — запущенный контейнер с PHP >= 8.3 и composer. Не задан — запомненный контейнер стенда; первый раз спросит из запущенных и запомнит в `tools/lint/.php-containers.json` (у разработчика, в git не попадает).
 - `COMPOSER_AUTH`, `MPS_AUTH_JSON` или `.auth-path` — `gitlab-token` для `git.mpinnovations.kz` (пакеты `mps/core`, `mps/utils`, `mps/elastic-query`). Нужен только при установке vendor: при первом запуске и после правки `composer.json`. В файлы стенда токен не пишется, в контейнер передаётся через окружение `docker exec`, не аргументом.
-- `TESTS_ONLY=1` / `PHPSTAN_ONLY=1` — только одна проверка.
-- Код возврата: `0` — всё прошло, `1` — упали тесты или phpstan, `2` — не готово окружение (контейнер не запущен, нет токена для установки vendor).
+- `TESTS_ONLY=1` / `PHPSTAN_ONLY=1` — только phpunit / только phpstan и маршруты.
+- Код возврата: `0` — всё прошло, `1` — упали тесты, phpstan или проверка маршрутов (`tools/lint/php_routes.py`), `2` — не готово окружение (контейнер не запущен, нет токена для установки vendor).
 - Lock-файла нет: `mps/*` закреплены точно, а Laravel, testbench и larastan ставятся свежими в рамках `^` при каждой установке vendor.
 
 Работа идёт в контейнере, в `/tmp/df-php-check`. Эталон копируется туда при каждом запуске, а `vendor` остаётся там между запусками. В репозиторий ничего не возвращается.
@@ -27,7 +27,7 @@ tools/php-check/run.sh             # прогон; vendor ставится са�
 |---|---|
 | `tests/TestCase.php` | `Tests\TestCase` на testbench: провайдер подпроекта и логгер `mps/utils`, алиасы `verify.signature` и `api.response`, конфиги эталона `mps-utils`, `parking-app`, `services` (остальные `config/*.php` — фрагменты приложения, стенд их не грузит) |
 | `stub/App/Http/Controllers/Controller.php` | базовый контроллер приложения |
-| `phpstan.neon` | `ignoreErrors` только для шума типизации `mps/*` — с причиной у каждого; подключает правила эталона `phpstan-rules.neon` (phpat — слои и домены `tests/Architecture/LayersArchitecture.php`; `phpstan-disallowed-calls` — фасад `DB` вне менеджера транзакций и миграций, `app()`/`resolve()` в бизнес-коде). Каждое правило проверено заведомым нарушением: `python3 tools/check/lint-proof/php.py` после прогона |
+| `phpstan.neon` | `ignoreErrors` только для шума типизации `mps/*` — с причиной у каждого; подключает правила эталона `phpstan-rules.neon` (phpat — слои и домены `tests/Architecture/LayersArchitecture.php`; `phpstan-disallowed-calls` — фасад `DB` вне менеджера транзакций и миграций, `app()`/`resolve()` в бизнес-коде, `Auth`/`auth()` в домене и workflow, `env()` вне `config/` и `config.php` модуля, отладочный вывод; свои правила `tests/Architecture/*Rule.php`). Правило larastan `noEnvCallsOutsideOfConfig` выключено: `env()` проверяет правило фреймворка, а larastan считает конфигом каталог testbench, не `config/` эталона. Каждое правило проверено заведомым нарушением: `python3 tools/check/lint-proof/php.py` после прогона |
 
 Остальные алиасы хоста (`auth:admin-api`, `permission:*`, `resolve.admin.parkings`) общему `TestCase.php` не нужны: тест маршрутов Admin (`tests/Feature/ParkingApp/Admin/Billing/TariffRouteTest.php`) подменяет `permission` и `resolve.admin.parkings` у себя, `auth` снимает `withoutMiddleware`.
 

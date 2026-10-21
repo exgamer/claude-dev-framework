@@ -21,5 +21,8 @@ tools/php-check/.auth-path
 # PHP-контейнеры разработчика (tools/lint/php_container.py): у каждого свои имена
 tools/lint/.php-containers.json
 
+# Реальные проекты разработчика для прогона анализаторов (tools/lint/real_projects.py): пути — свои
+tools/lint/.real-projects.json
+
 # Локальные настройки Claude Code
 .claude/settings.local.json

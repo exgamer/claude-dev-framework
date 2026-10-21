@@ -17,6 +17,7 @@
 9. **В** Нет методов-обёрток над одной проверкой/вызовом (`findByIdOrFail`, `assertValid`). — `conventions.md` п. 12a
 49. **В** Запрос репозитория виден целиком: без приватных методов-кусков, колонки явно в каждом `select` (не константой), фильтры списка — в том же методе (в форме (1) P-19 — в `filterSearch()`); подзапрос — не больше чем в 2–3 методах, join и простые `where` повторяются свободно; большой запрос по чужим таблицам — несколько методов репозиториев, сервис/workflow собирает их готовые результаты (запросов в нём нет). — `architecture/layers.md`; `conventions.md` п. 2a; тег `query-split-into-pieces`
 49a. **О** Метод репозитория — один запрос: «выбрать и записать», «заблокировать и удалить», «прочитать модель и сохранить» — два метода, порядок и `run()` — в сервисе/Command/workflow; обновление — `update()` одним запросом. — `architecture/layers.md`; `conventions.md` п. 2b; тег `repository-multi-query`
+51. **О** `env()` — только в `config/*.php` и в конфиге модуля `config.php` (подключается `mergeConfigFrom()`, `structure.md`); в коде — `config('…')`: после `config:cache` (прод) `.env` не читается и `env()` вне конфигов возвращает `null` — настройка молча пропадает (тег `env-outside-config`).
 
 ## Ядро
 
@@ -26,15 +27,15 @@
 ## Request и данные
 
 11. **О** В Request нет SQL: ни `exists:`/`unique:`/`Rule::exists/unique`, ни своих правил/замыканий с моделью/`DB::`/репозиторием. Существование — в сервисе/workflow, уникальность — уникальный индекс + проверка в сервисе. — `conventions.md` п. 9a (P-17)
-12. **О** `id`/`*_id` → `integer|gt:0` и `max:` предела `bigint` (`'max:' . Request::ID_MAX`); id пути — так же в Request, без ограничения маршрута (`0`/`-1`/`abc` → 422, не 404; существующий `whereNumber` — **В**, унаследованное; `conventions.md` п. 20); `page` — `min:0` (0 — первая страница, `regulations/rest-api.md`) и `max:` `Page::MAX_PAGE` (10000); у строк, чисел и массивов есть `max:`; допустимые значения — `Rule::enum()`; вложенная коллекция DTO — `list` + `{поле}.*: array`; бизнес-правил в Request нет. — `regulations/rest-api.md`, «Валидация входа», `mps-core/data-objects.md`
+12. **О** `id`/`*_id` → `integer|gt:0` и `max:` предела `bigint` (`'max:' . Request::ID_MAX`); id пути — так же в Request, без ограничения маршрута (`0`/`-1`/`abc` → 422, не 404; существующий `whereNumber` — **В**, унаследованное; `conventions.md` п. 20; тег `route-id-constrained`); `page` — `min:0` (0 — первая страница, `regulations/rest-api.md`) и `max:` `Page::MAX_PAGE` (10000); у строк, чисел и массивов есть `max:`; допустимые значения — `Rule::enum()`; вложенная коллекция DTO — `list` + `{поле}.*: array`; бизнес-правил в Request нет. — `regulations/rest-api.md`, «Валидация входа», `mps-core/data-objects.md`
 13. **О** PUT — полные данные: в `UpdateRequest` каждое поле `required`, очищаемое — `present|nullable`. — `conventions.md` п. 12 (O-10)
 13a. **О** PUT/PATCH статус не меняют: `status` и другие флаги состояния в `UpdateRequest` и общий «сменить статус» — нет, переход — свой эндпоинт и Command (`status-in-update-request`). — `regulations/rest-api.md`, «Методы» (O-28)
-14. **О** Роль/право на операцию — middleware на маршруте (`permission:…`/`role:…`), не `hasRole`/`authorize()`/`Gate::` в контроллере или домене. Доступ (здание/организация из заголовка или параметров) — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр; сервис и репозиторий о правах не знают. — `conventions.md` п. 19a
+14. **О** Роль/право на операцию — middleware на маршруте (`permission:…`/`role:…`), не `hasRole`/`authorize()`/`Gate::` в контроллере или домене. Доступ (здание/организация из заголовка или параметров) — middleware контекста → `$request->attributes` → `RequestHelper` → сервис получает фильтр; сервис и репозиторий о правах не знают. Текущий пользователь — `$request->user()` в контроллере, в домен и workflow — значением; `Auth::`/`auth()` там — нет (тег `controller-auth-via-facade`). — `conventions.md` п. 19a
 15. **В** Значения входа DTO — `{E}DtoValidator::validate($dto)` → `ValidationAppException($message, $errors)` (`message` — как принято в проекте); правила состояния и переходов — методы модели (`canArchive()`, не мутаторы); не inline в сервисе, Command, workflow (`invariants-inline`). — `conventions.md` п. 10, `regulations/entity.md` (O-26)
 15a. **О** Статус меняет только метод модели или метод репозитория конкретного перехода (условный `UPDATE`, 0 строк — 422); `->status =` и `status` в `fill()`/`update()`/`create()` вне них — нет, начальный статус — модель или фабрика, не Request (`status-set-directly`). — `regulations/entity.md`, «Переход состояния» (O-28)
 16. **О** Между слоями — DTO (`DataObject`, private-свойства, геттеры, fluent-сеттеры), не массив; enum-поле DTO — enum. — `conventions.md` п. 11
 17. **В** Ключи (атрибуты, заголовки, теги кэша) и значения домена (типы, статусы, провайдеры, действия) — enum, не константы; повтор значения существующего enum константой и константы в интерфейсах — **О**; подмножество значений enum — метод enum, не `const array` из кейсов в другом классе. — `conventions.md` п. 12b
-18. **В** Список — по форме из «Список» `design.md`; новый список без раздела — вопрос, рекомендация (2); правимый сохраняет форму. Сортировка явная и стабильная; каждое поле запроса → поле фильтра → условие. — `conventions.md` п. 2c (P-19), 12c, 12d; `regulations/rest-api.md`, «Валидация входа»
+18. **В** Список — по форме из «Список» `design.md`; новый список без раздела — вопрос, рекомендация (2); правимый сохраняет форму. Сортировка явная и стабильная; каждое поле запроса → поле фильтра → условие. Два фильтра по одной колонке (`status` и производный `archived`): явный главнее умолчания производного, противоречивая явная пара — 422, сочетание — в Swagger (`list-filters-conflict`). — `conventions.md` п. 2c (P-19), 12c, 12d; `regulations/rest-api.md`, «Валидация входа»
 
 ## Транзакции и побочные эффекты
 
@@ -50,7 +51,7 @@
 
 ## HTTP
 
-24. **О** OpenAPI-атрибуты на каждом эндпойнте, с `500`; `404` — только у поиска записи по ID; тег `'{Context} {Подпроект}: {Сущность}'`. — `conventions.md` п. 18
+24. **О** OpenAPI-атрибуты на каждом эндпойнте, с `500` и кодами middleware маршрута (под `permission:…` — `403`); `404` — только у поиска записи по ID; тег `'{Context} {Подпроект}: {Сущность}'` (`controller-missing-swagger`). — `conventions.md` п. 18; `regulations/rest-api.md`, «Статусы»
 25. **О** Ответ — `response()->json(new {E}Response(...), 200|201)`, удаление — `204`; обёртку `success/data` не собирать (её даёт `ApiResponseMiddleware`); макросы `Response::ok()` — нет. — `conventions.md` п. 19
 26. **В** Маршруты: префикс, имена `{ресурсы}.{index|view|create|update|delete}`, действие над ресурсом — `{ресурсы}.{действие}` в kebab-case (`tariffs.set-default`), URL в kebab-case, middleware — строковым алиасом. — `conventions.md` п. 20
 50. **О** `api.response` — первым в middleware группы маршрутов: иначе 401/403 от `auth`/подписи/скоупа/прав уходят без `success/data` (тег `api-response-not-first`). — `conventions.md` п. 20
@@ -72,11 +73,13 @@
 36. **В** Имена по таблице `style.md` (`{Entity}Dto`, `{Entity}CrudService`, `{Action}Workflow`, enum `UPPER_SNAKE` + `Enumerable`).
 37. **О** Модель: `@property` по-русски, `$table` со схемой (таблица в `public` — без префикса), `$fillable`, `$casts` (enum → enum). — `style.md`
 48. **В** Читается сверху вниз: замыкание не передаёт поведение в свой метод (`->when()` → `if`), вызов не вкладывается в вызов и не индексируется на месте (`execute([getByKey()])[0]` → три строки; один уровень с коротким аргументом — `execute(Mapper::toDto($request))` — допустим; цепочки `array_*` → `foreach`/именованные переменные), лямбда — одна строка только где требует библиотека, без затенения внешних переменных, глубина блоков ≤ 2. — `core/style.md`, «Форма кода»; `style.md`; тег `nested-call-chain`
+52. **О** Отладочного вывода в коде нет: `dd()`, `dump()`, `var_dump()`, `ray()`, `->dd()`/`->dump()` у коллекции или запроса — убрать до коммита; диагностика — логгер (тег `debug-output-left`).
 
 ## Тесты и проверка
 
 38. **О** Unit-тесты на правила R*, ветки ошибок и кейсы `qa.md` уровня unit — в `tests/Unit/…`, путь повторяет путь класса. — `structure.md`, «Тесты»
 39. **О** Прогнаны `composer csfix-validate`, `composer phpstan` (уровень не ниже 5, шум mps — `ignoreErrors`, не `@phpstan-ignore`; находки — `phpstan-errors`), `composer test:run` (или аналоги проекта); вывод показан. Не запускал — так и написано. — `conventions.md` п. 23
+53. **В** Проверка не глушится вместо исправления: новые `@phpstan-ignore*`, `markTestSkipped`/`markTestIncomplete`, `#[CodeCoverageIgnore]`/`@codeCoverageIgnore`, понижение `level`, `ignoreErrors`/`excludePaths` в `phpstan*.neon` — с причиной комментарием рядом (у пропуска теста — или в сообщении `markTestSkipped('…')`) (тег `check-silenced`). — `core/principles.md`, «Честность результата»
 40. **О** Связи: по каждому изменённому классу/роуту/таблице/enum найдены использования (имя + строковый литерал); новое значение enum — в `in:`, swagger `enum:`, словарях фронта. — `approaches/process/impact-analysis.md`
 40a. **О** Миграция — строго по «Схеме БД» `design.md` (согласована); расхождение — снова согласование, не правка по месту. — `regulations/technical-approval.md`, «Схема БД»
 41. **О** Миграция обратно совместима (expand/contract), FK явно, порядок выкатки и откат описаны. — `approaches/patterns/migrations.md`

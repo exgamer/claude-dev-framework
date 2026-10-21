@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `interface-file-group` | [ВНИМАНИЕ] | В модуле домена или workflow интерфейс группы лежит не в файле своей группы (`repository.go`, `tx_manager.go`, `modules.go`, `system.go`) или в файле по имени одного интерфейса; файл с общим термином в имени (`ports.go`…) — `interface-file-generic-name` | `conventions.md` п. 12 |
 | `interface-file-generic-name` | [ОШИБКА] | Файл интерфейсов назван общим hexagonal-термином (`ports.go`, `interfaces.go`, `dependencies.go`) — не отражает, что объявлено; в модуле домена и workflow — вместо файла группы | `conventions.md` п. 12, 13 |
-| `file-named-by-abstraction` | [ВНИМАНИЕ] | Файл общих объявлений назван по абстракции (`types.go`, `const.go`, `utils.go`), а не по смыслу (`enum.go`, `dto.go`, `entity.go`) | `conventions.md` п. 13; `core/style.md`, «Имена» |
+| `file-named-by-abstraction` | [ВНИМАНИЕ] | Файл общих объявлений назван по абстракции (`types.go`, `const.go`, `constants.go`, `consts.go`, `utils.go`, `helpers.go`, `common.go`, `misc.go`), а не по смыслу (`enum.go`, `dto.go`, `entity.go`) | `conventions.md` п. 13; `core/style.md`, «Имена» |
 | `state-field-exported` | [ОШИБКА] | У новой сущности поле состояния (статус, флаг состояния) экспортируемое — его можно записать мимо методов перехода; нужно неэкспортируемое поле, геттер, методы перехода и `Restore*` | `regulations/entity.md`, «Переход состояния» (O-28) |
 | `nil-dependency-injected` | [ОШИБКА] | В конструктор тихо передан `nil` вместо зависимости, вместо явной опциональности (nil-check с деградацией) или разделения сервиса | `conventions.md` п. 21 |
 | `sdk-not-in-design` | [ВНИМАНИЕ] | Код на SDK, а источник и версия SDK не записаны в `design.md` (раздел «SDK») | `conventions.md` п. 23 |
@@ -28,5 +28,6 @@
 | `unbounded-goroutines` | [ОШИБКА] | Горутина без ожидания, остановки по `ctx`, обработки ошибки и паники; `go` в цикле по входным данным без ограничения параллелизма | `approaches/patterns/concurrency.md`, «Data race — Go»; `performance.md`, «Go» |
 | `channel-misuse` | [ОШИБКА] | Канал закрывает не отправитель или дважды, отправка в закрытый, вечная блокировка без `ctx.Done()` | `approaches/patterns/concurrency.md`, «Data race — Go» |
 | `context-not-propagated` | [ОШИБКА] | `ctx` не первым параметром в методе с I/O (или вызывающем его); `context.Background()`/`TODO()` в бизнес-коде; ctx в поле структуры (кроме сессии WebSocket) | `checklist.md` п. 18, `conventions.md` п. 1, 2; `structure.md`, «Entrypoint Layer» |
+| `imports-not-grouped` | [ОШИБКА] | Файл не по `gofmt` или импорты не тремя группами (std / внешние / свои модуля) | `checklist.md` п. 33, `style.md` |
 | `initialism-case` | [ВНИМАНИЕ] | Аббревиатура не заглавными в имени (`Id`, `Url`, `Dto` вместо `ID`, `URL`, `DTO`) | `checklist.md` п. 34, `style.md` |
 | `missing-blank-before-return` | [ВНИМАНИЕ] | Нет пустой строки перед `return`/`continue`/`break`, кроме первой строки блока | `checklist.md` п. 35, `style.md` |

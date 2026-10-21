@@ -10,6 +10,10 @@ services:
 rules:
     # встроенное исключение PHP (new, throw_if/throw_unless) вне тестов и миграций — только исключения ядра (conventions.md п. 13)
     - Tests\Architecture\GenericExceptionRule
+    # status/is_default мимо перехода: свойство модели, setAttribute(), ключ в fill()/update()/create()… вне модели и *Repository (checklist.md п. 15a)
+    - Tests\Architecture\StatusSetDirectlyRule
+    # Eloquent-связь в модели: метод возвращает Relation или вызывает $this->hasMany()/belongsTo()/… (conventions.md, «Модели и внешние системы»)
+    - Tests\Architecture\EloquentRelationRule
 
 parameters:
     # Хранилище — только через Infrastructure (architecture/layers.md): фасад DB вне Infrastructure, миграций и тестов —
@@ -30,6 +34,18 @@ parameters:
                 - '*/Infrastructure/*'
                 - '*/database/migrations/*'
                 - '*/tests/*'
+        -
+            class: 'Illuminate\Support\Facades\Auth'
+            message: 'текущий пользователь — $request->user() в контроллере, в домен и workflow — значением (checklist.md п. 14)'
+            allowExceptIn:
+                - '*/Domains/*'
+                - '*/Workflows/*'
+        -
+            class: 'Auth'
+            message: 'фасад Auth (глобальный алиас Auth): текущий пользователь — $request->user() в контроллере, в домен и workflow — значением (checklist.md п. 14)'
+            allowExceptIn:
+                - '*/Domains/*'
+                - '*/Workflows/*'
     disallowedFunctionCalls:
         -
             function:
@@ -44,3 +60,23 @@ parameters:
                 - '*/commands.php'
                 - '*/database/migrations/*'
                 - '*/tests/*'
+        -
+            function:
+                - 'auth()'
+            message: 'текущий пользователь — $request->user() в контроллере, в домен и workflow — значением (checklist.md п. 14)'
+            allowExceptIn:
+                - '*/Domains/*'
+                - '*/Workflows/*'
+        -
+            function:
+                - 'env()'
+            message: 'env() — только в config/*.php и config.php модуля: после config:cache вне конфигов он возвращает null; в коде — config() (checklist.md п. 51)'
+            allowIn:
+                - '*/config/*'
+                - '*/config.php'
+        -
+            function:
+                - 'dd()'
+                - 'dump()'
+                - 'var_dump()'
+            message: 'отладочный вывод в коде — убрать; диагностика — логгер (checklist.md п. 52)'

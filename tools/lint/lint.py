@@ -6,7 +6,8 @@
 Правила — те же, что в эталоне: конфиг эталона собран этим же генератором (`--render` и сравнение — в
 `tools/check/lint-rules.py`), поэтому доказательство на эталоне (`tools/check/lint-proof/go.py`) доказывает и шаблон.
 
-  lint.py go <проект> [--base REV]   — прогон; --base — только новое относительно ревизии (дифф задачи)
+  lint.py go <проект> [--base REV]   — прогон; --base — только новое относительно ревизии (дифф задачи) и ещё
+                                       глушение проверок в добавленных строках диффа (tools/lint/diff_silence.py, оба стека)
   lint.py go <проект> --render       — напечатать собранный конфиг (для сверки и чтения)
   lint.py php <проект> --sub <подпроект> [--container NAME] [--base REV]  (контейнер не задан — найдёт по монтированию или спросит и запомнит)
                                      — PHP: phpstan фреймворка в PHP-контейнере проекта, только правила фреймворка
@@ -42,6 +43,7 @@ linters:
   default: none
   enable:
     - depguard # слои и границы доменов
+    - errcheck # ошибка не игнорируется, в т. ч. через _
     - forbidigo # запрещённые вызовы
     - nlreturn # пустая строка перед return/continue/break
     - revive # ctx первым, ID в именах
@@ -50,7 +52,15 @@ linters:
       rules:
 """
 
-FOOTER = """    forbidigo:
+FOOTER = """    errcheck:
+      check-blank: true # `_ =` и `v, _ :=` для ошибки — тоже потеря (checklist.md п. 20)
+      # CaptureSoft/CaptureError возвращают ту же, уже отправленную в трекер ошибку — вызов отдельной строкой (conventions.md п. 8, 19)
+      exclude-functions:
+        - git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter.CaptureSoft
+        - git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter.CaptureError
+        - github.com/exgamer/gosdk-core/pkg/errorreporter.CaptureSoft
+        - github.com/exgamer/gosdk-core/pkg/errorreporter.CaptureError
+    forbidigo:
       forbid:
         - pattern: '^context\\.(Background|TODO)$'
           msg: "в бизнес-коде ctx приходит параметром; Background — только в main/console/тестах"
@@ -62,17 +72,32 @@ FOOTER = """    forbidigo:
         - name: context-as-argument
         - name: var-naming
   exclusions:
+    # std-error-handling: ошибка Close/Flush/os.Remove/печати не проверяется errcheck — отложенное закрытие после чтения
+    # (conventions.md п. 8); закрытие после записи (файл, буферизованный writer) проверяет ревьюер
+    presets: [std-error-handling]
     rules:
+      # main, cmd/, console, app — точки запуска: корневой ctx создаётся здесь (conventions.md п. 1)
       - path: '(^|/)(main\\.go|cmd/|internal/console/|internal/app/)'
         linters: [forbidigo]
+      # тесты создают свой ctx — правило о бизнес-коде (conventions.md п. 1)
       - path: '_test\\.go$'
         linters: [forbidigo]
       # ctx — правило бизнес-кода (conventions.md п. 1): pkg/ и миграции — не бизнес-код
       - path: '(^|/)(pkg/|internal/migrations/)'
         linters: [forbidigo]
+      # код тестов вне _test.go (structure.md): e2e-обвязка tests/ и общие фейки internal/testsupport/
+      - path: '(^|/)(tests/|internal/testsupport/)'
+        linters: [forbidigo]
       # var-naming — только аббревиатуры (checklist.md п. 34); ALL_CAPS и подчёркивания правило фреймворка не запрещает
       - linters: [revive]
         text: "(don't use ALL_CAPS|don't use an underscore|don't use underscores|should not use underscores)"
+
+formatters:
+  enable:
+    - gci # импорты тремя группами: std / внешние / свои (checklist.md п. 33)
+  settings:
+    gci:
+      sections: [standard, default, localmodule]
 """
 
 COMMON_DESC = "internal/common — общий словарь без зависимостей от слоёв"
@@ -194,15 +219,16 @@ def changed_go_files(project: Path, base) -> list[str]:
 
 
 def run_gocheck(project: Path, base) -> int:
-    cmd = [str(gocheck_binary()), str(project)]
+    cmd, stdin = [str(gocheck_binary()), str(project)], None
     if base:
         files = changed_go_files(project, base)
         if not files:
             print("gocheck: изменённых .go нет", flush=True)
             return 0
-        cmd += files
-    print(f"$ gocheck {project}{' (' + str(len(cmd) - 2) + ' изменённых файлов)' if base else ''}", flush=True)
-    r = subprocess.run(cmd, capture_output=True, text=True)
+        cmd.append("-")  # список — через stdin: большой дифф не упирается в длину командной строки
+        stdin = "\n".join(files) + "\n"
+    print(f"$ gocheck {project}{' (' + str(len(files)) + ' изменённых файлов)' if base else ''}", flush=True)
+    r = subprocess.run(cmd, input=stdin, capture_output=True, text=True)
     sys.stdout.write(r.stdout + r.stderr)
     return r.returncode
 
@@ -275,6 +301,26 @@ def php_namespace(project: Path, sub: str) -> str:
     sys.exit(f"нет psr-4 для {sub} в composer.json проекта")
 
 
+def phpstan_run(cpath: str, sub: str, work: str, files: list[str]) -> tuple[str, str]:
+    """Конфиг phpstan и команда: изменённые файлы (--base) — в parameters.paths конфига, не аргументами командной строки
+    (тысячи путей через `docker exec` — «argument list too long»); без файлов — весь подпроект."""
+    paths = "".join("        - '" + f.replace("'", "''") + "'\n" for f in files) if files else f"        - {cpath}/{sub}\n"
+    neon = f"""includes:
+    - {PHP_TOOLS}/vendor/phpat/phpat/extension.neon
+    - {PHP_TOOLS}/vendor/spaze/phpstan-disallowed-calls/extension.neon
+    - rules.neon
+
+parameters:
+    customRulesetUsed: true
+    paths:
+{paths}    bootstrapFiles:
+        - {cpath}/vendor/autoload.php
+    tmpDir: {work}/cache
+"""
+    cmd = f"cd {cpath} && php -d memory_limit=2G {PHP_TOOLS}/vendor/bin/phpstan analyse -c {work}/phpstan.neon --no-progress"
+    return neon, cmd
+
+
 def run_php(project: Path, sub: str, container: str, base, no_install=False):
     sys.path.insert(0, str(Path(__file__).parent))
     import php_rules
@@ -297,25 +343,12 @@ def run_php(project: Path, sub: str, container: str, base, no_install=False):
         if r.returncode:
             sys.stderr.write(r.stdout + r.stderr)
             return 2
-    neon = f"""includes:
-    - {PHP_TOOLS}/vendor/phpat/phpat/extension.neon
-    - {PHP_TOOLS}/vendor/spaze/phpstan-disallowed-calls/extension.neon
-    - rules.neon
-
-parameters:
-    customRulesetUsed: true
-    paths:
-        - {cpath}/{sub}
-    bootstrapFiles:
-        - {cpath}/vendor/autoload.php
-    tmpDir: {work}/cache
-"""
     docker(container, f"mkdir -p {work}/cache")
     docker(container, f"mkdir -p {PHP_TOOLS}/rules/P{tag}")
     docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/LayersArchitecture.php", php_rules.render_arch(ns, root, domains, php_rules.domain_modules(dom_dir)))
-    docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/{php_rules.EXCEPTION_RULE}.php", php_rules.render_exception_rule(ns))
+    for name, code in php_rules.render_own_rules(ns).items():
+        docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/{name}.php", code)
     docker(container, f"cat > {work}/rules.neon", php_rules.render_neon(ns + "\\LayersArchitecture"))
-    docker(container, f"cat > {work}/phpstan.neon", neon)
     files = []
     if base:
         diff = subprocess.check_output(["git", "diff", "--name-only", "--diff-filter=ACMR", base, "--", sub], cwd=project).decode().split()
@@ -327,13 +360,18 @@ parameters:
         if not files:
             print(f"нет изменённых PHP-файлов в {sub} относительно {base}")
             return 0
-    cmd = f"cd {cpath} && php -d memory_limit=2G {PHP_TOOLS}/vendor/bin/phpstan analyse -c {work}/phpstan.neon --no-progress " + " ".join(files)
+    neon, cmd = phpstan_run(cpath, sub, work, files)
+    docker(container, f"cat > {work}/phpstan.neon", neon)  # через stdin — длина списка файлов не ограничена
     shared = f" ({sub}/Domains/Common — общий модуль, не домен)" if "Common" in domains else ""
     print(f"домены (правила «домен не знает другие»): {', '.join(d for d in domains if d != 'Common') or 'нет ' + sub + '/Domains'}{shared}", flush=True)
     print(f"правила: {container}:{work}\n$ {cmd}", flush=True)
     r = docker(container, cmd + " 2>&1")
     sys.stdout.write("\n".join(l for l in r.stdout.splitlines() if "Deprecated: PHP Startup" not in l) + "\n")
-    return r.returncode
+    # маршруты (api.response первым, id в пути без ограничения, 403 у permission:) — разбором routes.php на хосте, без PHP
+    import php_routes
+    sys.stdout.flush()
+    routes = php_routes.main([str(project / sub), root] + (["--base", base] if base else []))  # с --base — добавленные строки
+    return r.returncode or routes
 
 
 RULES_TABLE = Path(__file__).resolve().parent.parent / "check" / "lint-proof" / "RULES.md"
@@ -433,8 +471,15 @@ def run(a):
         container = php_container.resolve(project, a.container)
         if not container:
             sys.exit(php_container.hint(project))
-        return run_php(project, a.sub, container, a.base, a.no_install)
-    return run_go(project, a.base)
+        code = run_php(project, a.sub, container, a.base, a.no_install)
+    else:
+        code = run_go(project, a.base)
+    if a.base:
+        # глушение проверок (`//nolint`, `@phpstan-ignore`, пропуск теста, ослабление конфига) — только в добавленных строках диффа
+        import diff_silence
+        sys.stdout.flush()
+        code = diff_silence.check(project, a.base, a.sub if a.stack == "php" else None) or code
+    return code
 
 
 if __name__ == "__main__":

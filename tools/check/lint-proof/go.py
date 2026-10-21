@@ -5,7 +5,7 @@
 Работает на временной копии эталона; репозиторий не меняется. Новое правило в конфиге — новый случай в CASES
 (`core/rules-evolution.md`, «Статика первой»: тег отдаётся инструменту только после такой проверки).
 """
-import os, shutil, subprocess, sys, tempfile
+import contextlib, io, os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 SRC = sys.argv[1]
 M = "example.com/parking-service"
@@ -33,6 +33,14 @@ CASES = [  # (имя, путь файла, код, что должно быть 
  ("entrypoint→app", "internal/entrypoints/admin/http/billing/tariff/zz_v.go", f'package tariff\nimport _ "{M}/internal/app"\n', "entrypoint-no-infra"),
  ("common→internal", "internal/common/zz_v.go", f'package common\nimport _ "{M}/internal/entrypoints/system/http/healthcheck"\n', "common-no-internal"),
  ("context.Background в домене", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nimport "context"\nfunc zzF() context.Context {\n\treturn context.Background()\n}\n', "forbidigo"),
+ ("разрешено: context.Background в e2e-обвязке tests/", "tests/harness/zz_v.go", 'package harness\nimport "context"\nfunc ZzF() context.Context {\n\treturn context.Background()\n}\n', None),
+ ("разрешено: context.Background в internal/testsupport", "internal/testsupport/zzfakes/zz_v.go", 'package zzfakes\nimport "context"\nfunc ZzF() context.Context {\n\treturn context.Background()\n}\n', None),
+ ("ошибка через _", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nimport "strconv"\nfunc zzF() int {\n\tn, _ := strconv.Atoi("1")\n\n\treturn n\n}\n', "errcheck"),
+ ("ошибка не проверена", "internal/infrastructure/postgres/billing/tariff/zz_v.go", 'package tariff\nimport "os"\nfunc zzF() {\n\tos.Chdir("zz")\n}\n', "errcheck"),
+ ("разрешено: defer f.Close() после чтения", "internal/infrastructure/postgres/billing/tariff/zz_v.go", 'package tariff\nimport (\n\t"io"\n\t"os"\n)\nfunc zzF() ([]byte, error) {\n\tf, err := os.Open("zz")\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tdefer f.Close()\n\n\treturn io.ReadAll(f)\n}\n', None),
+ ("разрешено: errorreporter.CaptureSoft отдельной строкой", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nimport (\n\t"context"\n\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter"\n)\nfunc zzF(ctx context.Context, err error) {\n\terrorreporter.CaptureSoft(ctx, err, nil)\n\terrorreporter.CaptureError(ctx, err, nil)\n}\n', None),
+ ("импорты не по группам", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nimport (\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter"\n\t"context"\n)\nfunc zzF(ctx context.Context, err error) {\n\terrorreporter.CaptureSoft(ctx, err, nil)\n}\n', "gci"),
+ ("разрешено: импорты тремя группами", "internal/domains/billing/tariff/zz_v.go", f'package tariff\nimport (\n\t"context"\n\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/errorreporter"\n\n\t"{M}/internal/common"\n)\nvar _ common.Currency\nfunc zzF(ctx context.Context, err error) {{\n\terrorreporter.CaptureSoft(ctx, err, nil)\n}}\n', None),
  ("нет пустой строки перед return", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc zzF(a int) int {\n\tb := a + 1\n\treturn b\n}\n', "nlreturn"),
  ("ctx не первым", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nimport "context"\nfunc ZzF(a int, ctx context.Context) error {\n\t_ = ctx\n\n\treturn nil\n}\n', "context-as-argument"),
  ("разрешено: internal/common импортирует свой подпакет", "internal/common/zzsub/zz_v.go", 'package zzsub\n', None),
@@ -48,6 +56,13 @@ CASES = [  # (имя, путь файла, код, что должно быть 
  ("разрешено: validate совпадает с binding", "internal/entrypoints/admin/http/billing/tariff/zz_v.go", 'package tariff\ntype zzRequest struct {\n\tName string `json:"name" binding:"required" validate:"required"`\n}\n\nvar _ = zzRequest{}\n', None),
  ("файл ports.go", "internal/domains/billing/tariff/ports.go", 'package tariff\n', "interface-file-generic-name"),
  ("файл utils.go", "internal/domains/billing/tariff/utils.go", 'package tariff\n', "file-named-by-abstraction"),
+ ("файл constants.go", "internal/domains/billing/tariff/constants.go", 'package tariff\n', "file-named-by-abstraction"),
+ ("файл helpers.go", "internal/workflows/billing/tariff/helpers.go", 'package tariff\n', "file-named-by-abstraction"),
+ ("разрешено: файл enum.go", "internal/domains/billing/tariff/enum.go", 'package tariff\n', None),
+ ("ссылка на пункт design в комментарии", "internal/domains/billing/tariff/zz_v.go", 'package tariff\n\n// R15: тариф без цены не сохраняется\nvar zzA = 1\n', "task-artifact-ref-in-code"),
+ ("ссылка на раздел design", "internal/domains/billing/tariff/zz_v.go", 'package tariff\n\n// Порядок проверок — design §4.2\nvar zzA = 1\n', "task-artifact-ref-in-code"),
+ ("ссылка на артефакт в имени кейса теста", "internal/domains/billing/tariff/zz_v_test.go", 'package tariff\nimport "testing"\nfunc TestZz(t *testing.T) {\n\tt.Run("T3: пустой список", func(t *testing.T) {})\n}\n', "task-artifact-ref-in-code"),
+ ("разрешено: коды в данных теста", "internal/domains/billing/tariff/zz_v_test.go", 'package tariff\nimport "testing"\n\n// Ячейка и модель — данные, не ссылки; обёртка над `Manager2[R1, R2]`\nfunc TestZz(t *testing.T) {\n\tcell, model, body := "A1", "T800", `{"F1":1}`\n\t_, _, _ = cell, model, body\n}\n', None),
  ("разрешено: тест домена импортирует gorm", "internal/domains/billing/tariff/zz_v_test.go", 'package tariff\nimport (\n\t"testing"\n\n\t"gorm.io/gorm"\n)\nfunc TestZz(t *testing.T) {\n\tvar _ *gorm.DB\n}\n', None),
  ("Id вместо ID", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc ZzF() int {\n\tparkingId := 1\n\n\treturn parkingId\n}\n', "var-naming"),
 ]
@@ -72,6 +87,7 @@ for name, path, code, expect in CASES:
     full = os.path.join(dst, path)
     os.makedirs(os.path.dirname(full), exist_ok=True)
     open(full, "w").write(code)
+    subprocess.run(["gofmt", "-w", full], check=True)  # gci проверяет и форматирование gofmt — случай про своё правило
     cfg = os.path.join(dst, ".golangci.yml")
     original = open(cfg).read()
     if name in RERENDER:
@@ -104,5 +120,18 @@ clean = run_all(dst)
 last = clean.strip().splitlines()[-1] if clean.startswith("\n") else "gocheck: " + clean.splitlines()[0]
 print("чистый эталон:", last)
 fails += last != "0 issues."
+# --base с тысячами изменённых файлов (~1,3 МБ путей — больше предела командной строки): список уходит в gocheck через stdin
+for args in (["init", "-q"], ["add", "-A"], ["-c", "user.name=proof", "-c", "user.email=proof@example.com", "commit", "-q", "-m", "base"]):
+    subprocess.run(["git", *args], cwd=dst, check=True, capture_output=True)
+big = os.path.join(dst, "internal/common", "zzbig" + "d" * 200, "e" * 200)
+os.makedirs(big)
+for i in range(3000):
+    open(os.path.join(big, f"zz_{i}.go"), "w").write("package " + "e" * 200 + "\n")
+out = io.StringIO()
+with contextlib.redirect_stdout(out):
+    code = lint.run_gocheck(Path(dst), "HEAD")
+ok = code == 0 and "gocheck: файлов: 3000; находок: 0" in out.getvalue()
+fails += not ok
+print(("OK    " if ok else "MISS  ") + "--base: 3000 изменённых файлов (длинные пути) — через stdin" + ("" if ok else "\n" + out.getvalue()[-500:]))
 shutil.rmtree(work)
 sys.exit(1 if fails else 0)
