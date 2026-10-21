@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import links  # noqa: E402
 
-SKIP = ("core/decisions-log.md", "core/backlog.md", "/official/", "/reference/", "tools/graph/")
+SKIP = ("core/decisions-log.md", "CHANGELOG.md", "core/backlog.md", "/official/", "/reference/", "tools/graph/")
 MIN_WORDS = 25
 POINTER_WORDS = 40
 

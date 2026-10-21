@@ -18,7 +18,7 @@ import sys
 ENTRY_DIRS = ("skills/", "agents/")
 ENTRY_FILES = ("README.md",)
 BASES = ("", "stacks/go", "stacks/php", "stacks", "skills")
-SKIP_SOURCES = ("core/decisions-log.md",)
+SKIP_SOURCES = ("core/decisions-log.md", "CHANGELOG.md")  # история: упоминает и удалённые файлы
 SKIP_SOURCE_PARTS = ("/official/", "/reference/")
 # Пути внутри проекта пользователя или вне фреймворка — их в репозитории нет по определению
 PROJECT_PREFIXES = ("docs/", ".claude/", "internal/", "cmd/", "pkg/", "parking_app/", "app/", "App/", "review_result/",

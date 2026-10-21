@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import links  # noqa: E402
 
-SKIP = ("/official/", "/reference/", "core/decisions-log.md", "tools/graph/")
+SKIP = ("/official/", "/reference/", "core/decisions-log.md", "CHANGELOG.md", "tools/graph/")
 BLOCK_RE = re.compile(r"^([ \t]*)```(go|php)[ \t]*\n(.*?)^[ \t]*```", re.S | re.M)  # и с отступом (блок в пункте списка)
 GO_WRAPS = ["{}", "package x\n{}", "package x\nfunc _() {{\n{}\n}}\n", "package x\ntype _ struct {{\n{}\n}}\n",
             "package x\ntype _ interface {{\n{}\n}}\n", "package x\nvar _ = T{{\n{}\n}}\n"]

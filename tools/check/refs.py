@@ -19,7 +19,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import links  # noqa: E402
 
-SKIP = ("core/decisions-log.md", "/official/", "/reference/", "tools/graph/")
+SKIP = ("core/decisions-log.md", "CHANGELOG.md", "/official/", "/reference/", "tools/graph/")
 FILE = r"`((?:\{DF\}/)?[\w./{}-]+\.md)`"
 ITEM_RE = re.compile(FILE + r"[,]?\s+пп?\.\s*((?:\d+[a-z]?(?:\s*(?:,|и|–|-)\s*)?)+)")
 SECTION_RE = re.compile(FILE + r",\s*«([^»]{3,80})»")

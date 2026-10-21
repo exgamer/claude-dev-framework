@@ -22,7 +22,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(__file__))
 import links  # noqa: E402
 
-SKIP = ("/official/", "/reference/", "core/decisions-log.md")
+SKIP = ("/official/", "/reference/", "core/decisions-log.md", "CHANGELOG.md")
 
 
 def graph(root):
