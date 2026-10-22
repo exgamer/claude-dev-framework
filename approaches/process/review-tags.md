@@ -114,6 +114,7 @@
 | Тег | Уровень | Суть | Источник правила |
 |---|---|---|---|
 | `impact-unhandled-usage` | [ОШИБКА] | Изменённый символ, роут, событие, таблица или enum, использование которого не учтено (нет в «Связях» `design.md`, не изменено) | `approaches/process/impact-analysis.md`; `review.md`, «Порядок», п. 8 |
+| `contract-change-unasked` | [ОШИБКА] / [ВНИМАНИЕ] | Изменён контракт (API, событие, таблица или формат кэша для других) без ответа пользователя о совместимости в «Контрактах» `design.md`; ревью без `design.md` — [ВНИМАНИЕ] «проверить, согласовано ли изменение контракта» | `approaches/process/impact-analysis.md`, «Обратная совместимость» (O-29); `review.md`, «Порядок», п. 8 |
 | `enum-list-drift` | [ОШИБКА] | Новое значение enum/статуса/allowlist не отражено во всех местах старого набора (валидации, Swagger `enum`, словари фронта, мапперы, `switch`/`match`) | `approaches/process/impact-analysis.md`; `review.md`, «За пределами дифа», п. 3 |
 | `schema-not-approved` | [ОШИБКА] / [ВНИМАНИЕ] | Изменение структуры БД нет в «Схеме БД» `design.md` или нет согласования; ревью без `design.md` — [ВНИМАНИЕ] «проверить согласование схемы» | `regulations/technical-approval.md`; `review.md`, «За пределами дифа», п. 4a |
 | `legacy-pattern-copied` | [ОШИБКА] | Из легаси или соседнего кода перенесена реализация вопреки правилу стека — в коде или в мерах `threats.md`/`design.md` | `approaches/process/legacy-refactor.md` (O-17) |
