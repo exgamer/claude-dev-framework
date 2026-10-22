@@ -5,6 +5,7 @@
   python3 tools/ab/ab.py prepare --rev <ревизия «до»> [--stack go|php|both] [--task archive|fix]
                                                                                — рабочая папка, проекты, задача
   python3 tools/ab/ab.py diffs <папка>                                         — слепые диффы для судьи
+                                                                               (`--task fix` — ещё `<стек>-<буква>.bug.md`)
   python3 tools/ab/ab.py cleanup <папка>                                       — удалить проекты и копии в контейнере
 
 Что делает prepare:
@@ -140,6 +141,9 @@ def diffs(a):
                                capture_output=True, text=True, check=True).stdout
             os.remove(idx)
             (out / f"{stack}-{label}.diff").write_text(d)
+            bug = Path(p["path"]) / "docs" / "tasks" / state.get("key", "") / "bug.md"
+            if state.get("task") == "fix" and bug.exists():
+                shutil.copy(bug, out / f"{stack}-{label}.bug.md")  # отчёт разработчика: «Испорченные данные» в диффы кода не попадают
             mapping[f"{stack}-{label}"] = v
     (work / "mapping.secret.json").write_text(json.dumps(mapping, indent=2))
     print(f"диффы для судьи: {out} (какая версия под какой буквой — {work / 'mapping.secret.json'}, судье не показывать)")
