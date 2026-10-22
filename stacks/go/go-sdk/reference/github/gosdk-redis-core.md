@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-redis-core v1.0.14
+# github.com/exgamer/gosdk-redis-core v1.0.15
 
 ## `github.com/exgamer/gosdk-redis-core/pkg/app`
 

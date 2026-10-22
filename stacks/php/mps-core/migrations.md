@@ -55,12 +55,10 @@ return new class () extends Migration {
 **Обязательные правила:**
 - `declare(strict_types=1);` — как в любом PHP-файле (`../checklist.md` п. 33)
 - Анонимный класс: `return new class () extends Migration`
-- `private string $tableName` — всегда, имя таблицы через свойство, **со схемой подпроекта** (`parking.tariffs`; `approaches/patterns/migrations.md`)
-- Триггер `on_update_current_timestamp` — для каждой таблицы с `updated_at`; функция — из схемы подпроекта (`parking.on_update_current_timestamp()`, создаётся миграцией `Infrastructure/Postgres/Common/Providers/database/migrations/`): подпроект не зависит от функции в `public`
-- `created_at` — `default(DB::raw('CURRENT_TIMESTAMP'))`, не `$table->timestamps()`
-- `updated_at` — `nullable()`, обновляется триггером
+- `private string $tableName` — всегда, имя таблицы через свойство; схема — как в проекте: таблицы подпроекта в своей схеме — со схемой (в эталоне `parking.tariffs`; `approaches/patterns/migrations.md`), иначе без
+- `created_at` и `updated_at` — желательно у каждой таблицы; как заполняются — как принято в проекте. В эталоне: `created_at` — `default(DB::raw('CURRENT_TIMESTAMP'))`, `updated_at` — `nullable()`, обновляется триггером `on_update_current_timestamp`, функция — в схеме подпроекта (`parking.on_update_current_timestamp()`, миграция `Infrastructure/Postgres/Common/Providers/database/migrations/`): подпроект не зависит от функции в `public`
 - Внешние ключи — явно (раздел ниже); `comment()` у колонок данных — как в эталоне
-- Удаление индекса — `DB::statement('DROP INDEX parking.<имя>')`, не `$table->dropIndex()`: Laravel на Postgres пишет `drop index "<имя>"` без схемы, и вне `search_path` миграция падает; имя индекса по колонкам — `<схема>_<таблица>_<колонки>_index` (эталон — `2026_10_20_100400_replace_parking_id_index_on_tariffs_table.php`)
+- Удаление индекса — таблица в своей схеме — `DB::statement('DROP INDEX <схема>.<имя>')` (схема подпроекта, как в `$tableName`), не `$table->dropIndex()`: Laravel на Postgres пишет `drop index "<имя>"` без схемы, и вне `search_path` миграция падает; имя индекса по колонкам — `<схема>_<таблица>_<колонки>_index` (эталон — `2026_10_20_100400_replace_parking_id_index_on_tariffs_table.php`)
 
 ---
 

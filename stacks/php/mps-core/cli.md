@@ -18,7 +18,7 @@ Entrypoints/Console/{Domain}/
 ## ServiceProvider
 
 ```php
-namespace App\ParkingApp\Entrypoints\Console\YourDomain;
+namespace App\YourApp\Entrypoints\Console\YourDomain;
 
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
@@ -34,7 +34,7 @@ class ServiceProvider extends CoreServiceProvider
 `Entrypoints/Console/{Domain}/commands.php` возвращает классы команд всех модулей домена (образец — `stacks/php/examples/parking_app/Entrypoints/Console/Billing/commands.php`):
 
 ```php
-use App\ParkingApp\Entrypoints\Console\YourDomain\YourModule\YourActionConsoleCommand;
+use App\YourApp\Entrypoints\Console\YourDomain\YourModule\YourActionConsoleCommand;
 
 return [
     YourActionConsoleCommand::class,
@@ -48,9 +48,9 @@ return [
 Тонкая оболочка: проверяет и маппит аргументы CLI, вызывает доменный Command, возвращает код выхода. Бизнес-логики в `handle()` нет. Образец — `stacks/php/examples/parking_app/Entrypoints/Console/Billing/Tariffs/SetDefaultTariffConsoleCommand.php`.
 
 ```php
-namespace App\ParkingApp\Entrypoints\Console\YourDomain\YourModule;
+namespace App\YourApp\Entrypoints\Console\YourDomain\YourModule;
 
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands\YourDomainCommand;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Commands\YourDomainCommand;
 use Illuminate\Console\Command;
 
 class YourActionConsoleCommand extends Command

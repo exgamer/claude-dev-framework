@@ -23,10 +23,10 @@ Command/Query с базовым классом ядра, `prepare()`/`get()` и�
 Одна операция одного домена, слишком большая для метода сервиса. Живёт в `Domains/{Domain}/Modules/{Module}/Commands/`.
 
 ```php
-namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands;
+namespace App\YourApp\Domains\YourDomain\Modules\YourModule\Commands;
 
 // core < 1.10 (эталон, 1.6.0) — интерфейс подпроекта; core ≥ 1.10 — MPS\Core\Components\Database\Transaction\TransactionManagerInterface (transactions.md)
-use App\ParkingApp\Core\Database\Managers\TransactionManagerInterface;
+use App\YourApp\Core\Database\Managers\TransactionManagerInterface;
 use MPS\Core\Exceptions\NotFoundAppException;
 
 final class ReplaceYourEntityCommand

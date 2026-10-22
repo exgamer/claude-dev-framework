@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-db-core v1.0.21
+# github.com/exgamer/gosdk-db-core v1.0.22
 
 ## `github.com/exgamer/gosdk-db-core/pkg/debug`
 

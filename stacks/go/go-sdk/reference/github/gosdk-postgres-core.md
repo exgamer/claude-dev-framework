@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-postgres-core v1.0.23
+# github.com/exgamer/gosdk-postgres-core v1.0.24
 
 ## `github.com/exgamer/gosdk-postgres-core/pkg/app`
 

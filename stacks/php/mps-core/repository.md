@@ -25,7 +25,7 @@
 Форма пагинации списка выбирается пользователем на задаче и записана в разделе «Список» `design.md` (P-19, `../conventions.md` п. 2c): (1) — ниже, (2) через `Page` (`paginate…({E}FilterDto, Page)`, рекомендация; эталон `../examples/parking_app` — на ней) — `../conventions.md` п. 2c, 2a, 12c, 12d. Существующий код на (1) — не нарушение. API (1) по справочнику ядра (`reference/mps-core-v1.10.2.md`): репозиторий — `CRUDRepository::search(array $params = [], $id = null, int $perPage = 30, ?int $page = null, ?BuilderContract $query = null): LengthAwarePaginatorContract|Collection` + хук `filterSearch()`; сервис — `search(SearchDataObject $dto): array` (`SearchAwareInterface`; `SearchDataObject`: `setParams`, `setPerPage`, `setPage`); запрос — наследник `Core/Requests/SearchRequest` подпроекта (`page`, `per_page`, `sort`, сортируемые поля — `$sortAttributes`); ответ — `Core/Resources/PaginateResource` подпроекта, помощник запроса — `Core/Database/Query/PaginatedQueryHelper`; блок `pagination` в обеих формах — `Core/Resources/PaginationMeta` (формат Go SDK, `regulations/rest-api.md`), `paginator->toArray()` Laravel как есть не отдаётся. API этих классов — по эталону: `../examples/parking_app/Core/Requests/SearchRequest.php`, `../examples/parking_app/Core/Resources/PaginateResource.php`, `../examples/parking_app/Core/Database/Query/PaginatedQueryHelper.php`.
 
 ```php
-// Request: фильтры + page/per_page/sort от App\ParkingApp\Core\Requests\SearchRequest
+// Request: фильтры + page/per_page/sort от App\YourApp\Core\Requests\SearchRequest
 class IndexRequest extends SearchRequest
 {
     protected array $sortAttributes = ['id', 'name'];
@@ -52,9 +52,9 @@ return response()->json(PaginateResource::make($paginated));
 ```
 
 ```php
-namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Repositories;   // реализация — в Infrastructure (P-10), интерфейс — в Domains/.../Repositories/
+namespace App\YourApp\Infrastructure\Postgres\YourDomain\YourModule\Repositories;   // реализация — в Infrastructure (P-10), интерфейс — в Domains/.../Repositories/
 
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
 use Illuminate\Contracts\Database\Query\Builder as BuilderContract;
 use Illuminate\Support\Collection;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;

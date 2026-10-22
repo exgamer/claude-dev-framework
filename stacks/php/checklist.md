@@ -51,7 +51,7 @@
 
 ## HTTP
 
-24. **О** OpenAPI-атрибуты на каждом эндпойнте; тег `'{Context} {Подпроект}: {Сущность}'` (`controller-missing-swagger`). — `conventions.md` п. 18
+24. **О** OpenAPI-атрибуты на каждом эндпойнте; тег `'{Context} {Подпроект}: {Сущность}'`, в отдельном сервисе — `'{Context}: {Сущность}'` (`controller-missing-swagger`). — `conventions.md` п. 18
 24a. **В** В Swagger — коды, которые эндпойнт отдаёт: `500` и коды middleware маршрута (под `permission:…` — `403`); `404` — только у поиска записи по ID (`swagger-status-mismatch`). — `conventions.md` п. 18; `regulations/rest-api.md`, «Статусы»
 25. **О** Ответ — `response()->json(new {E}Response(...), 200|201)`, удаление — `204`; обёртку `success/data` не собирать (её даёт `ApiResponseMiddleware`); макросы `Response::ok()` — нет. — `conventions.md` п. 19
 26. **В** Маршруты: префикс, имена `{ресурсы}.{index|view|create|update|delete}`, действие над ресурсом — `{ресурсы}.{действие}` в kebab-case (`tariffs.set-default`), URL в kebab-case, нового сервиса — по схеме `regulations/rest-api.md`, «URL» (`url-not-by-scheme`), middleware — строковым алиасом. — `conventions.md` п. 20
@@ -70,10 +70,10 @@
 ## Оформление
 
 33. **О** Используемые расширения PHP (`ext-zip`, `ext-intl`…) объявлены в `require` `composer.json` (AINA-2744). `declare(strict_types=1);` в каждом файле; форматирование — `composer csfix-validate`.
-34. **В** Docblock класса — одна строка по-русски + `@author`; описания, пересказывающие имя, и «ИИ-шные» комментарии не писать. Любой текст для людей (Swagger, ошибки клиенту, коммиты, ответы в MR) — по делу, без «ИИ-воды»; нигде нет Claude/ИИ как автора или соавтора (`Co-Authored-By: Claude`, «Generated with Claude Code»). — `style.md`, `core/style.md`, «Любой текст для людей»
+34. **В** Docblock класса — одна строка по-русски (язык — `core/style.md`, «Язык») + `@author`; описания, пересказывающие имя, и «ИИ-шные» комментарии не писать. Любой текст для людей (Swagger, ошибки клиенту, коммиты, ответы в MR) — по делу, без «ИИ-воды»; нигде нет Claude/ИИ как автора или соавтора (`Co-Authored-By: Claude`, «Generated with Claude Code»). — `style.md`, `core/style.md`, «Любой текст для людей»
 35. **В** `final` у Command/Query/workflow/валидаторов; Command/Query — без базового класса ядра (`MPS\Core\Commands\Command`/`Queries\Query`, `prepare()`/`get()` не используются), метод `execute(...)` с типизированными аргументами (`command-query-form`, `mps-core/commands.md`); promotion `private readonly`, trailing comma. — `style.md`
 36. **В** Имена по таблице `style.md` (`{Entity}Dto`, `{Entity}CrudService`, `{Action}Workflow`, enum `UPPER_SNAKE` + `Enumerable`).
-37. **О** Модель: `@property` по-русски, `$table` со схемой (таблица в `public` — без префикса), `$fillable`, `$casts` (enum → enum). — `style.md`
+37. **О** Модель: `@property`, описание по-русски у неочевидных полей (язык — `core/style.md`, «Язык»), `$table` — схема как в проекте, `public` — без префикса, `$fillable`, `$casts` (enum → enum). — `style.md`
 48. **В** Читается сверху вниз: замыкание не передаёт поведение в свой метод (`->when()` → `if`), вызов не вкладывается в вызов и не индексируется на месте (`execute([getByKey()])[0]` → три строки; один уровень с коротким аргументом — `execute(Mapper::toDto($request))` — допустим; цепочки `array_*` → `foreach`/именованные переменные), лямбда — одна строка только где требует библиотека, без затенения внешних переменных, глубина блоков ≤ 2. — `core/style.md`, «Форма кода»; `style.md`; тег `nested-call-chain`
 54. **В** 4+ аргумента у метода (не конструктора; допустимо до 3 позиционных + DTO опций последним и у приватного шага длинного метода до ~5) → DTO параметров (`too-many-params`). — `core/style.md`, «Форма кода»
 52. **О** Отладочного вывода в коде нет: `dd()`, `dump()`, `var_dump()`, `ray()`, `->dd()`/`->dump()` у коллекции или запроса — убрать до коммита; диагностика — логгер (тег `debug-output-left`).

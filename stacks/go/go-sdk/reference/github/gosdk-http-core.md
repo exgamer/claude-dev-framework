@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-http-core v1.0.38
+# github.com/exgamer/gosdk-http-core v1.1.0
 
 ## `github.com/exgamer/gosdk-http-core/pkg/app`
 

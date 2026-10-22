@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-console-core v1.0.4
+# github.com/exgamer/gosdk-console-core v1.0.5
 
 ## `github.com/exgamer/gosdk-console-core/pkg/app`
 

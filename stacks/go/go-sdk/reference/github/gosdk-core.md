@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-core v1.0.28
+# github.com/exgamer/gosdk-core v1.0.29
 
 ## `github.com/exgamer/gosdk-core/pkg/app`
 

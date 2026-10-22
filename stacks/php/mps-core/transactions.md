@@ -43,10 +43,6 @@ use MPS\Core\Components\Database\Transaction\NoopTransactionManager;
 - `NoopTransactionManager` — заглушка для тестов без БД: callback выполняется без транзакции,
   `afterCommit` — сразу. Подключается как `mock` в `definitions.php`.
 
-Старый проектный `App\Core\Database\Managers\TransactionManagerInterface` совместим по сигнатуре
-`run()`. В проектах, где он ещё используется, новый код пишем на интерфейс из ядра, старый
-мигрируем по мере правок — две реализации одновременно держать не нужно.
-
 ---
 
 ## Как использовать — TransactionManagerInterface

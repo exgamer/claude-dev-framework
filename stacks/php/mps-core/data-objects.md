@@ -7,9 +7,9 @@
 Базовый класс для доменных DTO. Свойства `private` (`../conventions.md` п. 11), fluent-сеттеры, геттеры.
 
 ```php
-namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\DTO;
+namespace App\YourApp\Domains\YourDomain\Modules\YourModule\DTO;
 
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Enums\YourStatusEnum;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Enums\YourStatusEnum;
 use MPS\Core\DataObjects\DataObject;
 
 class YourDto extends DataObject

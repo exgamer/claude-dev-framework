@@ -26,7 +26,7 @@
 
 ```php
 // Чистый Unit — Helper, Trait, DataObject
-namespace Tests\Unit\ParkingApp\Core\Helpers;
+namespace Tests\Unit\YourApp\Core\Helpers;
 
 use PHPUnit\Framework\TestCase;
 
@@ -41,7 +41,7 @@ class YourHelperTest extends TestCase
 
 ```php
 // Unit с мокированием зависимостей — Service, Command
-namespace Tests\Unit\ParkingApp\Domains\YourDomain\YourModule;
+namespace Tests\Unit\YourApp\Domains\YourDomain\YourModule;
 
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
@@ -69,7 +69,7 @@ class YourServiceTest extends TestCase
 Полный стек с реальной БД. Каждый тест откатывается в транзакцию.
 
 ```php
-namespace Tests\Feature\ParkingApp\Admin\YourDomain;
+namespace Tests\Feature\YourApp\Admin\YourDomain;
 
 use Tests\Feature\FeatureTestCase;
 
@@ -114,13 +114,13 @@ Infrastructure/Http/{Provider}/{Product}/
 **Не класть в `tests/`** — Mock регистрируется в `definitions.php` и подключается автоматически в тестовом окружении, это не тестовый файл.
 
 ```php
-namespace App\ParkingApp\Infrastructure\Http\Lpm\Camera\Mocks;
+namespace App\YourApp\Infrastructure\Http\YourProvider\YourProduct\Mocks;
 
-use App\ParkingApp\Domains\Catalog\Modules\Parkings\Repositories\CameraRepositoryInterface;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Repositories\YourProductRepositoryInterface;
 
-class LpmCameraRepositoryMock implements CameraRepositoryInterface
+class YourProviderYourProductRepositoryMock implements YourProductRepositoryInterface
 {
-    public function findStatus(int $cameraId): ?string
+    public function findStatus(int $id): ?string
     {
         return 'online';
     }
@@ -131,9 +131,9 @@ class LpmCameraRepositoryMock implements CameraRepositoryInterface
 
 ```php
 [
-    'abstract' => CameraRepositoryInterface::class,
-    'concrete' => LpmCameraRepository::class,
-    'mock'     => LpmCameraRepositoryMock::class,
+    'abstract' => YourProductRepositoryInterface::class,
+    'concrete' => YourProviderYourProductRepository::class,
+    'mock'     => YourProviderYourProductRepositoryMock::class,
 ],
 ```
 
@@ -141,9 +141,9 @@ class LpmCameraRepositoryMock implements CameraRepositoryInterface
 
 ```php
 // ❌ Unit тест наследует FeatureTestCase — переместить в Feature/
-namespace Tests\Unit\ParkingApp\Domains\Catalog\ProductOffer;
+namespace Tests\Unit\YourApp\Domains\YourDomain\YourModule;
 
 use Tests\Feature\FeatureTestCase; // ← нельзя в Unit/
 
-class ProductOfferServiceTest extends FeatureTestCase { ... }
+class YourServiceTest extends FeatureTestCase { ... }
 ```

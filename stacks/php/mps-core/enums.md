@@ -11,7 +11,7 @@ Enum-ы живут в `Domains/{Domain}/Modules/{Module}/Enums/`.
 ## StatusEnum
 
 ```php
-namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Enums;
+namespace App\YourApp\Domains\YourDomain\Modules\YourModule\Enums;
 
 use MPS\Core\Enums\Enumerable;
 use MPS\Core\Enums\EnumerableTrait;

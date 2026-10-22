@@ -99,9 +99,7 @@ config/database.php                            ← у приложения, не
 
 **Хелперы (`Core/Helpers/{Thing}Helper.php`)** — чистые преобразования формата (`core/principles.md`, «Повторяющаяся обработка — один хелпер»): `PhoneHelper::normalize(string $raw): ?string`, `PhoneHelper::format(string $digits): string`, `IinHelper`, `CardHelper`, `MoneyHelper`. `final class`, только `public static` методы, без конструктора и DI, без `DB::`/моделей/конфига, без доменных типов; одна тема — один класс (не `StrHelper` с телефоном, картой и датами внутри). Тест — путь полностью повторяет путь класса (раздел «Тесты» ниже): `tests/Unit/{Подпроект}/Core/Helpers/{Thing}HelperTest.php`, как `tests/Unit/ParkingApp/Core/Helpers/SignatureHelperTest.php` эталона. Вызывается из `prepareForValidation()` Request'а (нормализация входа), из Response (формат вывода), из консольных команд; в сервисе и репозитории преобразований формата нет — им приходит уже нормализованное значение. Форма — `PhoneHelper` выше; `StrHelper` с телефоном внутри — не образец.
 
-**Слой `Contexts/` из регламента архитектуры бэкенда проекта = `Entrypoints/`** (решение P-9): отдельной папки `Contexts/` нет, контекст — первый уровень внутри `Entrypoints/` (`Entrypoints/Admin/…`). Пустую папку `Contexts/` в подпроекте образцом не считать.
-
-**Контексты (`{Context}`)** — для кого точка входа: `Admin`, `Mobile`, `Integration`, `Lpm` (железо/партнёр), `Console`, `Queue`. Healthcheck (liveness/readiness) своим кодом не пишется: `MPS\Utils\Components\HealthCheck` из `mps/utils` (`GET /health/liveness`, `/health/readiness` — БД, кеш, RabbitMQ; `mps-core/capabilities.md`) — его `ServiceProvider` регистрирует корневой провайдер подпроекта (`$utilsProviders` в `examples/parking_app/ServiceProvider.php`), настройки — секция `health_check` в `config/mps-utils.php` (`examples/config/mps-utils.php`). Один и тот же модуль для разных контекстов — разные директории и разные контроллеры (регламент архитектуры проекта: «контексты — разные продукты, а не роли», `if ($isAdmin)` запрещён).
+**Контексты (`{Context}`)** — для кого точка входа: `Admin`, `Mobile`, `Integration`, `Console`, `Queue` — плюс свои у проекта (например, контекст для железа партнёра). Healthcheck (liveness/readiness) своим кодом не пишется: `MPS\Utils\Components\HealthCheck` из `mps/utils` (`GET /health/liveness`, `/health/readiness` — БД, кеш, RabbitMQ; `mps-core/capabilities.md`) — его `ServiceProvider` регистрирует корневой провайдер подпроекта (`$utilsProviders` в `examples/parking_app/ServiceProvider.php`), настройки — секция `health_check` в `config/mps-utils.php` (`examples/config/mps-utils.php`). Один и тот же модуль для разных контекстов — разные директории и разные контроллеры (контексты — разные продукты, а не роли, `if ($isAdmin)` запрещён: `architecture/layers.md`, P-13).
 
 **Без `src/`** (решение P-3): `Domains/{D}/Modules/{M}/`, `Entrypoints/{Ctx}/{D}/{M}/`, один PSR-4 на подпроект. Вариант `Domains/{D}/src/…` + PSR-4 на каждый домен в новом коде не используется; существующие модули в такой форме не переписываются без задачи.
 
@@ -109,19 +107,19 @@ config/database.php                            ← у приложения, не
 
 ## Пути
 
-| Что | Путь (`parking_app`) | Namespace |
+| Что | Путь (от корня подпроекта, в эталоне — `parking_app/`) | Namespace |
 |---|---|---|
-| DTO | `Domains/{D}/Modules/{M}/DTO/{E}Dto.php` | `App\ParkingApp\Domains\{D}\Modules\{M}\DTO` |
+| DTO | `Domains/{D}/Modules/{M}/DTO/{E}Dto.php` | `App\{Подпроект}\Domains\{D}\Modules\{M}\DTO` |
 | Интерфейс репозитория | `Domains/{D}/Modules/{M}/Repositories/{E}RepositoryInterface.php` | `…\Modules\{M}\Repositories` |
 | Сервис | `Domains/{D}/Modules/{M}/Services/{E}CrudService.php` (+ `Interface`) | `…\Modules\{M}\Services` |
 | Валидатор DTO | `Domains/{D}/Modules/{M}/Validators/{E}DtoValidator.php` | `…\Modules\{M}\Validators` |
 | Command / Query | `Domains/{D}/Modules/{M}/Commands/{Action}Command.php` / `Queries/{Action}Query.php`, метод `execute(...)` (`mps-core/commands.md`, «Форма Command и Query») | `…\Modules\{M}\Commands` / `…\Queries` |
-| Workflow | `Workflows/{D}/{M}/{Action}Workflow.php`, метод `execute()` | `App\ParkingApp\Workflows\{D}\{M}` |
-| Контроллер | `Entrypoints/{Ctx}/{D}/{M}/Http/Controllers/{E}Controller.php` | `App\ParkingApp\Entrypoints\{Ctx}\{D}\{M}\Http\Controllers` |
+| Workflow | `Workflows/{D}/{M}/{Action}Workflow.php`, метод `execute()` | `App\{Подпроект}\Workflows\{D}\{M}` |
+| Контроллер | `Entrypoints/{Ctx}/{D}/{M}/Http/Controllers/{E}Controller.php` | `App\{Подпроект}\Entrypoints\{Ctx}\{D}\{M}\Http\Controllers` |
 | Request | `Entrypoints/{Ctx}/{D}/{M}/Http/Requests/{E}/CreateRequest.php` | `…\Http\Requests\{E}` |
 | Response | `Entrypoints/{Ctx}/{D}/{M}/Http/Responses/{E}Response.php` | `…\Http\Responses` |
 | Маршруты | `Entrypoints/{Ctx}/{D}/routes.php` | — |
-| Модель | `Infrastructure/Postgres/{D}/{M}/Models/{E}.php` | `App\ParkingApp\Infrastructure\Postgres\{D}\{M}\Models` |
+| Модель | `Infrastructure/Postgres/{D}/{M}/Models/{E}.php` | `App\{Подпроект}\Infrastructure\Postgres\{D}\{M}\Models` |
 | Репозиторий | `Infrastructure/Postgres/{D}/{M}/Repositories/{E}Repository.php` | `…\{M}\Repositories` |
 | Биндинг репозитория | `Infrastructure/Postgres/{D}/Providers/definitions.php` | — |
 | Миграция | `Infrastructure/Postgres/{D}/Providers/database/migrations/` | — |

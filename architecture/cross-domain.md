@@ -34,4 +34,4 @@
 Создание тарифа требует существующей парковки (Catalog) — Billing о Catalog не знает:
 
 - Go: `stacks/go/examples/tariff/internal/workflows/billing/tariff/create_tariff_workflow.go` → `Exec(ctx, params)`: проверка `parkingRepository.GetByID` → в одном `txManager.Exec` `tariffRepository.Create` и строка outbox (два модифицирующих запроса — O-8); существование парковки при записи держит внешний ключ.
-- PHP: `stacks/php/examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php` → `execute(TariffDto)`: проверка `parkingRepository->oneById` → в одном `transactionManager->run()` `tariffCrudService->create` и строка outbox (в существующем коде такой класс бывает назван `CreateTariffCommand` — старый нейминг, P-2).
+- PHP: `stacks/php/examples/parking_app/Workflows/Billing/Tariffs/CreateTariffWorkflow.php` → `execute(TariffDto)`: проверка `parkingRepository->oneById` → в одном `transactionManager->run()` `tariffCrudService->create` и строка outbox.

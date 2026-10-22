@@ -9,7 +9,7 @@
 Зависимости — `private readonly` (`../conventions.md` п. 6). Исключение — сам `$repository`: это `protected ?CRUDRepositoryInterface` из `CRUDRepositoryAwareTrait` ядра, переобъявить его `private readonly` нельзя (PHP: фатальная ошибка), поэтому он присваивается в конструкторе.
 
 ```php
-namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Services;
+namespace App\YourApp\Domains\YourDomain\Modules\YourModule\Services;
 
 use MPS\Core\Components\CRUD\Services\Database\Eloquent\CRUDService;
 

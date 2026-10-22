@@ -5,7 +5,7 @@
 Модель — маппинг на таблицу и правила состояния своей строки: начальное состояние, проверки перехода `can*()` (O-26, O-28); процессов, запросов и побочных эффектов в ней нет. Поля состояния (`status`, флаги) не в `$fillable`: их меняют только метод модели и метод репозитория конкретного перехода (`regulations/entity.md`, «Переход состояния»).
 
 ```php
-namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Models;
+namespace App\YourApp\Infrastructure\Postgres\YourDomain\YourModule\Models;
 
 use MPS\Core\Models\Model;
 

@@ -16,7 +16,7 @@
 
 ```php
 use App\Http\Controllers\Controller;
-use App\ParkingApp\Core\Http\RequestHelper;
+use App\YourApp\Core\Http\RequestHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use MPS\Core\Exceptions\NotFoundAppException;
@@ -95,7 +95,7 @@ class TariffController extends Controller
 Только формат (п. 9): `gt:0` для id, `max:` для строк и массивов, `Rule::enum()`, вложенная коллекция — `list` + `{поле}.*: array`. Без SQL (`exists:`/`unique:` — P-17), без проверки доступа (middleware, п. 19a). Нормализация входа (телефон) — `prepareForValidation()` вызовом хелпера (`core/principles.md`, «Повторяющаяся обработка — один хелпер»).
 
 ```php
-use App\ParkingApp\Core\Requests\Request;
+use App\YourApp\Core\Requests\Request;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 
@@ -185,12 +185,12 @@ class TariffResponse extends JsonResource
 ## Entrypoint ServiceProvider
 
 ```php
-namespace App\ParkingApp\Entrypoints\Admin\Billing;
+namespace App\YourApp\Entrypoints\Admin\YourDomain;
 
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
 /**
- * Подключает routes.php админки Billing автозагрузкой ModuleServiceProvider; middleware и права — в самих маршрутах.
+ * Подключает routes.php админки домена автозагрузкой ModuleServiceProvider; middleware и права — в самих маршрутах.
  *
  * @author …
  */

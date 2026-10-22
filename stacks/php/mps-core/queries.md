@@ -16,7 +16,7 @@ Domains/{Domain}/Modules/{Module}/Queries/
 Форма — одна для Command и Query: `commands.md`, «Форма Command и Query» (основное место): `final` класс без `MPS\Core\Queries\Query` ядра (`prepare()`, `get()`, `setQueryParams()` не используются), публичный `execute(...)` с нужными типизированными аргументами, зависимости — конструктором, логгер — только если нужен. Параметры — типизированный DTO фильтра или скаляры, не `array`; данные других модулей своего домена — через их интерфейсы (O-6), пачкой по id (`approaches/patterns/performance.md`).
 
 ```php
-namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Queries;
+namespace App\YourApp\Domains\YourDomain\Modules\YourModule\Queries;
 
 final class ListYourItemsWithRelatedQuery
 {

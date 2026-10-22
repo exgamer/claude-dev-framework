@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-rabbit-core v1.0.12
+# github.com/exgamer/gosdk-rabbit-core v1.0.13
 
 ## `github.com/exgamer/gosdk-rabbit-core/pkg/app`
 

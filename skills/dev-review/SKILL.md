@@ -32,7 +32,7 @@ trigger: /dev-review
 **По задетому в диффе** — нужные разделы (по заголовкам, не файл целиком; дифф задевает несколько или все слои — по каждому):
 - расположение/новые файлы → `structure.md`, разделы по задетым слоям;
 - пункт памятки, который код задевает, → раздел `conventions.md` / `style.md` по ссылке из пункта;
-- слой/пакет SDK или ядра → `go-sdk/<слой>.md` / `mps-core/<тема>.md`;
+- слой/пакет SDK или ядра → `go-sdk/<слой>.md` / `mps-core/<тема>.md`; дифф в самом пакете SDK (`gosdk-*`, `go-sdk-*-core`) → `stacks/go/conventions.md` п. 24;
 - платежи, HTTP-роуты, статусы/enum, транзакции, данные → соответствующие разделы `review-findings.md` (платёжные пути в Go — раздел «Платёжные хендлеры» обязательно);
 - API/контракт, миграции, git-гигиена → `{DF}/regulations/{rest-api,entity,contracts,git}.md`; миграции — ещё `{DF}/regulations/technical-approval.md`, «Схема БД», и «да» на схему в `docs/tasks/<ключ>/answers.md` (проверка `schema-not-approved`, `review.md`, «За пределами дифа», п. 4a);
 - граница доменов, workflow, интеграция → `{DF}/architecture/*.md`;

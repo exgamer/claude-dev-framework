@@ -14,10 +14,10 @@
 Общие правила consumer — `approaches/patterns/async.md`, «Consumer». Тонкий, как контроллер: payload → DTO → сервис/workflow. Бизнес-логики нет; доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (`workflow-trusts-transport-request`). Повторная доставка безопасна (`approaches/patterns/idempotency.md`): обработчик проверяет текущий статус записи и выходит, если уже обработано.
 
 ```php
-namespace App\ParkingApp\Entrypoints\Queue\YourDomain\YourModule;
+namespace App\YourApp\Entrypoints\Queue\YourDomain\YourModule;
 
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\DTO\YourEventDto;
-use App\ParkingApp\Workflows\YourDomain\YourModule\HandleYourEventWorkflow;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\DTO\YourEventDto;
+use App\YourApp\Workflows\YourDomain\YourModule\HandleYourEventWorkflow;
 use MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job as UtilsJob;
 
 class YourEventHandler extends UtilsJob
@@ -66,7 +66,7 @@ class YourEventHandler extends UtilsJob
                 'queue' => config('app.rabbit-config.your-domain.your-event.queue-name'),
                 'exchange' => config('app.rabbit-config.your-domain.your-event.exchange'),
                 'routing_key' => config('app.rabbit-config.your-domain.your-event.routing-key'),
-                'handler' => \App\ParkingApp\Entrypoints\Queue\YourDomain\YourModule\YourEventHandler::class,
+                'handler' => \App\YourApp\Entrypoints\Queue\YourDomain\YourModule\YourEventHandler::class,
                 'durability' => ['delayed' => [60, 300, 900, 3600]],
             ],
         ],
@@ -79,9 +79,9 @@ class YourEventHandler extends UtilsJob
 ## Отложенное действие домена (Laravel Job)
 
 ```php
-namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule\Jobs;
+namespace App\YourApp\Domains\YourDomain\Modules\YourModule\Jobs;
 
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Commands\YourActionCommand;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Commands\YourActionCommand;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

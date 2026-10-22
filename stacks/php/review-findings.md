@@ -86,7 +86,6 @@
 - **Enum без `Enumerable`** (AINA-2628, nit: «Имплементить Enumerable из mps/core») — каждый enum: `implements \MPS\Core\Enums\Enumerable` и `use EnumerableTrait;` первой строкой тела (`mps-core/enums.md`). Тег `enum-not-enumerable`.
 - Eloquent-связи (`BelongsTo`, `HasMany`) в моделях не используются — данные собираются через репозитории; параметр `expanded` не используется (`mps-core/service.md`, «Связанные данные — без `expanded`»), тег `expanded-param-used`.
 - Модель лежит в домене/инфраструктуре **своей** сущности, не рядом с тем, кто её первым использовал.
-- **Известное расхождение (PHP-монолит):** `MPS\Core\Enums\EnumerableTrait::labels()` vs `App\Traits\EnumLabelTranslatable::getLabels()` — две конвенции, не сводить молча.
 
 ## Внешние интеграции (`Infrastructure/*/Integrations`, `Infrastructure/Http/*`)
 
@@ -131,7 +130,7 @@
 
 - **Разъезд захардкоженных списков** (`enum-list-drift`): `in:a,b` в других реквестах, `enum: [...]` в `@OA`-аннотациях, словари во фронтовых эндпоинтах; мапперы, allowlist и `match` по enum (`MediaCollectionMapper::MAP` — кейс в enum есть, в маппере нет, AINA-2978).
 - **Данные под миграцию поведения**: новый каст модели (`'col' => SomeEnum::class`) — значение вне enum → `ValueError` при гидрации и 500 на чтении.
-- **Гигиена дифа**: `composer.lock` вместе с `composer.json`; `.php-cs-fixer.cache` и сгенерированный `storage/api-docs/*.json` не уезжают в MR (лежат в `.gitignore`, но исторически трекаются — смотреть `git status --short`, не только HEAD).
+- **Гигиена дифа**: `composer.lock` вместе с `composer.json`; `.php-cs-fixer.cache`, сгенерированный `storage/api-docs/*.json` и другие сгенерированные файлы не уезжают в MR; файл может отслеживаться git вопреки `.gitignore` (закоммичен до того, как попал в игнор) — смотреть `git status --short`, не только `.gitignore`.
 - **Комментарии-пересказы кода**, сгенерированные ИИ (`// получаем пользователя`), — снимать до ревью; за них бьют прицельно. Сюда же — комментарии, объясняющие архитектуру/ответственность слоёв и устройство связей («проверяется здесь, а не в Request», «X о Y не знает — связь здесь») — `core/style.md`, «Комментарии». Тег `ai-style-comment`.
 - **Описание метода пересказывает имя** (AINA-2628, nit: «лишний коммент — читается из метода») — «Неудалённые здания по набору id» над `findAliveByIds`. Убрать описание, `@param`/`@return` с типами оставить. Тег `comment-restates-name`.
 - **Коммиты** — по `regulations/git.md`, «Коммиты» (`тип: описание #КЛЮЧ-задачи`, типы и требования к описанию — там); несоблюдение просят исправить прямо в тредах.

@@ -51,7 +51,7 @@
 0. **Запросы к БД вне репозитория** — всегда, механически, не по памяти (кейс 2026-10-14: запросы в workflow прошли, потому что искали глазами «в сервисе»):
    ```
    grep -rnE "DB::|::(query|where|whereIn|whereKey|find|findOrFail|all|firstWhere|create|insert|updateOrCreate|firstOrCreate)\(" \
-     Domains Contexts Workflows Entrypoints --include='*.php' | grep -vE "/(Repositories|Models)/|/Infrastructure/"
+     Domains Workflows Entrypoints --include='*.php' | grep -vE "/(Repositories|Models)/|/Infrastructure/"
    ```
    Корни — папки проекта с кодом доменов (в подпроекте — в его корне, без подпроектов — под `app/`): смотри `structure.md`. Паттерн ловит статические вызовы по модели (`Session::query()`, `User::where(...)`) и `DB::`; методы коллекций (`->pluck()`, `->first()`) намеренно не ищутся — шум. Каждая строка в `Services/`, `Commands/`, `Queries/`, `Workflows/`, `Validators/`, `Controllers/` — `service-direct-db-query` (в Request — `request-queries-db`); `::create(`/`::all(` у DTO, enum, фабрик — не БД, отсеивать по классу. При ревью дифа — по файлам дифа и их соседям в модуле, при `--all` — по всему проекту. Прогон на PHP-подпроекте 2026-10-14: одно срабатывание, и оно настоящее (`SessionEventService` → `Session::query()`), шума нет.
 0a. **Повторённая обработка формата** (`duplicated-format-logic`, `core/principles.md`, «Повторяющаяся обработка — один хелпер»):
@@ -112,7 +112,7 @@
      "select coalesce(col::text,'<NULL>'), count(*) from tbl group by 1 order by 2 desc;"
    ```
    Значение вне enum → `ValueError` при гидрации и 500 на **чтении**.
-3. **Инструменты.** `composer phpstan` (уровень — `conventions.md` п. 23) и `composer csfix-validate` в контейнере проекта (см. `composer.json` → `scripts`). Массовый `composer csfix` по репозиторию не запускать — репозитории не отформатированы целиком; значим только вывод по файлам дифа. Охват — `phpstan.neon` → `paths`, `.php-cs-fixer.php` → `in()`: диф вне охвата — писать это явно и прогонять хотя бы `php -l` по каждому файлу. Тесты не запустились (нет базы, сломан `RefreshDatabase` и т. п.) — так и написать в отчёте с причиной; «не запускал» не выдаётся за «прошли».
+3. **Инструменты.** `composer phpstan` (уровень — `conventions.md` п. 23) и `composer csfix-validate` в контейнере проекта (см. `composer.json` → `scripts`). Репозиторий не отформатирован целиком — `composer csfix` только по файлам дифа, по всему репозиторию не запускать; значим вывод по файлам дифа. Охват — `phpstan.neon` → `paths`, `.php-cs-fixer.php` → `in()`: диф вне охвата — писать это явно и прогонять хотя бы `php -l` по каждому файлу. Тесты не запустились (нет базы, сломан `RefreshDatabase` и т. п.) — так и написать в отчёте с причиной; «не запускал» не выдаётся за «прошли».
 
 Помечай каждую находку (находка с тегом — уровень по каталогу тегов):
 - **[БЕЗОПАСНОСТЬ]** — уязвимость из `security.md`, всегда КРИТИЧНО

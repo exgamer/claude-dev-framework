@@ -12,7 +12,7 @@
 
 ```php
 // Infrastructure/Postgres/{Domain}/Providers/ServiceProvider.php
-namespace App\ParkingApp\Infrastructure\Postgres\YourDomain\Providers;
+namespace App\YourApp\Infrastructure\Postgres\YourDomain\Providers;
 
 use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 
@@ -64,8 +64,8 @@ private array $providers = [
 
 ```php
 // Domains/{Domain}/definitions.php
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Services\YourCrudService;
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Services\YourCrudServiceInterface;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Services\YourCrudService;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Services\YourCrudServiceInterface;
 
 return [
     [
@@ -77,8 +77,8 @@ return [
 
 ```php
 // Infrastructure/Postgres/{Domain}/Providers/definitions.php
-use App\ParkingApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
-use App\ParkingApp\Infrastructure\Postgres\YourDomain\YourModule\Repositories\YourRepository;
+use App\YourApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositoryInterface;
+use App\YourApp\Infrastructure\Postgres\YourDomain\YourModule\Repositories\YourRepository;
 
 return [
     [
@@ -98,9 +98,9 @@ return [
 Большинство модулей ServiceProvider не имеют.
 
 ```php
-namespace App\ParkingApp\Domains\YourDomain\Modules\YourModule;
+namespace App\YourApp\Domains\YourDomain\Modules\YourModule;
 
-use App\ParkingApp\Core\Providers\ServiceProvider as Base;
+use App\YourApp\Core\Providers\ServiceProvider as Base;
 
 class ServiceProvider extends Base
 {

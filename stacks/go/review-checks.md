@@ -34,7 +34,7 @@
 
 Применяй все правила из загруженных файлов (`architecture/*.md`, `structure.md`, `conventions.md`, `style.md`, `review-findings.md` и SDK документации).
 
-Отдельно для платёжных путей (`workflows/**/payment`, `entrypoints/**/{kaspi,halyk,kassa24,...}`) — каждый пункт `approaches/patterns/payments.md` проверяй явно и пиши в отчёт результат, даже если нарушений нет; Go-кейсы, которые уже стреляли, — `review-findings.md`, «Платёжные хендлеры».
+Отдельно для платёжных путей (`workflows/**/payment`, `entrypoints/**/http/{provider}` — хендлеры платёжных провайдеров) — каждый пункт `approaches/patterns/payments.md` проверяй явно и пиши в отчёт результат, даже если нарушений нет; Go-кейсы, которые уже стреляли, — `review-findings.md`, «Платёжные хендлеры».
 
 ## 5.3 — Проверки за пределами дифа
 
@@ -77,5 +77,5 @@
    ```
    Первая: экспортируемое поле состояния у новой сущности — `state-field-exported` (у существующей анемичной — не находка, `regulations/entity.md`, «Когда применять»). Вторая: поле состояния в запросе PUT/PATCH — `status-in-update-request`; фильтр списка — не находка.
 1. **Разъезд списков, новый статус без потребителя, данные под миграцию, гигиена MR** — правила общие, `approaches/process/review.md`, «За пределами дифа»; здесь только что искать в Go: `switch`/`map` по типу статуса, `enums:` в swagger-аннотациях DTO, строковые литералы значений; `go.sum` вместе с `go.mod`; локальной базы в репозитории может не быть — тогда проверку колонок явно поручать автору.
-2. **Инструменты.** Прогон Go — по `approaches/process/self-check.md` (команды, `-race`, CI без гейтов). Падение e2e из `tests/*` без `APP_URL` («unsupported protocol scheme») — не сигнал; локальный гейт — юнит-тесты пакетов. Swagger: `swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1`.
+2. **Инструменты.** Прогон Go — по `approaches/process/self-check.md` (команды, `-race`, CI без гейтов). Падение e2e из-за окружения (нет `APP_URL`) — не сигнал о коде, но в итог — что не запускалось (`approaches/process/testing.md`). Swagger: `swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1`.
 3. **Платёжные пути** — раздел «Платёжные пути» выше.

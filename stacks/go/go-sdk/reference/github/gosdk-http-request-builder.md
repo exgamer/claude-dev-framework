@@ -1,4 +1,4 @@
-# github.com/exgamer/gosdk-http-request-builder v1.0.15
+# github.com/exgamer/gosdk-http-request-builder v1.0.16
 
 ## `github.com/exgamer/gosdk-http-request-builder/pkg/builder`
 

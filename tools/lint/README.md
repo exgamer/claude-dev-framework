@@ -18,7 +18,7 @@ python3 tools/lint/lint.py go <проект> --render     # напечатать
 ## PHP
 
 ```bash
-python3 tools/lint/lint.py php <проект> --sub parking_app [--container <имя>] [--base <rev>]
+python3 tools/lint/lint.py php <проект> --sub <подпроект> [--container <имя>] [--base <rev>]
 ```
 
 - Запуск — в PHP-контейнере проекта: нужен `vendor/autoload.php` проекта. Контейнер — `--container`, `PHP_CONTAINER`, запомненный для проекта или единственный запущенный, в который смонтирован проект; иначе спросит в терминале и запомнит (`tools/lint/php_container.py`, `tools/lint/.php-containers.json` у разработчика, в git не попадает; спрашивает и `install.sh`). Имя контейнера в фреймворке не зашито — у каждого разработчика своё. Путь проекта в контейнере — по его монтированиям.

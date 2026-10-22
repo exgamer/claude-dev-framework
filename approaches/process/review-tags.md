@@ -77,7 +77,7 @@
 | `cache-stampede` | [ВНИМАНИЕ] | Горячий ключ кэша без защиты от одновременного перезаполнения | `approaches/patterns/concurrency.md` |
 | `side-effect-without-outbox` | [ОШИБКА] | Побочный эффект, которому нужна гарантия доставки (ТЗ, сверка 2026-10-20; платёжный путь — всегда), — fire-and-forget после записи вместо outbox | `approaches/patterns/outbox.md`; `payments.md` |
 | `status-without-consumer` | [ОШИБКА] | Новый статус/значение без потребителя (крон, consumer, переход, ручной разбор с описанной выборкой/алертом) — тупик | `approaches/process/impact-analysis.md`; `outbox.md`, «Форма» |
-| `payment-without-parent` | [ОШИБКА] | Платёж без связанной сущности (`session_id = 0`, пустой `order_id`) не отсекается до записи | `approaches/patterns/payments.md` |
+| `payment-without-parent` | [ОШИБКА] | Платёж без связанной сущности (`0` или пустой id родительской записи) не отсекается до записи | `approaches/patterns/payments.md` |
 
 ## Производительность, кэш, списки
 
