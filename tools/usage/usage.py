@@ -17,6 +17,14 @@
   usage.py [--project PATH] --session ID [--since ISO] [--match REGEX] [--out FILE]
                                             — агенты одной сессии без ключа задачи (проверки /dev-rule,
                                               полная сверка): по агентам, по этапам (описание до «:»), итог
+  usage.py [--project PATH] --context [--session ID]
+                                            — контекст последнего вызова сессии (по умолчанию — самой свежей):
+                                              по нему оркестратор /dev решает о перезапуске сессии
+
+«Стоимость» — в единицах цены входа модели: вход 1, запись кэша 1,25 (TTL 5 мин) / 2 (1 час), чтение кэша
+0,05 (Opus 5.5) / 0,025 (Fable 5.1) / 0,1 (остальные), выход 5; разбивка записи по TTL — из `usage.cache_creation`.
+«Перезапись» — запись кэша в вызовах после паузы дольше TTL (кэш остыл, контекст записан заново); у агентов
+кэш живёт 5 минут — поэтому доводка закончившегося агента после паузы стоит как запись всего его контекста.
 """
 import argparse
 import json
@@ -30,6 +38,17 @@ PROJECTS = Path.home() / ".claude" / "projects"
 TASK_RE = re.compile(r"docs/tasks/([A-Za-z0-9._-]+)|Задача:\s*([A-Za-z0-9._-]+)")
 PLAN_ID_RE = re.compile(r"\b(T\d+[a-z]?)\b")
 FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
+READ_PRICE = {"claude-opus-5-5": 0.05, "claude-fable-5-1": 0.025, "claude-mythos-5-1": 0.025}  # остальные — 0,1
+
+
+def call_cost(u, model):
+    """Стоимость вызова в единицах цены входа модели."""
+    cc = u.get("cache_creation") or {}
+    w5, w1h = cc.get("ephemeral_5m_input_tokens"), cc.get("ephemeral_1h_input_tokens")
+    if w5 is None and w1h is None:
+        w5, w1h = u.get("cache_creation_input_tokens") or 0, 0
+    return ((u.get("input_tokens") or 0) + 1.25 * (w5 or 0) + 2 * (w1h or 0)
+            + READ_PRICE.get(model, 0.1) * (u.get("cache_read_input_tokens") or 0) + 5 * (u.get("output_tokens") or 0))
 
 
 def project_dir(project: Path) -> Path:
@@ -43,6 +62,7 @@ def ts(value):
 def read_transcript(path: Path):
     """Токены по уникальным ответам (одна запись API пишется несколькими строками), модель, время, первое поручение."""
     usage_by_msg, models, times, prompt, out_chars = {}, set(), [], "", 0
+    call_meta = {}  # id ответа → (время первой строки, модель)
     with path.open(encoding="utf-8") as f:
         for line in f:
             try:
@@ -59,7 +79,9 @@ def read_transcript(path: Path):
                 elif isinstance(content, list):
                     prompt = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
             if d.get("type") == "assistant" and msg.get("usage"):
-                usage_by_msg[msg.get("id") or d.get("uuid")] = msg["usage"]
+                mid = msg.get("id") or d.get("uuid")
+                usage_by_msg[mid] = msg["usage"]
+                call_meta.setdefault(mid, (d.get("timestamp"), msg.get("model") or ""))
                 for c in msg.get("content") or []:
                     if c.get("type") == "text":
                         out_chars += len(c.get("text", ""))
@@ -68,7 +90,22 @@ def read_transcript(path: Path):
                 if msg.get("model") and not msg["model"].startswith("<"):
                     models.add(msg["model"])
     tokens = {k: sum(u.get(k) or 0 for u in usage_by_msg.values()) for k in FIELDS}
+    cost, rewrite, prev, context = 0.0, 0, None, 0
+    for mid, u in sorted(usage_by_msg.items(), key=lambda x: call_meta[x[0]][0] or ""):
+        when, model = call_meta[mid]
+        cost += call_cost(u, model)
+        cc = u.get("cache_creation") or {}
+        ttl = 3600 if (cc.get("ephemeral_1h_input_tokens") or 0) > (cc.get("ephemeral_5m_input_tokens") or 0) else 300
+        written = u.get("cache_creation_input_tokens") or 0
+        context = (u.get("input_tokens") or 0) + written + (u.get("cache_read_input_tokens") or 0)
+        t_now = ts(when)
+        if prev and t_now and (t_now - prev).total_seconds() > ttl and written * 2 > context:
+            rewrite += written
+        prev = t_now or prev
     return {
+        "cost": cost,
+        "rewrite": rewrite,
+        "context": context,
         "tokens": tokens,
         "calls": len(usage_by_msg),
         "out_chars": out_chars,
@@ -122,6 +159,10 @@ def add(acc, t):
         acc[k] += t[k]
 
 
+def money(n):
+    return fmt(int(round(n)))
+
+
 def stage(description: str) -> str:
     """Этап — часть описания агента до «:» (`Wave1: …`, `Step 3a: …`), иначе первые два слова."""
     head = description.split(":", 1)[0] if ":" in description else " ".join(description.split()[:2])
@@ -135,10 +176,11 @@ def render(key, agents, orchestrators):
     lines.append("")
     lines.append("## Агенты")
     lines.append("")
-    lines.append("| # | Роль | Поручение | Задача плана | Модель | Старт | Длит. | Вызовов | Вход | Запись кэша | Чтение кэша | Выход ≥ | Вывод, симв. | Итого |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
-    by_role = defaultdict(lambda: {"n": 0, "t": dict.fromkeys(FIELDS, 0)})
+    lines.append("| # | Роль | Поручение | Задача плана | Модель | Старт | Длит. | Вызовов | Вход | Запись кэша | Чтение кэша | Выход ≥ | Вывод, симв. | Итого | Перезапись | Стоимость |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    by_role = defaultdict(lambda: {"n": 0, "t": dict.fromkeys(FIELDS, 0), "cost": 0.0, "rewrite": 0})
     grand = dict.fromkeys(FIELDS, 0)
+    grand_cost, grand_rewrite = 0.0, 0
     for i, a in enumerate(agents, 1):
         t = a["tokens"]
         plan_ids = ", ".join(dict.fromkeys(PLAN_ID_RE.findall(a["description"]))) or "—"
@@ -146,17 +188,26 @@ def render(key, agents, orchestrators):
         lines.append(
             f"| {i} | {a['role']} | {a['description']} | {plan_ids} | {', '.join(a['models']) or '—'} | {start} | {duration(a)} "
             f"| {a['calls']} | {fmt(t['input_tokens'])} | {fmt(t['cache_creation_input_tokens'])} "
-            f"| {fmt(t['cache_read_input_tokens'])} | {fmt(t['output_tokens'])} | {fmt(a['out_chars'])} | **{fmt(total(t))}** |"
+            f"| {fmt(t['cache_read_input_tokens'])} | {fmt(t['output_tokens'])} | {fmt(a['out_chars'])} | **{fmt(total(t))}** "
+            f"| {fmt(a['rewrite'])} | {money(a['cost'])} |"
         )
-        by_role[a["role"]]["n"] += 1
-        add(by_role[a["role"]]["t"], t)
+        r = by_role[a["role"]]
+        r["n"] += 1
+        r["cost"] += a["cost"]
+        r["rewrite"] += a["rewrite"]
+        add(r["t"], t)
         add(grand, t)
+        grand_cost += a["cost"]
+        grand_rewrite += a["rewrite"]
 
-    lines += ["", "## По ролям", "", "| Роль | Агентов | Выход ≥ | Итого | Доля |", "|---|---|---|---|---|"]
+    lines += ["", "## По ролям", "", "| Роль | Агентов | Выход ≥ | Итого | Доля | Перезапись | Стоимость | Доля стоимости |", "|---|---|---|---|---|---|---|---|"]
     gt = total(grand) or 1
-    for role, r in sorted(by_role.items(), key=lambda x: -total(x[1]["t"])):
-        lines.append(f"| {role} | {r['n']} | {fmt(r['t']['output_tokens'])} | {fmt(total(r['t']))} | {total(r['t']) * 100 // gt}% |")
-    lines.append(f"| **все агенты** | {len(agents)} | {fmt(grand['output_tokens'])} | **{fmt(total(grand))}** | 100% |")
+    gc = grand_cost or 1
+    for role, r in sorted(by_role.items(), key=lambda x: -x[1]["cost"]):
+        lines.append(f"| {role} | {r['n']} | {fmt(r['t']['output_tokens'])} | {fmt(total(r['t']))} | {total(r['t']) * 100 // gt}% "
+                     f"| {fmt(r['rewrite'])} | {money(r['cost'])} | {round(r['cost'] * 100 / gc)}% |")
+    lines.append(f"| **все агенты** | {len(agents)} | {fmt(grand['output_tokens'])} | **{fmt(total(grand))}** | 100% "
+                 f"| {fmt(grand_rewrite)} | **{money(grand_cost)}** | 100% |")
 
     by_stage = defaultdict(lambda: {"n": 0, "t": dict.fromkeys(FIELDS, 0), "calls": 0})
     for a in agents:
@@ -173,16 +224,21 @@ def render(key, agents, orchestrators):
 
     if orchestrators:
         lines += ["", "## Оркестратор", "", "Основная сессия `/dev` целиком, включая работу в ней не по этой задаче.", ""]
-        lines.append("| Сессия | Модель | Старт | Длит. | Вызовов | Выход ≥ | Итого |")
-        lines.append("|---|---|---|---|---|---|---|")
+        lines.append("| Сессия | Модель | Старт | Длит. | Вызовов | Выход ≥ | Итого | Контекст в конце | Перезапись | Стоимость |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|")
         orch_total = dict.fromkeys(FIELDS, 0)
+        orch_cost = 0.0
         for sid, o in orchestrators:
             t = o["tokens"]
             add(orch_total, t)
+            orch_cost += o["cost"]
             start = o["start"].astimezone().strftime("%m-%d %H:%M") if o["start"] else "—"
-            lines.append(f"| {sid[:8]} | {', '.join(o['models']) or '—'} | {start} | {duration(o)} | {o['calls']} | {fmt(t['output_tokens'])} | {fmt(total(t))} |")
+            lines.append(f"| {sid[:8]} | {', '.join(o['models']) or '—'} | {start} | {duration(o)} | {o['calls']} | {fmt(t['output_tokens'])} "
+                         f"| {fmt(total(t))} | {fmt(o['context'])} | {fmt(o['rewrite'])} | {money(o['cost'])} |")
         add(orch_total, grand)
-        lines += ["", f"**Всего по задаче (агенты + оркестратор): {fmt(total(orch_total))}**, из них выход — не меньше {fmt(orch_total['output_tokens'])}."]
+        all_cost = orch_cost + grand_cost
+        lines += ["", f"**Всего по задаче (агенты + оркестратор): {fmt(total(orch_total))}**, из них выход — не меньше {fmt(orch_total['output_tokens'])}; "
+                  f"стоимость — {money(all_cost)} ед. цены входа, оркестратор — {round(orch_cost * 100 / (all_cost or 1))}%."]
     return "\n".join(lines) + "\n"
 
 
@@ -195,12 +251,22 @@ def main():
     p.add_argument("--since", help="только агенты, начавшиеся не раньше (ISO, например 2026-10-20T13:00)")
     p.add_argument("--match", help="только агенты, у которых описание совпадает с регулярным выражением")
     p.add_argument("--out", help="записать отчёт в файл (для --session)")
+    p.add_argument("--context", action="store_true", help="контекст последнего вызова сессии (--session или самой свежей)")
     args = p.parse_args()
 
     project = Path(args.project).expanduser()
     pdir = project_dir(project)
     if not pdir.is_dir():
         sys.exit(f"нет транскриптов для {project.resolve()} ({pdir})")
+
+    if args.context:
+        sessions = sorted(pdir.glob(f"{args.session or ''}*.jsonl"), key=lambda p: p.stat().st_mtime)
+        if not sessions:
+            sys.exit("сессий не найдено")
+        o = read_transcript(sessions[-1])
+        print(f"контекст: {fmt(o['context'])} токенов (сессия {sessions[-1].stem[:8]}, вызовов {o['calls']}, стоимость {money(o['cost'])} ед. цены входа)")
+        return
+
     agents = collect(pdir)
 
     if args.session:

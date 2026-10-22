@@ -99,6 +99,20 @@ if [ -f "$PROJECT/composer.json" ]; then
 fi
 
 echo
+echo "Разрешения для <проект>/.claude/settings.json (по желанию, вручную) — агенты не ждут подтверждения на чтение и прогон"
+echo "тестов: пока агент ждёт, его кэш (5 минут) остывает, и следующий шаг записывает весь контекст заново."
+echo "Список под проект подберёт /fewer-permission-prompts; пример:"
+cat <<'JSON'
+  "permissions": {
+    "allow": [
+      "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)",
+      "Bash(go build *)", "Bash(go vet *)", "Bash(go test *)", "Bash(gofmt -l *)",
+      "Bash(docker exec * php vendor/bin/phpunit*)", "Bash(docker exec * php * vendor/bin/phpstan analyse*)",
+      "Bash(python3 *dev-framework/tools/lint/lint.py *)", "Bash(python3 *dev-framework/tools/usage/usage.py *)"
+    ]
+  }
+JSON
+echo
 echo "Стопы для ~/.claude/settings.json (добавить вручную, если ещё нет) — спрашивать перед коммитом, пушем и разрушающим SQL:"
 cat <<'JSON'
   "permissions": {
