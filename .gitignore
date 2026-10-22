@@ -29,3 +29,6 @@ tools/lint/.real-projects.json
 
 # Бинарник анализатора после ручного `go build` (lint.py собирает свой в кеш вне репозитория)
 tools/lint/gocheck/gocheck
+
+# Метка продолжения команды после /clear (tools/resume/resume.py): у каждого своя
+.claude/df-resume.json

@@ -3,9 +3,10 @@
 # скиллов в <проект>/.claude/skills/, агентов в <проект>/.claude/agents/. Только в проект, не в ~/.claude: описания
 # скиллов и агентов грузятся в каждую сессию, а нужны только в рабочих проектах.
 # Источник истины — этот репозиторий: правки только здесь, симлинки подхватывают их сразу; новый скилл или агент —
-# повторный запуск. Ничего не удаляет: если цель уже существует и это не наш симлинк — пропускает и сообщает.
+# повторный запуск. Ещё — хук продолжения команды после /clear (tools/resume/resume.py) в <проект>/.claude/settings.local.json.
+# Ничего не удаляет: если цель уже существует и это не наш симлинк — пропускает и сообщает.
 #   ./install.sh <папка проекта>
-#   ./install.sh --remove <папка проекта>   — убрать симлинки фреймворка из проекта
+#   ./install.sh --remove <папка проекта>   — убрать симлинки фреймворка и хук продолжения из проекта
 set -euo pipefail
 
 DF_SRC="$(cd "$(dirname "$0")" && pwd -P)"   # -P: при запуске через ~/.claude/dev-framework — тот же путь, что в симлинках
@@ -22,6 +23,7 @@ if [ $remove = 1 ]; then
   for dst in "$SKILLS_DIR"/dev "$SKILLS_DIR"/dev-* "$AGENTS_DIR"/df-*.md; do
     if [ -L "$dst" ] && [[ "$(readlink "$dst")" == "$DF_SRC"/* ]]; then rm "$dst"; echo "removed $dst"; fi
   done
+  python3 "$DF_SRC/tools/resume/resume.py" uninstall "$PROJECT" || true
   exit 0
 fi
 
@@ -62,11 +64,14 @@ done
 if git -C "$PROJECT" rev-parse --git-dir >/dev/null 2>&1; then
   ex="$(git -C "$PROJECT" rev-parse --git-path info/exclude)"; [[ "$ex" = /* ]] || ex="$PROJECT/$ex"
   prefix="$(git -C "$PROJECT" rev-parse --show-prefix)"   # проект в подпапке репозитория: пути в exclude — от корня
-  for pat in "/${prefix}.claude/skills/dev" "/${prefix}.claude/skills/dev-*" "/${prefix}.claude/agents/df-*.md"; do
+  for pat in "/${prefix}.claude/skills/dev" "/${prefix}.claude/skills/dev-*" "/${prefix}.claude/agents/df-*.md" "/${prefix}.claude/df-resume.json" "/${prefix}.claude/settings.local.json"; do
     grep -qxF "$pat" "$ex" 2>/dev/null || echo "$pat" >> "$ex"
   done
-  echo "git     симлинки — в .git/info/exclude"
+  echo "git     симлинки, метка продолжения и settings.local.json — в .git/info/exclude"
 fi
+
+# Продолжение команды после /clear и в новой сессии: хук SessionStart — в личные настройки проекта, не в ~/.claude
+python3 "$DF_SRC/tools/resume/resume.py" install "$PROJECT" || echo "hook    не добавлен — установка продолжается"
 
 # Анализаторы — на машину, не в проект: правила фреймворка гоняет tools/lint/lint.py своим конфигом (tools/lint/README.md)
 if [ -f "$PROJECT/go.mod" ]; then
@@ -108,7 +113,8 @@ cat <<'JSON'
       "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)",
       "Bash(go build *)", "Bash(go vet *)", "Bash(go test *)", "Bash(gofmt -l *)",
       "Bash(docker exec * php vendor/bin/phpunit*)", "Bash(docker exec * php * vendor/bin/phpstan analyse*)",
-      "Bash(python3 *dev-framework/tools/lint/lint.py *)", "Bash(python3 *dev-framework/tools/usage/usage.py *)"
+      "Bash(python3 *dev-framework/tools/lint/lint.py *)", "Bash(python3 *dev-framework/tools/usage/usage.py *)",
+      "Bash(python3 *dev-framework/tools/resume/resume.py *)"
     ]
   }
 JSON
