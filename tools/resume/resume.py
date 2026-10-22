@@ -5,6 +5,8 @@
 закончил. Метка — <проект>/.claude/df-resume.json (личная, в git не идёт: install.sh — в .git/info/exclude).
 Хук SessionStart (startup|clear) подкладывает новой сессии незаконченные команды: пользователь пишет
 «дальше» — сессия вызывает тот же скилл с теми же аргументами и проходит его Фазу 0 заново.
+Тот же хук в проекте, где тур ещё не предлагали (нет <проект>/.claude/df-intro-shown), просит первой строкой
+первого ответа предложить /dev-intro и ставит эту отметку — подсказка одна на проект.
 
   resume.py set <команда> <задача> [--flags "<флаги>"]   — метка: /<команда> [флаги] <задача>
   resume.py done <команда> <задача>                      — снять метку
@@ -27,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 MARK = Path(".claude") / "df-resume.json"
+INTRO_MARK = Path(".claude") / "df-intro-shown"
 MAX_AGE = timedelta(days=14)
 # нет ссылки ~/.claude/dev-framework (фреймворк удалён) — хук молчит, а не падает на каждом старте
 HOOK_CMD = ('f="$HOME/.claude/dev-framework/tools/resume/resume.py"; '
@@ -125,6 +128,14 @@ def context(entries):
     )
 
 
+def intro():
+    return (
+        "dev-framework: в этом проекте тур по фреймворку ещё не предлагали. Первой строкой первого ответа в этой "
+        "сессии, о чём бы ни было сообщение, — «Можно пройти тур по возможностям dev-framework: `/dev-intro`.», "
+        "затем — ответ как обычно. Больше в этом проекте не предлагай."
+    )
+
+
 def cmd_set(args):
     project = target(args)
     args.task = same_task(project, args.task)
@@ -163,10 +174,21 @@ def cmd_hook(_):
         data = {}
     cwd = data.get("cwd")
     project = project_dir(cwd if isinstance(cwd, str) else None)
+    parts = []
+    mark = project / INTRO_MARK
+    # скилл тура — по ссылке в проекте: после обновления фреймворка без install.sh его ещё нет, отметку не тратим
+    if (project / ".claude" / "skills" / "dev-intro").exists() and not mark.exists():
+        try:
+            mark.touch()  # отметка — сразу: подсказка не повторится в следующих сессиях
+            parts.append(intro())
+        except OSError:
+            pass
     entries = load(project)
     if entries:
+        parts.append(context(entries))
+    if parts:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart",
-                                                 "additionalContext": context(entries)}}, ensure_ascii=False))
+                                                 "additionalContext": "\n\n".join(parts)}}, ensure_ascii=False))
 
 
 def cmd_install(args):

@@ -3,7 +3,8 @@
 # скиллов в <проект>/.claude/skills/, агентов в <проект>/.claude/agents/. Только в проект, не в ~/.claude: описания
 # скиллов и агентов грузятся в каждую сессию, а нужны только в рабочих проектах.
 # Источник истины — этот репозиторий: правки только здесь, симлинки подхватывают их сразу; новый скилл или агент —
-# повторный запуск. Ещё — хук продолжения команды после /clear (tools/resume/resume.py) в <проект>/.claude/settings.local.json.
+# повторный запуск. Ещё — хук продолжения команды после /clear и подсказки о туре /dev-intro (tools/resume/resume.py)
+# в <проект>/.claude/settings.local.json.
 # Ничего не удаляет: если цель уже существует и это не наш симлинк — пропускает и сообщает.
 #   ./install.sh <папка проекта>
 #   ./install.sh --remove <папка проекта>   — убрать симлинки фреймворка и хук продолжения из проекта
@@ -64,13 +65,14 @@ done
 if git -C "$PROJECT" rev-parse --git-dir >/dev/null 2>&1; then
   ex="$(git -C "$PROJECT" rev-parse --git-path info/exclude)"; [[ "$ex" = /* ]] || ex="$PROJECT/$ex"
   prefix="$(git -C "$PROJECT" rev-parse --show-prefix)"   # проект в подпапке репозитория: пути в exclude — от корня
-  for pat in "/${prefix}.claude/skills/dev" "/${prefix}.claude/skills/dev-*" "/${prefix}.claude/agents/df-*.md" "/${prefix}.claude/df-resume.json" "/${prefix}.claude/settings.local.json"; do
+  for pat in "/${prefix}.claude/skills/dev" "/${prefix}.claude/skills/dev-*" "/${prefix}.claude/agents/df-*.md" "/${prefix}.claude/df-resume.json" "/${prefix}.claude/df-intro-shown" "/${prefix}.claude/settings.local.json"; do
     grep -qxF "$pat" "$ex" 2>/dev/null || echo "$pat" >> "$ex"
   done
-  echo "git     симлинки, метка продолжения и settings.local.json — в .git/info/exclude"
+  echo "git     симлинки, метки продолжения и тура, settings.local.json — в .git/info/exclude"
 fi
 
-# Продолжение команды после /clear и в новой сессии: хук SessionStart — в личные настройки проекта, не в ~/.claude
+# Продолжение команды после /clear и в новой сессии, подсказка о туре /dev-intro в первой сессии проекта:
+# хук SessionStart — в личные настройки проекта, не в ~/.claude
 python3 "$DF_SRC/tools/resume/resume.py" install "$PROJECT" || echo "hook    не добавлен — установка продолжается"
 
 # Анализаторы — на машину, не в проект: правила фреймворка гоняет tools/lint/lint.py своим конфигом (tools/lint/README.md)
@@ -129,3 +131,5 @@ cat <<'JSON'
     ]
   }
 JSON
+echo
+echo "Дальше: перезапустить Claude Code в проекте и пройти тур по возможностям — /dev-intro"
