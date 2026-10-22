@@ -1,6 +1,6 @@
 # Граф правил — сводка
 
-Узлов 1204, связей 4891, групп 10. Кандидаты ниже — подсказки, проверять по файлам.
+Узлов 1227, связей 4950, групп 9. Кандидаты ниже — подсказки, проверять по файлам.
 
 ## Сироты (на файл нет ссылок)
 - stacks/php/README.md
@@ -12,29 +12,28 @@
 - теги находок — 27
 - Конкурентность — 26
 - транзакции — 25
-- unit-тесты — 23
+- unit-тесты — 24
+- субагенты — 21
 - безопасность — 21
 - Ошибки и исключения — 21
-- субагенты — 19
 - HTTP точка входа — 19
 - миграции БД — 19
 - Подтверждение коммита/пуша — 19
 - DI — 19
+- правила валидации — 19
 - именование — 19
 - RabbitMQ — 18
 - Внешние интеграции — 18
 - Авторизация и права — 18
 - слои — 18
 - swagger — 18
-- правила валидации — 18
 
 ## Кандидаты в противоречия (conflicts_with)
 C1. [approaches/patterns/cache.md § список] «Инвалидация — при записи, в том же сценарии, что меняет данные» VS [approaches/patterns/transactions.md § «Общее»] «Внутри транзакции нет побочных эффектов: HTTP, брокер, файлы, dispatch, инвалидация кэша — после коммита» (0.15)
 C2. [approaches/process/bugfix.md § Границы] «Не баг-фикс → стоп и /dev: миграция/схема БД, изменение контракта или модели доступа, >1 модуля или ~>10 файлов без тестов, правка в другом сервисе/SDK» VS [skills/dev-go/SKILL.md § Шаг 2] «Без design.md — только мелкая правка: один модуль, без эндпойнтов, таблиц/миграций, событий, контракта и чувствительных зон; иначе /dev» (0.25)
 C3. [approaches/process/bugfix.md § Границы] «Чувствительная зона — не граница баг-фикса: самопроверка по stacks/<stack>/security.md, модель угроз не нужна» VS [skills/dev-php/SKILL.md § Шаг 2] «Без design.md — только мелкая правка: один модуль, без эндпойнтов, таблиц/миграций, событий, контракта и чувствительных зон; иначе /dev» (0.25)
 C4. [approaches/process/bugfix.md § Тот же разработчик] «Тот же разработчик (SendMessage) только после «ок» на причину в --step и при одном возврате к п.2; исправления по ревью — свежий агент» VS [skills/dev-fix/SKILL.md § Фаза 0] «В /dev-fix координатор код не пишет: разработка и ревью — свежие агенты df-go/df-php и df-review» (0.2)
-C5. [approaches/process/planning.md § Волны] «Параллельно — только при непересекающихся файлах, без чтения результата друг друга и с готовыми контрактами волны 0» VS [core/backlog.md § B-85] «B-85: интеграционные прогоны на общей тестовой БД — только по очереди» (0.3)
-C6. [core/rules-evolution.md § Куда писать] «.claude/dev-rules.md проекта приоритетнее фреймворка в проекте; повтор в 2+ проектах — поднимать во фреймворк» VS [core/principles.md § шапка] «При конфликте побеждает более конкретное: стек > архитектура > принципы, кроме «Пробелы и споры»» (0.15)
-C7. [core/style.md § Комментарии] «PHP: docblock класса обязателен — одна строка + @author; @property у модели всегда» VS [core/style.md § Комментарии] «Doc-комментарий — только если есть что сказать сверх имени; формат «Имя Описание по-русски»» (0.15)
-C8. [stacks/go/examples/tariff/README.md § Событие tariff.created] «Событие tariff.created: все поля обязательны, null нет; at-least-once, дедуп по event_id» VS [stacks/php/examples/README.md § Событие tariff.created] «Событие tariff.created: null только у grace_minutes; ядро не ждёт подтверждения брокера (расхождение с Go — особенность примера)» (0.6)
-C9. [stacks/go/structure.md § Структура директорий] «Bootstrap путь — bootstrap/{module}/ или bootstrap/{domain}/{module}/ по удобству; остальные слои всегда {domain}/{module}/» VS [architecture/layers.md § Направление зависимостей] «Запрещено: Domain → Infrastructure|Entrypoint|Workflow, Workflow → Entrypoint|Workflow, Infrastructure → Entrypoint, Entrypoint → Bootstrap, Context A → B» (0.1)
+C5. [core/rules-evolution.md § Куда писать] «.claude/dev-rules.md проекта приоритетнее фреймворка в проекте; повтор в 2+ проектах — поднимать во фреймворк» VS [core/principles.md § шапка] «При конфликте побеждает более конкретное: стек > архитектура > принципы, кроме «Пробелы и споры»» (0.15)
+C6. [core/style.md § Комментарии] «PHP: docblock класса обязателен — одна строка + @author; @property у модели всегда» VS [core/style.md § Комментарии] «Doc-комментарий — только если есть что сказать сверх имени; формат «Имя Описание по-русски»» (0.15)
+C7. [stacks/go/examples/tariff/README.md § Событие tariff.created] «Событие tariff.created: все поля обязательны, null нет; at-least-once, дедуп по event_id» VS [stacks/php/examples/README.md § Событие tariff.created] «Событие tariff.created: null только у grace_minutes; ядро не ждёт подтверждения брокера (расхождение с Go — особенность примера)» (0.6)
+C8. [stacks/go/structure.md § Структура директорий] «Bootstrap путь — bootstrap/{module}/ или bootstrap/{domain}/{module}/ по удобству; остальные слои всегда {domain}/{module}/» VS [architecture/layers.md § Направление зависимостей] «Запрещено: Domain → Infrastructure|Entrypoint|Workflow, Workflow → Entrypoint|Workflow, Infrastructure → Entrypoint, Entrypoint → Bootstrap, Context A → B» (0.1)
