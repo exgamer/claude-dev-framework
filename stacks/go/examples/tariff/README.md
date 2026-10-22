@@ -3,7 +3,7 @@
 Один модуль целиком, написанный строго по правилам фреймворка. Это **образец формы**: при сомнении, как оформить файл, смотреть сюда, а детали (имена полей, бизнес-правила) брать из соседнего модуля проекта. Основан на модуле тарифов.
 
 - Модуль Go — заглушка `example.com/parking-service`. Пути SDK — `git.mpinnovations.kz/mps/go-packages/gosdk-*`; источник и версия SDK на задаче — из `go.mod` проекта, у нового проекта — вопрос (`conventions.md`, п. 23).
-- Проверено 2026-10-21: свой `go.mod`/`go.sum`, сборка офлайн из module cache против gosdk-core v1.0.9, gosdk-db-core v1.0.10, gosdk-http-core v1.0.14, gosdk-http-request-builder v1.0.2, gosdk-postgres-core v1.0.8, gosdk-redis-core v1.0.7, gosdk-rabbit-core v1.0.10, gosdk-sentry-core v1.0.5, gosdk-console-core v1.0.6 (Go 1.26+). Из каталога эталона:
+- Проверено 2026-10-22: свой `go.mod`/`go.sum`, сборка офлайн из module cache против gosdk-core v1.0.10, gosdk-db-core v1.0.10, gosdk-http-core v1.1.0, gosdk-http-request-builder v1.0.2, gosdk-postgres-core v1.0.8, gosdk-redis-core v1.0.7, gosdk-rabbit-core v1.0.10, gosdk-sentry-core v1.0.5, gosdk-console-core v1.0.6 (Go 1.27.3+). Из каталога эталона:
   ```sh
   export GOFLAGS=-mod=mod GOPROXY=off GOSUMDB=off GOPRIVATE= GONOPROXY=
   go build ./... && go vet ./... && go test -race ./... && gofmt -l .

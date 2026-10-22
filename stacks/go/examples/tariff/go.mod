@@ -1,12 +1,12 @@
 module example.com/parking-service
 
-go 1.26.0
+go 1.27.3
 
 require (
 	git.mpinnovations.kz/mps/go-packages/gosdk-console-core v1.0.6
-	git.mpinnovations.kz/mps/go-packages/gosdk-core v1.0.9
+	git.mpinnovations.kz/mps/go-packages/gosdk-core v1.0.10
 	git.mpinnovations.kz/mps/go-packages/gosdk-db-core v1.0.10
-	git.mpinnovations.kz/mps/go-packages/gosdk-http-core v1.0.14
+	git.mpinnovations.kz/mps/go-packages/gosdk-http-core v1.1.0
 	git.mpinnovations.kz/mps/go-packages/gosdk-http-request-builder v1.0.2
 	git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core v1.0.8
 	git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core v1.0.10
@@ -100,7 +100,6 @@ require (
 	github.com/swaggo/swag v1.16.6 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
-	github.com/vearne/gin-timeout v0.2.3 // indirect
 	github.com/zsais/go-gin-prometheus v1.0.3 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.9.2 // indirect
 	go.uber.org/atomic v1.12.0 // indirect

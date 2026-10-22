@@ -1,4 +1,4 @@
-# git.mpinnovations.kz/mps/go-packages/gosdk-core v1.0.9
+# git.mpinnovations.kz/mps/go-packages/gosdk-core v1.0.10
 
 ## `git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app`
 

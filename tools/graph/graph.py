@@ -130,7 +130,7 @@ def finish() -> None:
     q = suggest_questions(G, C, labels)
     (OUT / "GRAPH_REPORT.md").write_text(generate(G, C, co, labels, gods, sur, det, {"input": 0, "output": 0}, "dev-framework rules", suggested_questions=q))
     to_json(G, C, str(OUT / "graph.json"))
-    to_html(G, C, str(OUT / "graph.html"), community_labels=labels)
+    to_html(G, C, "graphify-out/graph.html", community_labels=labels)  # путь — в заголовке страницы: относительный, без папки пользователя
     lab_path.write_text(json.dumps({str(k): v for k, v in labels.items()}, ensure_ascii=False, indent=2))
 
     label = lambda n: G.nodes[n].get("label", n)

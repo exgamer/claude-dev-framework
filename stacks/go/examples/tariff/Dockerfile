@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 # Приватные модули SDK; токен — секретом сборки (--secret id=netrc,src=$HOME/.netrc), не build-arg: build-arg виден в docker history
 ARG GOPRIVATE=git.mpinnovations.kz/*

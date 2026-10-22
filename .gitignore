@@ -12,8 +12,10 @@ __pycache__/
 tools/sdk-ref/out/
 tmp/
 
-# Граф правил (tools/graph): корпус — копия, собирается заново
+# Граф правил (tools/graph): корпус — копия, собирается заново; чанки агентов — временные, с абсолютными путями
 tools/graph/corpus/
+tools/graph/graphify-out/.chunk_*
+tools/graph/graphify-out/.graphify_chunk_*
 
 # Стенд PHP-эталона: путь к auth.json с токеном — локальный
 tools/php-check/.auth-path
