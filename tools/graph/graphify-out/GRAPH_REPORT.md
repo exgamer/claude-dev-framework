@@ -1,12 +1,12 @@
-# Graph Report - dev-framework rules  (2026-10-22)
+# Graph Report - dev-framework rules  (2026-10-23)
 
 ## Corpus Check
-- 111 files · ~121,057 words
+- 111 files · ~121,339 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1236 nodes · 4901 edges · 11 communities detected
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 187 edges (avg confidence: 0.82)
+- 1273 nodes · 5054 edges · 10 communities detected
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 178 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -20,19 +20,18 @@
 - [[_COMMUNITY_REST, Swagger, PHP-памятка|REST, Swagger, PHP-памятка]]
 - [[_COMMUNITY_Community 8|Community 8]]
 - [[_COMMUNITY_Community 9|Community 9]]
-- [[_COMMUNITY_Community 10|Community 10]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `stacks/php/conventions.md` - 97 edges
-2. `stacks/php/checklist.md` - 93 edges
-3. `skills/dev-php/SKILL.md` - 85 edges
-4. `транзакции` - 84 edges
-5. `approaches/process/review-tags.md` - 81 edges
-6. `stacks/php/review-findings.md` - 78 edges
-7. `core/decisions.md` - 77 edges
-8. `stacks/go/examples/tariff/README.md` - 77 edges
-9. `core/principles.md` - 75 edges
-10. `stacks/go/checklist.md` - 75 edges
+1. `core/backlog.md` - 116 edges
+2. `stacks/php/conventions.md` - 98 edges
+3. `stacks/php/checklist.md` - 94 edges
+4. `транзакции` - 85 edges
+5. `skills/dev-php/SKILL.md` - 85 edges
+6. `approaches/process/review-tags.md` - 82 edges
+7. `stacks/php/review-findings.md` - 79 edges
+8. `core/decisions.md` - 77 edges
+9. `stacks/go/examples/tariff/README.md` - 77 edges
+10. `stacks/go/checklist.md` - 76 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Очередь, Job::dispatch, HTTP, файлы, сброс кэша — после записи и вне транзакции` --semantically_similar_to--> `Побочные эффекты после фиксации платежа — через outbox, не fire-and-forget`  [INFERRED] [semantically similar]
@@ -43,8 +42,8 @@
   corpus/approaches/process/subagent.md → corpus/approaches/process/self-check.md
 - `Обёртку {success, data} даёт middleware стека (Go FormattedResponseMiddleware, PHP ApiResponseMiddleware), не контроллер (response-double-wrap)` --semantically_similar_to--> `Тонкая точка входа: биндинг → DTO → один вызов сервиса/Command/workflow → ответ`  [INFERRED] [semantically similar]
   corpus/regulations/rest-api.md → corpus/architecture/layers.md
-- `Контроллер тонкий: Request → {E}Dto::make()->fromArray(validated()) → сервис/workflow → Response` --semantically_similar_to--> `Тонкая точка входа: биндинг → DTO → один вызов сервиса/Command/workflow → ответ`  [INFERRED] [semantically similar]
-  corpus/stacks/php/conventions.md → corpus/architecture/layers.md
+- `Ранний выход и форма кода core/style.md действуют и для Python в тестах` --semantically_similar_to--> `Ранний выход вместо else после return (else-after-return); для всех стеков`  [INFERRED] [semantically similar]
+  corpus/stacks/qa-playwright/conventions.md → corpus/core/style.md
 
 ## Hyperedges (group relationships)
 - **Форма outbox: запись в транзакции, Command доставки, повтор SKIP LOCKED** — file_approaches_patterns_outbox_md, file_stacks_go_examples_tariff_readme_md, file_approaches_process_review_tags_md, topic_outbox [INFERRED 0.85]
@@ -67,55 +66,51 @@
 
 ### Community 0 - "Роли, агенты, процесс"
 Cohesion: 0.02
-Nodes (193): agents/df-review.md, approaches/process/mr-threads.md, approaches/process/review.md, core/backlog.md, core/principles.md, core/rules-evolution.md, regulations/code-review.md, regulations/git.md (+185 more)
+Nodes (220): agents/df-analyst.md, agents/df-architect.md, agents/df-go.md, agents/df-php.md, agents/df-qa.md, approaches/process/analysis.md, approaches/process/bugfix.md, approaches/process/code-navigation.md (+212 more)
 
 ### Community 1 - "Транзакции и конкурентность"
 Cohesion: 0.03
-Nodes (175): agents/df-analyst.md, agents/df-architect.md, agents/df-go.md, agents/df-php.md, approaches/process/analysis.md, approaches/process/bugfix.md, approaches/process/code-navigation.md, approaches/process/impact-analysis.md (+167 more)
+Nodes (191): agents/df-review.md, approaches/process/mr-threads.md, approaches/process/review.md, approaches/process/review-tags.md, core/backlog.md, core/decisions.md, core/rules-evolution.md, regulations/code-review.md (+183 more)
 
 ### Community 2 - "Ревью и безопасность"
 Cohesion: 0.03
-Nodes (160): regulations/rest-api.md, regulations/service-requirements.md, stacks/go/checklist.md, stacks/go/go-sdk/capabilities.md, stacks/go/go-sdk/entrypoint/http.md, stacks/go/go-sdk/exceptions.md, stacks/php/conventions.md, stacks/php/examples/README.md (+152 more)
+Nodes (157): regulations/entity.md, regulations/rest-api.md, stacks/go/checklist.md, stacks/go/go-sdk/entrypoint/http.md, stacks/go/go-sdk/main.md, stacks/php/conventions.md, stacks/php/mps-core/capabilities.md, stacks/php/mps-core/data-objects.md (+149 more)
 
 ### Community 3 - "Разработчик, тесты, Go-памятка"
 Cohesion: 0.03
-Nodes (159): approaches/patterns/outbox.md, approaches/patterns/transactions.md, architecture/cross-domain.md, architecture/layers.md, stacks/go/conventions.md, stacks/go/go-sdk/domain.md, stacks/go/go-sdk/workflow.md, stacks/go/review-checks.md (+151 more)
+Nodes (149): approaches/patterns/async.md, approaches/patterns/cache.md, approaches/patterns/concurrency.md, approaches/patterns/idempotency.md, approaches/patterns/outbox.md, approaches/patterns/performance.md, stacks/go/examples/tariff/README.md, stacks/go/go-sdk/entrypoint/rabbit.md (+141 more)
 
 ### Community 4 - "Слои, домен, DTO"
-Cohesion: 0.04
-Nodes (122): approaches/patterns/async.md, approaches/patterns/cache.md, approaches/patterns/concurrency.md, approaches/patterns/idempotency.md, approaches/patterns/performance.md, approaches/process/review-tags.md, stacks/go/go-sdk/entrypoint/rabbit.md, stacks/go/go-sdk/infra/postgres.md (+114 more)
+Cohesion: 0.03
+Nodes (142): approaches/patterns/transactions.md, architecture/cross-domain.md, architecture/layers.md, stacks/go/go-sdk/domain.md, stacks/go/go-sdk/workflow.md, stacks/go/review-checks.md, stacks/go/structure.md, stacks/php/mps-core/commands.md (+134 more)
 
 ### Community 5 - "Кэш, DI, модули SDK"
-Cohesion: 0.05
-Nodes (90): agents/df-security.md, approaches/patterns/payments.md, approaches/process/security.md, skills/dev-security/SKILL.md, stacks/go/review-findings.md, stacks/go/security.md, stacks/php/security.md, B-110: неподтверждённая находка безопасности — стеки «не флагай», каталог — [ВНИМАНИЕ] с пояснением риска (+82 more)
+Cohesion: 0.04
+Nodes (111): approaches/patterns/migrations.md, approaches/process/self-check.md, core/principles.md, regulations/technical-approval.md, skills/dev-go/SKILL.md, skills/dev-php/SKILL.md, stacks/go/go-sdk/capabilities.md, stacks/php/checklist.md (+103 more)
 
 ### Community 6 - "Git, MR, эволюция правил"
-Cohesion: 0.04
-Nodes (79): architecture/integrations.md, regulations/contracts.md, stacks/go/examples/tariff/README.md, stacks/go/go-sdk/app.md, stacks/go/go-sdk/di.md, stacks/go/go-sdk/infra/http.md, stacks/go/go-sdk/infra.md, stacks/go/go-sdk/main.md (+71 more)
+Cohesion: 0.05
+Nodes (93): agents/df-security.md, approaches/patterns/payments.md, approaches/process/security.md, skills/dev-security/SKILL.md, stacks/go/review-findings.md, stacks/go/security.md, stacks/php/security.md, Новый роут без auth: review.md — mr-hygiene [ВНИМАНИЕ], каталог — missing-auth-middleware [БЕЗОПАСНОСТЬ] (+85 more)
 
 ### Community 7 - "REST, Swagger, PHP-памятка"
 Cohesion: 0.05
-Nodes (78): approaches/patterns/migrations.md, approaches/process/self-check.md, regulations/technical-approval.md, skills/dev-go/SKILL.md, skills/dev-php/SKILL.md, stacks/php/checklist.md, stacks/php/mps-core/migrations.md, Агенту проще заглушить проверку, чем исправить; заглушка прячет следующие нарушения (+70 more)
+Nodes (82): architecture/integrations.md, core/style.md, stacks/go/conventions.md, stacks/go/go-sdk/infra/http.md, stacks/go/go-sdk/infra.md, stacks/go/review-tags.md, stacks/go/style.md, stacks/php/style.md (+74 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.05
-Nodes (75): core/style.md, stacks/go/style.md, stacks/php/mps-core/data-objects.md, stacks/php/mps-core/enums.md, stacks/php/review-findings.md, stacks/php/style.md, 4+ аргумента у метода (не конструктор) → DTO параметров; до 3 позиционных + DTO, приватный шаг до ~5, Проверки значений DTO — {E}DtoValidator::validate (P-8, O-26), static final, без зависимостей (+67 more)
+Cohesion: 0.04
+Nodes (75): regulations/service-requirements.md, stacks/go/go-sdk/app.md, stacks/go/go-sdk/di.md, stacks/go/go-sdk/exceptions.md, stacks/go/go-sdk/module.md, stacks/php/mps-core/domain.md, stacks/php/mps-core/exceptions.md, stacks/php/mps-core/rules.md (+67 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.06
-Nodes (70): agents/df-qa.md, approaches/process/testing.md, skills/dev-qa/SKILL.md, stacks/php/mps-core/tests.md, stacks/php/structure.md, stacks/qa-playwright/conventions.md, B-85: интеграционные прогоны на общей тестовой БД — только по очереди, D-9 спор: workflow.md разрешает интерфейс на сервис домена для мока, contracts.md — в Go бизнес-сервисы не мокаем (+62 more)
-
-### Community 10 - "Community 10"
-Cohesion: 0.1
-Nodes (35): regulations/entity.md, stacks/php/mps-core/model.md, Знание о статусах в одном месте: сервис, сравнивающий статусы сам, расходится с соседним при первой правке, PUT/PATCH статус не меняют; переход — свой эндпоинт и Command (O-28), Eloquent-связей в моделях нет; параметра expanded нет, O-28: переход состояния — своя Command и эндпоинт, условный UPDATE (0 строк — 422); PATCH/PUT статус не принимают, Запись перехода — условный UPDATE … WHERE status = :expected; 0 строк — 422, Mapper инфраструктуры вызывает Restore*, никогда New* (+27 more)
+Cohesion: 0.08
+Nodes (53): approaches/process/testing.md, skills/dev-qa/SKILL.md, stacks/php/mps-core/tests.md, stacks/php/structure.md, stacks/qa-playwright/conventions.md, Интеграционные прогоны на общей тестовой БД — только по очереди, оркестратор проверяет, что другой прогон не идёт, Unit-тесты — вместе с кодом; без тестов на новую логику задача не готова, QA: красное не сходится за 3 попытки — остановиться и показать (+45 more)
 
 ## Ambiguous Edges - Review These
 - `Инвалидация — при записи, в том же сценарии, что меняет данные` → `Внутри транзакции нет побочных эффектов: HTTP, брокер, файлы, dispatch, инвалидация кэша — после коммита`  [AMBIGUOUS]
   corpus/approaches/patterns/cache.md · relation: conflicts_with
+- `FK объявляется явно с поведением UPDATE/DELETE (по умолчанию RESTRICT); колонки под фильтры/сортировки/уникальность — с индексом в той же миграции` → `Исключение: низкоселективный фильтр внутри выборки, суженной индексом скоупа, индекса не требует (предлагается)`  [AMBIGUOUS]
+  corpus/approaches/patterns/migrations.md · relation: conflicts_with
 - `Параметры списка: page 1, per_page 30, page >10000 или отрицательный → 422` → `IndexRequest: page sometimes min:0 max Page::MAX_PAGE; per_page sometimes between:1,MAX_PER_PAGE`  [AMBIGUOUS]
   corpus/stacks/php/mps-core/http.md · relation: conflicts_with
-- `B-115: review.md упоминает ветку preprod, которой нет в потоке git.md` → `Рабочая ветка от release, hotfix от production; без release — от main`  [AMBIGUOUS]
-  corpus/core/backlog.md · relation: conflicts_with
 - `Новый роут без auth — причина в MR, нет — вопрос «осознанно?»; admin-действие в client без auth — [БЕЗОПАСНОСТЬ]` → `Новый route без auth где соседи требуют — missing-auth-middleware; admin-действие в client-группе — прямая [БЕЗОПАСНОСТЬ]`  [AMBIGUOUS]
   corpus/stacks/go/review-findings.md · relation: conflicts_with
 - `ServiceProvider модуля — только если модуль регистрирует что-то сверх definitions.php домена; у большинства нет` → `Биндинги DI — только в definitions.php (полный перечень мест); биндинг вне — di-outside-definitions`  [AMBIGUOUS]
@@ -126,7 +121,7 @@ Nodes (35): regulations/entity.md, stacks/php/mps-core/model.md, Знание о
   corpus/stacks/php/mps-core/transactions.md · relation: conflicts_with
 
 ## Knowledge Gaps
-- **7 isolated node(s):** `Прочитанный целиком файл оплачивается на всех следующих шагах (96% токенов — повторное чтение)`, `Флаг — две живые реализации за одним адресом, старую забывают удалить; версия видна в URL и логах`, `Агенту проще заглушить проверку, чем исправить; заглушка прячет следующие нарушения`, `Знание о статусах в одном месте: сервис, сравнивающий статусы сам, расходится с соседним при первой правке`, `метка продолжения` (+2 more)
+- **10 isolated node(s):** `Прочитанный целиком файл оплачивается на всех следующих шагах (96% токенов — повторное чтение)`, `Флаг — две живые реализации за одним адресом, старую забывают удалить; версия видна в URL и логах`, `Бэклог — чтобы находки не всплывали по одной в каждой следующей правке`, `Агенту проще заглушить проверку, чем исправить; заглушка прячет следующие нарушения`, `Знание о статусах в одном месте: сервис, сравнивающий статусы сам, расходится с соседним при первой правке` (+5 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 
 ## Suggested Questions
@@ -134,9 +129,9 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `Инвалидация — при записи, в том же сценарии, что меняет данные` and `Внутри транзакции нет побочных эффектов: HTTP, брокер, файлы, dispatch, инвалидация кэша — после коммита`?**
   _Edge tagged AMBIGUOUS (relation: conflicts_with) - confidence is low._
-- **What is the exact relationship between `Параметры списка: page 1, per_page 30, page >10000 или отрицательный → 422` and `IndexRequest: page sometimes min:0 max Page::MAX_PAGE; per_page sometimes between:1,MAX_PER_PAGE`?**
+- **What is the exact relationship between `FK объявляется явно с поведением UPDATE/DELETE (по умолчанию RESTRICT); колонки под фильтры/сортировки/уникальность — с индексом в той же миграции` and `Исключение: низкоселективный фильтр внутри выборки, суженной индексом скоупа, индекса не требует (предлагается)`?**
   _Edge tagged AMBIGUOUS (relation: conflicts_with) - confidence is low._
-- **What is the exact relationship between `B-115: review.md упоминает ветку preprod, которой нет в потоке git.md` and `Рабочая ветка от release, hotfix от production; без release — от main`?**
+- **What is the exact relationship between `Параметры списка: page 1, per_page 30, page >10000 или отрицательный → 422` and `IndexRequest: page sometimes min:0 max Page::MAX_PAGE; per_page sometimes between:1,MAX_PER_PAGE`?**
   _Edge tagged AMBIGUOUS (relation: conflicts_with) - confidence is low._
 - **What is the exact relationship between `Новый роут без auth — причина в MR, нет — вопрос «осознанно?»; admin-действие в client без auth — [БЕЗОПАСНОСТЬ]` and `Новый route без auth где соседи требуют — missing-auth-middleware; admin-действие в client-группе — прямая [БЕЗОПАСНОСТЬ]`?**
   _Edge tagged AMBIGUOUS (relation: conflicts_with) - confidence is low._
