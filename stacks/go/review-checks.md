@@ -18,10 +18,13 @@
 | Infra Repository (HTTP) | `repository.go`, импортирует `gosdk-http-request-builder` | `internal/infrastructure/http/{provider}/{product}/` — внешний провайдер; `internal/infrastructure/http/{service}/{module}/` — наш сервис (G-2) |
 | Infra Model | `model.go`, struct с `gorm:` тегами | `internal/infrastructure/postgres/{domain}/{module}/` |
 | HTTP Handler | `handler.go`, методы принимают `*gin.Context` | `internal/entrypoints/{context}/http/{domain}/{module}/` |
+| HTTP Routes | `routes.go`, `SetRoutes(a, router, handler, …)` — группа, middleware, маршруты | `internal/entrypoints/{context}/http/{domain}/{module}/`; в `internal/app/bootstrap/` — нет (`structure.md`, «Bootstrap / Application Layer», «Маршруты модуля») |
+| HTTP Middleware | функция `{Name}Middleware`, возвращает `gin.HandlerFunc` | `internal/entrypoints/{context}/http/middleware/{назначение}.go` |
 | RabbitMQ Consumer | `{module}_consumer.go`, метод `Consume(ctx, *message.Message)` | `internal/entrypoints/consumer/rabbit/{domain}/{module}/` (`structure.md`) |
 | Workflow | любой `.go` с оркестрацией нескольких доменных сервисов | `internal/workflows/{domain}/{module}/` |
-| Bootstrap Module | `module.go` + `repositories_factory.go` / `services_factory.go` / `handlers_factory.go` | `internal/app/bootstrap/{module}/` или `internal/app/bootstrap/{domain}/{module}/` |
-| Bootstrap Module консоли | `module.go` + `commands_factory.go`, модуль с полем `Console` | `internal/console/bootstrap/{domain}/{module}/` (`structure.md`, «Entrypoint Layer», консоль) |
+| Своё ядро | пакет ядра приложения (регистрируется в `app.go` рядом с ядрами SDK) | `internal/app/kernel/{name}/` |
+| Bootstrap Module | `module.go`, `config.go`, `*_factory.go` (`repositories_`, `services_`, `workflows_`, `handlers_`, `consumers_`) | `internal/app/bootstrap/{module}/` или `internal/app/bootstrap/{domain}/{module}/` |
+| Bootstrap Module консоли | `module.go` (модуль с полем `Console`), `commands_factory.go`, `config.go`, `*_factory.go` (`repositories_`, `services_`) | `internal/console/bootstrap/{domain}/{module}/` (`structure.md`, «Entrypoint Layer», консоль) |
 
 **Правило проверки:**
 1. Определи тип компонента (один или несколько из таблицы выше)

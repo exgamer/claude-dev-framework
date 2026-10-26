@@ -210,6 +210,10 @@ Swaggo-нотация для path-параметров — `:id` (Gin-стиль
 
 URL — `/api/<context>/<version>/<domain>/<module>/<entity>` (`regulations/rest-api.md`, «URL»; модуль, совпадающий с сущностью, не повторяется): группа `/api` → `/<context>/<version>/<domain>` → маршруты сущности.
 
+`SetRoutes(a, router, handler, auth…)` — роутер и auth-middleware собирает `module.go` и передаёт аргументами (`../../structure.md`, «Bootstrap / Application Layer», «Маршруты модуля»); контейнера в `routes.go` нет (`di-resolve-in-business-code`), `a` — только для middleware SDK; ошибку `SetRoutes` не возвращает. 4+ параметра у `SetRoutes` — не `too-many-params` (`core/style.md`, «Форма кода»).
+
+У каждого модуля — своя группа с полной цепочкой middleware: `RequestInfo` → `Logger` (кроме группы с секретами, ниже) → `Debug` → `Sentry` → `FormattedResponse` (кроме группы без `response.*`, ниже) → `Metrics` → auth, если маршрутам она нужна → маршруты. Общей группы или хелпера цепочки на несколько модулей контекста нет: `routes.go` модуля показывает всю цепочку своих маршрутов; одинаковая цепочка в модулях одного контекста — не `infra-logic-duplicated`.
+
 Обязательные middleware (отсутствие = ошибка ревью):
 - `middleware.RequestInfoMiddleware(a)`
 - `middleware.LoggerMiddleware()` — кроме группы с секретами в запросе (ниже)
@@ -224,12 +228,7 @@ URL — `/api/<context>/<version>/<domain>/<module>/<entity>` (`regulations/rest
 Порядок подключения обязателен: стек SDK → `FormattedResponseMiddleware` и метрики → auth (её отказы оборачивает `FormattedResponseMiddleware`, поэтому — после неё) → скоуп контекста → право на маршруте (`RequirePermissionMiddleware`) → `RequireJSONMiddleware` на маршрутах с телом (`../../structure.md`, «Entrypoint Layer») → хендлер:
 
 ```go
-func SetRoutes(a *app.App, handler *Handler, adminAuth gin.HandlerFunc) error {
-	router, err := di.GetRouter(a.Container)
-	if err != nil {
-		return err
-	}
-
+func SetRoutes(a *app.App, router *gin.Engine, handler *Handler, adminAuth gin.HandlerFunc) {
 	service := router.Group("/api")
 	{
 		service.Use(middleware.RequestInfoMiddleware(a)) // заполнение request info
@@ -250,12 +249,8 @@ func SetRoutes(a *app.App, handler *Handler, adminAuth gin.HandlerFunc) error {
 			billing.POST("/tariffs/:id/set-default", adminmiddleware.RequirePermissionMiddleware("parking.admin.tariffs.update"), handler.SetDefault())
 		}
 	}
-
-	return nil
 }
 ```
-
-`di` — `gosdk-http-core/pkg/di`.
 
 ## Response helpers
 

@@ -20,7 +20,7 @@
 | Env-файлы | `app.SetEnvFiles(...)` / `config.LoadEnv(...)` |
 | Конфиг из env в структуру | `core/pkg/config.InitConfig[E](&cfg)`; базовый — `config.BaseConfig`, `di.GetBaseConfig`; `time.Duration` из env не разбирает — таймаут в секундах (`../structure.md`, «config.go») |
 | Таймзона сервиса | `core/pkg/di.GetLocation(container)` |
-| DI | `core/pkg/di`: `Register[T]`, `Resolve[T]`, `MustResolve[T]` (только старт), именованные — `RegisterNamed`/`ResolveNamed`, проверка — `Has[T]`. Только в app/bootstrap |
+| DI | `core/pkg/di`: `Register[T]`, `Resolve[T]`, `MustResolve[T]` (только старт), именованные — `RegisterNamed`/`ResolveNamed`, проверка — `Has[T]`. Где можно — `stacks/go/structure.md`, «Bootstrap / Application Layer» |
 | Консольные команды (миграции, ручные операции) | `console-core/pkg/app.NewConsoleKernel("console").AddCommand(cobraCmd...)` — отдельный бинарник `cmd/console`, своё приложение `internal/console/` и bootstrap `internal/console/bootstrap/` (`../structure.md`, «Entrypoint Layer») |
 
 ## Ошибки, логи, трекинг

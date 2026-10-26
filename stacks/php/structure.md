@@ -19,7 +19,7 @@ parking_app/                                   ← корень подпроек
 │   ├── Database/Query/SearchRepositoryInterface.php ← CRUD ядра + `search(…, ?int $page)` + `allByIds()` — контракт репозитория для `PaginatedQueryHelper` (у интерфейса ядра `page` нет)
 │   ├── Providers/ServiceProvider.php          ← базовый провайдер подпроекта над классом ядра: от него — провайдеры доменов (подхватывает `definitions.php`)
 │   ├── Requests/Request.php                   ← базовый FormRequest, от него и IndexRequest; `Requests/SearchRequest.php` — форма (1) списка (P-19), эталон — `examples/parking_app/Core/Requests/SearchRequest.php`
-│   ├── Resources/                             ← `PaginatedResource` — форма пагинации (items/pagination), от неё наследуется {E}PaginatedResponse (форма (2), P-22); `PaginateResource` — форма (1) (P-19), эталон — `examples/parking_app/Core/Resources/PaginateResource.php`
+│   ├── Resources/                             ← `PaginatedResource` — форма пагинации (items/pagination), от неё наследуется {E}PaginatedResponse (форма (2), P-22); `PaginateResource` — форма (1) (P-19), эталон — `examples/parking_app/Core/Resources/PaginateResource.php`; `PaginationMeta` — поля `pagination` обеих форм (`regulations/rest-api.md`)
 │   ├── Http/Middleware/
 │   ├── Http/RequestHelper.php                 ← чтение контекста, положенного middleware в атрибуты запроса (`getParkingIds()`; нет атрибута — `InvalidConfigurationAppException`)
 │   ├── Http/Signature/                        ← value-объекты подписи запроса (`SignedMessage`, `SignedRequest`, `RequestSignature`) и порт хранилища nonce `SignatureNonceRepositoryInterface`
@@ -31,9 +31,9 @@ parking_app/                                   ← корень подпроек
 │   ├── definitions.php                        ← биндинги сервисов домена: Interface → класс
 │   ├── Common/                                ← общее двух и более модулей домена (`architecture/layers.md`, «Зависимости»): Enums/, ValueObjects/, Support/, Exceptions/; импортируют только модули домена
 │   └── Modules/{Module}/
-│       ├── DTO/{Entity}Dto.php                ← extends MPS\Core\DataObjects\DataObject
-│       ├── Enums/{Entity}StatusEnum.php
-│       ├── Repositories/{Entity}RepositoryInterface.php   ← только интерфейс
+│       ├── DTO/{Name}Dto.php                  ← extends MPS\Core\DataObjects\DataObject (`{Entity}Dto`, `{Entity}FilterDto`, DTO события и результата)
+│       ├── Enums/{Name}Enum.php               ← `{Entity}StatusEnum`, `{Entity}SortEnum` и т. п.
+│       ├── Repositories/{Name}RepositoryInterface.php   ← только интерфейсы портов: БД, кэш (`{Entity}CacheRepositoryInterface`), внешняя система (`{Name}RepositoryInterface`), публикатор (`{E}PublisherInterface`)
 │       ├── Services/{Entity}CrudService.php + {Entity}CrudServiceInterface.php
 │       ├── Services/{Context}{Entity}Service.php  ← только если логика для контекста отличается (P-13)
 │       ├── Commands/{Action}Command.php       ← большая операция изменения внутри домена, final без базового класса ядра, метод execute(...)
@@ -43,7 +43,9 @@ parking_app/                                   ← корень подпроек
 │       └── Components/{Name}/                 ← изолированный алгоритм (калькулятор и т.п.) со своими DTO/Enums; тесты — в tests/ (O-3), преобразования формата — Core/Helpers
 │
 ├── Workflows/{Domain}/{Module}/               ← только междоменная агрегатная логика
-│   └── {Action}Workflow.php                   ← метод execute() (решение P-2)
+│   ├── {Action}Workflow.php                   ← метод execute() (решение P-2)
+│   ├── {Name}NotifierInterface.php            ← порт workflow на внешнюю систему, которого нет в домене (имя по действию; эталон — `examples/parking_app/Workflows/Billing/Tariffs/TariffNotifierInterface.php`, тег `workflow-duplicates-domain-port`)
+│   └── DTO/{Name}Dto.php                      ← DTO результата workflow (сборка данных двух доменов)
 │
 ├── Entrypoints/{Context}/{Domain}/
 │   ├── ServiceProvider.php                    ← extends MPS\Core\Modules\ModuleServiceProvider (подхватывает routes.php)

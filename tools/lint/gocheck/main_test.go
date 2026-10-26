@@ -80,3 +80,46 @@ func TestTaskArtifactRef(t *testing.T) {
 		}
 	}
 }
+
+func TestDIOutsideAssembly(t *testing.T) {
+	const routes = "package tariff\n\nimport (\n\t\"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app\"\n\t\"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di\"\n)\n\nfunc SetRoutes(a *app.App) {\n\t_, _ = di.GetRouter(a.Container)\n}\n"
+	const resolve = "package tariff\n\nimport (\n\t\"github.com/exgamer/gosdk-core/pkg/app\"\n\t\"github.com/exgamer/gosdk-core/pkg/di\"\n)\n\nfunc newServices(a *app.App) {\n\t_, _ = di.Resolve[*int](a.Container)\n}\n"
+	const field = "package tariff\n\nimport \"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app\"\n\nfunc newHandler(a *app.App) any {\n\treturn a.Container\n}\n"
+	found := []struct {
+		name, rel, code string
+		n               int
+	}{
+		{"routes.go точки входа", "internal/entrypoints/admin/http/billing/tariff/routes.go", routes, 2},
+		{"фабрика bootstrap", "internal/app/bootstrap/billing/tariff/services_factory.go", resolve, 2},
+		{"контейнер полем в хендлере", "internal/entrypoints/admin/http/middleware/jwt_auth.go", field, 1},
+		{"pkg/", "pkg/zz/zz.go", routes, 2},
+	}
+	for _, c := range found {
+		msgs := check(t, c.rel, c.code)
+		if len(msgs) != c.n || !strings.Contains(msgs[0], "(di-resolve-in-business-code)") {
+			t.Errorf("%s: ждали %d di-resolve-in-business-code, получили %v", c.name, c.n, msgs)
+		}
+	}
+	for _, rel := range []string{
+		"internal/app/app.go", "internal/console/app.go", "internal/app/kernel/zz/kernel.go",
+		"internal/app/bootstrap/billing/tariff/module.go", "internal/app/bootstrap/tariff/module.go",
+		"internal/console/bootstrap/billing/outbox_tariff_event/module.go",
+		"internal/entrypoints/admin/http/billing/tariff/routes_test.go", "internal/testsupport/zz/app.go", "tests/harness/app.go",
+	} {
+		if msgs := check(t, rel, routes); len(msgs) != 0 {
+			t.Errorf("%s: сборка или тест, ждали 0 находок, получили %v", rel, msgs)
+		}
+	}
+	other := "package docker\n\ntype Spec struct{ Container string }\n\nfunc name(s Spec) string {\n\treturn s.Container\n}\n"
+	if msgs := check(t, "internal/infrastructure/docker/spec.go", other); len(msgs) != 0 {
+		t.Errorf("поле Container не из SDK: ждали 0 находок, получили %v", msgs)
+	}
+	ownWithApp := "package tariff\n\nimport \"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app\"\n\ntype Spec struct{ Container string }\n\nfunc name(_ *app.App, s Spec) string {\n\treturn s.Container\n}\n"
+	if msgs := check(t, "internal/entrypoints/admin/http/billing/tariff/spec.go", ownWithApp); len(msgs) != 0 {
+		t.Errorf("своё поле Container в файле с pkg/app: ждали 0 находок, получили %v", msgs)
+	}
+	viaField := "package tariff\n\nimport sdkapp \"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app\"\n\ntype holder struct {\n\tapp *sdkapp.App\n}\n\ntype wrapper struct {\n\t*sdkapp.App\n}\n\nfunc (h holder) c(w wrapper) (any, any) {\n\treturn h.app.Container, w.App.Container\n}\n"
+	if msgs := check(t, "internal/app/bootstrap/billing/tariff/handlers_factory.go", viaField); len(msgs) != 2 {
+		t.Errorf("контейнер через поле и встроенный *app.App: ждали 2 находки, получили %v", msgs)
+	}
+}

@@ -52,6 +52,12 @@ var timeUnits = map[string]bool{"Nanosecond": true, "Microsecond": true, "Millis
 
 const paginatorPkg = "gosdk-db-core/pkg/query/helpers"
 
+// Контейнер DI SDK: пакеты gosdk-*/pkg/di и поле Container у *app.App (gosdk-*/pkg/app).
+var diPkg = regexp.MustCompile(`/gosdk-[a-z-]+/pkg/di$`)
+var appPkg = regexp.MustCompile(`/gosdk-[a-z-]+/pkg/app$`)
+
+const diMsg = "контейнер DI вне сборки — только internal/app/kernel/, internal/app/app.go, internal/console/app.go, module.go модулей bootstrap; сюда зависимость приходит аргументом (di-resolve-in-business-code)"
+
 type finding struct {
 	pos token.Position
 	msg string
@@ -155,9 +161,19 @@ func checkFile(fset *token.FileSet, root, rel string) []finding {
 
 		return x
 	}
-	timeName, paginator := "", false
+	timeName, paginator, appName := "", false, ""
+	checkDI := !diAllowed(rel)
 	for _, imp := range file.Imports {
 		path, _ := strconv.Unquote(imp.Path.Value)
+		if checkDI && diPkg.MatchString(path) {
+			out = append(out, finding{pos(imp.Pos()), diMsg})
+		}
+		if appPkg.MatchString(path) {
+			appName = "app"
+			if imp.Name != nil {
+				appName = imp.Name.Name
+			}
+		}
 		if path == "time" {
 			timeName = "time"
 			if imp.Name != nil {
@@ -187,11 +203,19 @@ func checkFile(fset *token.FileSet, root, rel string) []finding {
 		skip[imp.Path] = true
 	}
 	entrypoint := strings.Contains("/"+rel, "/internal/entrypoints/")
+	var appVars map[string]bool
+	if checkDI && appName != "" {
+		appVars = appTypedNames(file, appName)
+	}
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.CallExpr:
 			if paginator && timeName != "" && isSetTimeoutWithUnit(x, timeName) {
 				out = append(out, finding{pos(x.Pos()), "SetTimeout пагинатора — число секунд (SetTimeout(10)): хелпер сам умножает на time.Second (paginator-timeout-units)"})
+			}
+		case *ast.SelectorExpr:
+			if x.Sel.Name == "Container" && appVars[lastName(x.X)] {
+				out = append(out, finding{pos(x.Sel.Pos()), diMsg})
 			}
 		case *ast.BasicLit:
 			if x.Kind == token.STRING && !skip[x] {
@@ -235,6 +259,76 @@ func isDomainHandlerFile(rel string) bool {
 	}
 
 	return base == "service.go" || strings.HasSuffix(base, "_service.go") || strings.HasSuffix(base, "_command.go") || strings.HasSuffix(base, "_query.go")
+}
+
+// diAllowed: контейнер DI — только в сборке (stacks/go/structure.md, «Bootstrap / Application Layer»): ядра
+// internal/app/kernel/, сборка приложения internal/app/app.go и консольного internal/console/app.go, module.go модулей
+// bootstrap, серверных и консольных. Тесты и тестовая обвязка (tests/, internal/testsupport/) не проверяются.
+func diAllowed(rel string) bool {
+	p := "/" + rel
+	switch {
+	case strings.HasSuffix(p, "_test.go"), strings.Contains(p, "/tests/"), strings.Contains(p, "/internal/testsupport/"):
+		return true
+	case strings.Contains(p, "/internal/app/kernel/"), strings.HasSuffix(p, "/internal/app/app.go"), strings.HasSuffix(p, "/internal/console/app.go"):
+		return true
+	}
+
+	return filepath.Base(p) == "module.go" && (strings.Contains(p, "/internal/app/bootstrap/") || strings.Contains(p, "/internal/console/bootstrap/"))
+}
+
+// appTypedNames — имена параметров, переменных и полей файла с типом app.App или *app.App (alias — имя импорта
+// gosdk-*/pkg/app); встроенное поле — под именем App. Переменная без объявленного типа (a := app.New()) не видна.
+func appTypedNames(file *ast.File, alias string) map[string]bool {
+	isApp := func(e ast.Expr) bool {
+		if s, ok := e.(*ast.StarExpr); ok {
+			e = s.X
+		}
+		sel, ok := e.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "App" {
+			return false
+		}
+		id, ok := sel.X.(*ast.Ident)
+
+		return ok && id.Name == alias
+	}
+	names := map[string]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.Field:
+			if isApp(x.Type) {
+				if len(x.Names) == 0 {
+					names["App"] = true
+				}
+				for _, id := range x.Names {
+					names[id.Name] = true
+				}
+			}
+		case *ast.ValueSpec:
+			if x.Type != nil && isApp(x.Type) {
+				for _, id := range x.Names {
+					names[id.Name] = true
+				}
+			}
+		}
+
+		return true
+	})
+
+	return names
+}
+
+// lastName — имя в конце выражения: a → a, m.app → app, appInstance.App → App.
+func lastName(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.SelectorExpr:
+		return x.Sel.Name
+	case *ast.ParenExpr:
+		return lastName(x.X)
+	}
+
+	return ""
 }
 
 // artifactRef — первая ссылка на артефакт задачи в тексте; id — шаблон ID для этого вида текста (nil — только путь и раздел).

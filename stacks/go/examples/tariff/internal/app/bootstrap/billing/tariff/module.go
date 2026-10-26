@@ -6,6 +6,7 @@ import (
 
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/di"
+	httpDI "git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di"
 	postgresDI "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/di"
 	rabbitDI "git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/di"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/rabbitmq"
@@ -86,20 +87,19 @@ func (m *Module) Init(a *app.App) error {
 	workflowsFactory := newWorkflowsFactory(repositoriesFactory, servicesFactory)
 	handlersFactory := newHandlersFactory(servicesFactory, workflowsFactory)
 
-	err = tariffhttp.SetRoutes(a, handlersFactory.TariffHandler, adminmiddleware.JWTAuthMiddleware(adminService))
+	router, err := httpDI.GetRouter(a.Container)
 	if err != nil {
 		return err
 	}
+
+	tariffhttp.SetRoutes(a, router, handlersFactory.TariffHandler, adminmiddleware.JWTAuthMiddleware(adminService))
 
 	integrationAuth := integrationtariffhttp.AuthMiddlewares{
 		APIKey:    integrationmiddleware.APIKeyMiddleware(partnerService),
 		Signature: integrationmiddleware.SignatureAuthMiddleware(partnerService, *signatureSettings),
 	}
 
-	err = integrationtariffhttp.SetRoutes(a, handlersFactory.IntegrationTariffHandler, integrationAuth)
-	if err != nil {
-		return err
-	}
+	integrationtariffhttp.SetRoutes(a, router, handlersFactory.IntegrationTariffHandler, integrationAuth)
 
 	consumerRetryConfig, err := loadConsumerRetryConfig()
 	if err != nil {

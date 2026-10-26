@@ -6,7 +6,7 @@
 
 ```
 Ты — разработчик <Go | PHP (Laravel + mps/core)>. `{DF}` = <путь> (фреймворк правил; его файлы не правь). Выполни `{DF}/skills/dev-<go|php>/SKILL.md` (запуск напрямую, не субагентом /dev) в проекте {P} (git, базовый коммит `{BASE}`<, подпроект `parking_app`>). Где путь `~/.claude/dev-framework` — это `{DF}`.
-<Go:> Сборка и тесты — с `GOFLAGS=-mod=mod GOPROXY=off GOSUMDB=off`, сеть не нужна.
+<Go:> Сборка и тесты — с `GOFLAGS=-mod=mod GOPROXY=off GONOSUMDB=git.mpinnovations.kz`, сеть не нужна.
 <PHP:> В контейнере `{C}` проект — `{CP}` (vendor стоит): phpunit — `docker exec {C} sh -c 'cd {CP} && php vendor/bin/phpunit'`, phpstan — `… && php -d memory_limit=2G vendor/bin/phpstan analyse`. Composer не запускай.
 
 Задача: T1 из `docs/tasks/archive-tariff/plan.md` проекта (ключ `archive-tariff`; `design.md`, `requirements.md`, `answers.md` — там же, согласования получены). Делай её одну.
@@ -49,7 +49,7 @@
 
 ```
 Ты — ревьюер. `{DF}` = <путь> (фреймворк правил; не правь). Выполни `{DF}/skills/dev-review/SKILL.md` (напрямую, не субагентом /dev) для незакоммиченного диффа проекта {P} относительно `HEAD` (коммит base). Стек <Go (Go SDK) | PHP (Laravel + mps/core), подпроект `<sub>`>. Это реальный MR (<суть MR>); документов задачи (requirements/design) нет — ревью по коду и правилам. Где путь `~/.claude/dev-framework` — это `{DF}`.
-<Go:> Сборка и анализаторы — с `GOFLAGS=-mod=mod GOPROXY=off GOSUMDB=off`; не запускаются без сети — отметь в отчёте и ревьюй глазами по памятке целиком.
+<Go:> Сборка и анализаторы — с `GOFLAGS=-mod=mod GOPROXY=off GONOSUMDB=git.mpinnovations.kz,github.com/exgamer` (хосты SDK из `go.mod` проекта); не запускаются без сети — отметь в отчёте и ревьюй глазами по памятке целиком.
 <PHP:> Копия без vendor и вне PHP-контейнера: анализаторы (lint.py, phpstan, phpunit) не запускай — отметь в отчёте и ревьюй глазами по памятке целиком. Composer не запускай.
 IDE (MCP) может быть недоступна — Grep/Read. Пользователь недоступен: вопросы — в отчёт. Код не правь, без commit/push; отчёт — по SKILL в каталог этого проекта. Итог — по SKILL, плюс в конце список всех находок одной строкой каждая: «тег — уровень — файл:строка — суть».
 ```

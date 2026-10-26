@@ -2,7 +2,6 @@ package tariff
 
 import (
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"
-	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di"
 	"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -15,12 +14,7 @@ type AuthMiddlewares struct {
 }
 
 // SetRoutes Машинный вызов партнёра: сначала ключ API, затем подпись
-func SetRoutes(a *app.App, handler *Handler, auth AuthMiddlewares) error {
-	router, err := di.GetRouter(a.Container)
-	if err != nil {
-		return err
-	}
-
+func SetRoutes(a *app.App, router *gin.Engine, handler *Handler, auth AuthMiddlewares) {
 	service := router.Group("/api")
 	{
 		// LoggerMiddleware нет: на DEBUG он пишет заголовки и не маскирует Api-Key
@@ -40,6 +34,4 @@ func SetRoutes(a *app.App, handler *Handler, auth AuthMiddlewares) error {
 			billing.GET("/tariffs/:id", handler.View())
 		}
 	}
-
-	return nil
 }

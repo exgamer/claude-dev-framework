@@ -23,7 +23,7 @@ client (postgres DI), config (load{Name}Config)
   → repositoriesFactory
     → servicesFactory
       → workflowsFactory (repositoriesFactory, servicesFactory)
-        → handlersFactory (servicesFactory, workflowsFactory) → SetRoutes(a, handler, auth)
+        → handlersFactory (servicesFactory, workflowsFactory) → router (http DI) → SetRoutes(a, router, handler, auth)
       → consumersFactory → GetConsumers(...) → reg.RegisterMultipleHandler(...)
       → commandsFactory → m.Console.AddCommand(...)   (только модуль консоли, internal/console/bootstrap/)
 ```
@@ -33,8 +33,8 @@ client (postgres DI), config (load{Name}Config)
 - Модули не зависят друг от друга, кроме двух форм: готовый объект через DI (владелец регистрирует, потребитель — `di.Resolve` в `Init`, владелец раньше в `app.go`) и `Load{Name}()` настройки владельца — `../structure.md`, «Зависимости модулей bootstrap»
 - `Name()` возвращает строку-идентификатор модуля (уникальная в рамках приложения)
 - Если нет Rabbit — блок с consumers не нужен
-- DI использовать только внутри `Init` — не передавать `a.Container` в фабрики и сервисы
-- Маршруты регистрируются только через `SetRoutes` в `module.go`
+- DI использовать только внутри `Init` — не передавать `a.Container` в фабрики, сервисы и `SetRoutes` (`../structure.md`, «Bootstrap / Application Layer»)
+- Маршруты регистрируются только через `SetRoutes` в `module.go`: роутер, его настройка и auth-middleware — в `Init`, в `SetRoutes` — аргументами (`../structure.md`, «Bootstrap / Application Layer», «Маршруты модуля»)
 - HTTP server не создавать вручную — только через `HttpKernel`
 
 ## Шаблон
@@ -44,6 +44,7 @@ package tariff
 
 import (
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"
+	httpDI "git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di"
 	postgresDI "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/di"
 
 	tariffhttp "example.com/parking-service/internal/entrypoints/admin/http/billing/tariff"
@@ -71,7 +72,14 @@ func (m *Module) Init(a *app.App) error {
 	workflowsFactory := newWorkflowsFactory(repositoriesFactory, servicesFactory)
 	handlersFactory := newHandlersFactory(servicesFactory, workflowsFactory)
 
-	return tariffhttp.SetRoutes(a, handlersFactory.TariffHandler, adminAuth)
+	router, err := httpDI.GetRouter(a.Container)
+	if err != nil {
+		return err
+	}
+
+	tariffhttp.SetRoutes(a, router, handlersFactory.TariffHandler, adminAuth)
+
+	return nil
 }
 ```
 
@@ -90,10 +98,12 @@ func (m *Module) Init(a *app.App) error {
 	servicesFactory := newServicesFactory(repositoriesFactory)
 	handlersFactory := newHandlersFactory(servicesFactory)
 
-	err = cityhttp.SetRoutes(a, handlersFactory.CityHandler, adminAuth)
+	router, err := httpDI.GetRouter(a.Container)
 	if err != nil {
 		return err
 	}
+
+	cityhttp.SetRoutes(a, router, handlersFactory.CityHandler, adminAuth)
 
 	consumersFactory := newConsumersFactory(servicesFactory)
 	consumers := cityconsumer.GetConsumers(consumersFactory.CityConsumer)

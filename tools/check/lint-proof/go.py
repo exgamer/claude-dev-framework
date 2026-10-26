@@ -70,9 +70,13 @@ CASES = [  # (имя, путь файла, код, что должно быть 
  ("ссылка на артефакт в имени кейса теста", "internal/domains/billing/tariff/zz_v_test.go", 'package tariff\nimport "testing"\nfunc TestZz(t *testing.T) {\n\tt.Run("T3: пустой список", func(t *testing.T) {})\n}\n', "task-artifact-ref-in-code"),
  ("разрешено: коды в данных теста", "internal/domains/billing/tariff/zz_v_test.go", 'package tariff\nimport "testing"\n\n// Ячейка и модель — данные, не ссылки; обёртка над `Manager2[R1, R2]`\nfunc TestZz(t *testing.T) {\n\tcell, model, body := "A1", "T800", `{"F1":1}`\n\t_, _, _ = cell, model, body\n}\n', None),
  ("разрешено: тест домена импортирует gorm", "internal/domains/billing/tariff/zz_v_test.go", 'package tariff\nimport (\n\t"testing"\n\n\t"gorm.io/gorm"\n)\nfunc TestZz(t *testing.T) {\n\tvar _ *gorm.DB\n}\n', None),
+ ("контейнер DI в routes.go точки входа", "internal/entrypoints/admin/http/billing/tariff/zz_v.go", 'package tariff\nimport (\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di"\n\t"github.com/gin-gonic/gin"\n)\n// ZzRouter роутер из контейнера\nfunc ZzRouter(a *app.App) (*gin.Engine, error) {\n\treturn di.GetRouter(a.Container)\n}\n', "di-resolve-in-business-code"),
+ ("контейнер DI в фабрике bootstrap", "internal/app/bootstrap/billing/tariff/zz_v.go", 'package tariff\nimport (\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di"\n\t"github.com/gin-gonic/gin"\n)\n// ZzRouter роутер из контейнера\nfunc ZzRouter(a *app.App) (*gin.Engine, error) {\n\treturn di.GetRouter(a.Container)\n}\n', "di-resolve-in-business-code"),
+ ("разрешено: контейнер DI в module.go bootstrap", "internal/app/bootstrap/billing/zzother/module.go", 'package zzother\nimport (\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"\n\t"git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di"\n\t"github.com/gin-gonic/gin"\n)\n// ZzRouter роутер из контейнера\nfunc ZzRouter(a *app.App) (*gin.Engine, error) {\n\treturn di.GetRouter(a.Container)\n}\n', None),
  ("Id вместо ID", "internal/domains/billing/tariff/zz_v.go", 'package tariff\nfunc ZzF() int {\n\tparkingId := 1\n\n\treturn parkingId\n}\n', "var-naming"),
 ]
-env = dict(os.environ, GOFLAGS="-mod=mod", GOPROXY="off", GOSUMDB="off", GOPRIVATE="", GONOPROXY="")
+# GOSUMDB не выключается: при локальном Go ниже версии из go.mod эталона go переключается на тулчейн из кэша и сверяет его по sumdb
+env = dict(os.environ, GOFLAGS="-mod=mod", GOPROXY="off", GONOSUMDB="git.mpinnovations.kz", GOPRIVATE="", GONOPROXY="")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lint"))
 import lint  # noqa: E402  — анализатор фреймворка gocheck: правила без линтера в golangci
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"git.mpinnovations.kz/mps/go-packages/gosdk-core/pkg/app"
+	httpDI "git.mpinnovations.kz/mps/go-packages/gosdk-http-core/pkg/di"
 	postgresDI "git.mpinnovations.kz/mps/go-packages/gosdk-postgres-core/pkg/di"
 	rabbitDI "git.mpinnovations.kz/mps/go-packages/gosdk-rabbit-core/pkg/di"
 	redisDI "git.mpinnovations.kz/mps/go-packages/gosdk-redis-core/pkg/di"
@@ -39,13 +40,20 @@ func (m *Module) Init(a *app.App) error {
 		return err
 	}
 
+	router, err := httpDI.GetRouter(a.Container)
+	if err != nil {
+		return err
+	}
+
 	handler := healthcheckhttp.NewHandler(
 		healthcheckhttp.Dependency{Name: "postgres", Probe: postgresProbe(postgresClient)},
 		healthcheckhttp.Dependency{Name: "redis", Probe: redisProbe(redisClient)},
 		healthcheckhttp.Dependency{Name: "rabbitmq", Probe: rabbitProbe(rabbitConnection)},
 	)
 
-	return healthcheckhttp.SetRoutes(a, handler)
+	healthcheckhttp.SetRoutes(a, router, handler)
+
+	return nil
 }
 
 func postgresProbe(db *gorm.DB) func(ctx context.Context) error {
