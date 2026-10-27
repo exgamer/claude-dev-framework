@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	// ParkingDeactivatedQueue Своя очередь сервиса; NACK — в retry-очередь (DLX), не обратно в эту
+	// ParkingDeactivatedQueue Своя очередь сервиса; NACK уходит в retry-очередь (DLX)
 	ParkingDeactivatedQueue = "billing-tariff.parking-deactivated"
-	// ParkingDeactivatedRetryQueue Без читателя, объявляет bootstrap модуля: по TTL сообщение возвращается в ParkingDeactivatedQueue
+	// ParkingDeactivatedRetryQueue Без читателя: по TTL сообщение возвращается в ParkingDeactivatedQueue
 	ParkingDeactivatedRetryQueue = "billing-tariff.parking-deactivated.retry"
 )
 
-// GetConsumers Подписки модуля тарифов. NewConsumerByConfigs вместо TopicDurable-пресета: нужны NoRequeueOnNack и DLX-аргументы очереди;
+// GetConsumers Подписки модуля тарифов: очередь с DLX-аргументами и NoRequeueOnNack;
 // маршалер SDK переносит счётчик x-death в metadata (DefaultMarshaler падает на нестроковом заголовке)
 func GetConsumers(consumer *Consumer) []config.HandlerRegister {
 	parkingDeactivatedConfig := config.NewConsumerByConfigs(

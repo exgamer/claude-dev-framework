@@ -18,7 +18,7 @@ use MPS\Core\Models\Model;
  * @property YourStatusEnum $status
  * @property Carbon $created_at
  *
- * @author …
+ * @author Имя Фамилия <name@example.com>
  */
 class YourModel extends Model
 {
@@ -30,7 +30,7 @@ class YourModel extends Model
     ];
 
     protected $casts = [
-        'status'     => YourStatusEnum::class,
+        'status' => YourStatusEnum::class,
         'created_at' => 'datetime',
     ];
 
@@ -55,6 +55,8 @@ class YourModel extends Model
 ```
 
 Описание `@property` — только у неочевидных полей, `@author` — как у любого класса (`../style.md`, «Шапка класса», «Классы»). Связей (`hasMany`, `belongsTo`…) в модели нет — раздел «Relations» ниже. Эталон — `../examples/parking_app/Infrastructure/Postgres/Billing/Tariffs/Models/Tariff.php`.
+
+У модели ядра `$timestamps = false`: колонки, которые заполняет БД (`created_at` с `DEFAULT`, `updated_at` триггером, `id` — заполняется), после `fill()->save()` в модели не появляются — в памяти `null`. Ответ после создания — по перечитанной записи (метод `get…` репозитория после записи, как после `updateFromDto`), а не по модели из `save()`: `created_at->toJSON()` на ней — ошибка и 500 уже после записи.
 
 ## Что допустимо
 

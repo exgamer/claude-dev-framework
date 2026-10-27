@@ -11,7 +11,7 @@ use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Models\Model;
 
 /**
- * Событие о тарифе для отправки в RabbitMQ (outbox)
+ * Событие о тарифе для отправки в RabbitMQ (outbox).
  *
  * @property int $id                                      Уходит в сообщение как event_id
  * @property int $tariff_id
@@ -27,7 +27,7 @@ use MPS\Core\Models\Model;
  * @property Carbon $created_at
  * @property Carbon|null $updated_at
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class OutboxTariffEvent extends Model
 {
@@ -41,8 +41,6 @@ class OutboxTariffEvent extends Model
         'price',
         'grace_minutes',
         'routing_key',
-        'status',
-        'attempts',
     ];
 
     protected $casts = [
@@ -58,4 +56,23 @@ class OutboxTariffEvent extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    /**
+     * Начальное состояние нового события: ждёт первой отправки, попыток не было.
+     */
+    public function initPending(): self
+    {
+        $this->status = OutboxTariffEventStatusEnum::PENDING;
+        $this->attempts = 0;
+
+        return $this;
+    }
+
+    /**
+     * Отправлять можно только ждущее отправки: опубликованное уже доставлено, у исчерпавшего попытки — ручной разбор.
+     */
+    public function canPublish(): bool
+    {
+        return in_array($this->status, OutboxTariffEventStatusEnum::deliverable(), true);
+    }
 }

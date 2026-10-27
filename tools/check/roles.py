@@ -9,12 +9,16 @@
 (у агента — ещё прямая загрузка его skill, если агент на него ссылается). Транзитивно любая роль дотягивается почти до
 всего фреймворка, поэтому сравнивается прямая загрузка: файл пропал из неё и не достижим через одну ссылку —
 «потеряно»; достижим через одну ссылку — «перенесён глубже» (проверить глазами, что роль его по-прежнему читает).
-Ссылка — полный путь, голое имя или хвост пути (`subagent.md`, `go-sdk/app.md`; одно имя в двух стеках — по метке «PHP —»/«Go —» или стеку роли). Команды роли (`lint.py`, `run.sh`) скрипт не видит.
+Ссылка — полный путь, голое имя или хвост пути (`subagent.md`, `go-sdk/app.md`; одно имя в двух стеках — по метке «PHP —»/«Go —»
+или стеку роли, у роли без стека — файл обоих стеков), маска (`architecture/*.md` — все файлы папки). Не загрузка — упоминание
+после «кроме», «не для», с «не читаешь»/«не читается» в том же обороте и перечень поводов «если правка задевает …» до конца
+предложения. Команды роли (`lint.py`, `run.sh`) скрипт не видит.
 Справочники `official/`/`reference/` и `core/decisions-log.md` не считаются; `<stack>` в пути раскрывается в оба стека; ссылка skill → его агент — не загрузка. Механическая часть проверки
 поведения «до/после» (`skills/dev-rule/SKILL.md`, Шаг 3а): содержание правил по-прежнему сверяет агент.
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -23,6 +27,41 @@ sys.path.insert(0, os.path.dirname(__file__))
 import links  # noqa: E402
 
 SKIP = ("/official/", "/reference/", "core/decisions-log.md", "CHANGELOG.md")
+MASK_RE = re.compile(r"(?:\{DF\}/|~/\.claude/dev-framework/)?((?:[\w.\-{},]+/)+)\*\.md")
+EXCEPT_RE = re.compile(r"кроме\s+(?:`[^`]+`(?:\s*(?:,|и)\s*)?)+")  # «кроме `a.md` и `b.md`»
+TRIGGER_RE = re.compile(r"если правка задевает.*?(?=\.\s+[А-ЯA-Z]|$)")  # перечень поводов, не загрузка
+NOT_READ_AFTER = re.compile(r"^[^;.(`]*не\s+чита")  # «`x.md` — материал ревьюера, целиком не читаешь»
+NOT_FOR_BEFORE = re.compile(r"не\s+для[^;.(]*$")
+
+
+def skipped(line, start, end):
+    """Упоминание файла, которое не загрузка: перечень поводов, «кроме …», «не для …», «… не читаешь»."""
+    for rx in (TRIGGER_RE, EXCEPT_RE):
+        if any(m.start() <= start < m.end() for m in rx.finditer(line)):
+            return True
+    return bool(NOT_READ_AFTER.search(line[end:].lstrip("`")) or NOT_FOR_BEFORE.search(line[:start]))
+
+
+def resolve_all(d, tok, known, line, pos):
+    """links.resolve_loose; голое имя, которое есть в обоих стеках, у роли без стека — файлы обоих стеков."""
+    r = links.resolve_loose(d, tok, known, line, pos)
+    if r:
+        return [r]
+    bare = tok.removeprefix("{DF}/").removeprefix("~/.claude/dev-framework/")
+    if "/" in bare or links.stack_near(d, line, pos):
+        return []
+    return sorted(f for f in known if f.startswith(("stacks/go/", "stacks/php/")) and f.endswith("/" + bare)
+                  and not any(s in f for s in SKIP))
+
+
+def mask_files(d, mask_dir, known):
+    """`architecture/*.md` → файлы папки (без вложенных); папка — как путь в links.resolve."""
+    for base in [os.path.dirname(d)] + list(links.BASES):
+        folder = os.path.normpath(os.path.join(base, mask_dir))
+        files = [f for f in known if os.path.dirname(f) == folder and f.endswith(".md")]
+        if files:
+            return files
+    return []
 
 
 def graph(root):
@@ -39,14 +78,19 @@ def graph(root):
             targets = set()
             for line in open(d, encoding="utf-8", errors="ignore"):
                 line = line.replace("<stack>", "{go,php}")  # роль читает файл своего стека: stacks/<stack>/…, dev-<stack>
+                found, excluded = set(), set()
+                for m in MASK_RE.finditer(line):
+                    if not skipped(line, m.start(), m.end()):
+                        for v in links.expand(m.group(1)):
+                            found.update(mask_files(d, v.removeprefix("{DF}/"), known))
                 for m in links.PATH_RE.finditer(line):
                     tok = m.group(0)
                     if links.IGNORE.search(tok):
                         continue
-                    for v in links.expand(tok):
-                        r = links.resolve_loose(d, v, known, line, m.start())
-                        if r and r.endswith(".md") and r != d and not any(s in r for s in SKIP):
-                            targets.add(r)
+                    resolved = [r for v in links.expand(tok) for r in resolve_all(d, v, known, line, m.start())]
+                    (excluded if skipped(line, m.start(), m.end()) else found).update(resolved)
+                targets |= {r for r in found - excluded
+                            if r.endswith(".md") and r != d and not any(s in r for s in SKIP)}
             edges[d] = targets
         return edges
     finally:

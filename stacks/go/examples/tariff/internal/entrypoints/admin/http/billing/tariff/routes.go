@@ -17,12 +17,10 @@ func SetRoutes(a *app.App, router *gin.Engine, handler *Handler, adminAuth gin.H
 		service.Use(middleware.DebugMiddleware())
 		service.Use(middleware.SentryMiddleware())
 
-		// /api/<context>/<version>/<domain>/<entity>: модуль совпадает с сущностью — не повторяется
 		billing := service.Group("/admin/v1/billing")
 		{
 			billing.Use(middleware.FormattedResponseMiddleware())
 			billing.Use(middleware.MetricsMiddleware(a))
-			// Отказы auth-middleware оборачивает FormattedResponseMiddleware — они ставятся после неё
 			billing.Use(adminAuth)
 			billing.Use(adminmiddleware.ResolveAdminParkingsMiddleware())
 

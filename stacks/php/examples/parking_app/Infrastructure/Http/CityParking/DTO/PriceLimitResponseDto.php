@@ -9,7 +9,7 @@ use MPS\Core\DataObjects\DataObject;
 /**
  * Ответ реестра парковок на запрос лимита цены (GET /parkings/{id}/price-limit): контракт внешней системы, не доменная модель.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PriceLimitResponseDto extends DataObject
 {

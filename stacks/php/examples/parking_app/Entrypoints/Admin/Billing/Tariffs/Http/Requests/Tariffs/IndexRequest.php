@@ -14,7 +14,7 @@ use OpenApi\Attributes as OA;
 /**
  * Список тарифов: фильтры, сортировка и страница.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Parameter(
     parameter: 'TariffsIndexRequestPage',

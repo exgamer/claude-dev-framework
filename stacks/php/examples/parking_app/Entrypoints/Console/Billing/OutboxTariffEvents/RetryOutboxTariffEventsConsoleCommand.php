@@ -11,7 +11,7 @@ use Throwable;
 /**
  * Повтор отправки зависших событий о тарифах по расписанию (routes/console.php хоста).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class RetryOutboxTariffEventsConsoleCommand extends Command
 {

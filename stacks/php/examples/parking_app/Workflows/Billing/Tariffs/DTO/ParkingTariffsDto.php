@@ -9,7 +9,7 @@ use MPS\Core\DataObjects\DataObject;
 /**
  * Результат сценария двух доменов: данные парковки (Catalog) вместе с её действующими тарифами (Billing).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingTariffsDto extends DataObject
 {

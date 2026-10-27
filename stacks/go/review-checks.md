@@ -78,7 +78,7 @@
    grep -nE '^\s+(Status|Is[A-Z][A-Za-z]*)\s' <entity.go в дифе>
    grep -nE '(Status|Is[A-Z][A-Za-z]*)\s.*binding:' <request.go в дифе>
    ```
-   Первая: экспортируемое поле состояния у новой сущности — `state-field-exported` (у существующей анемичной — не находка, `regulations/entity.md`, «Когда применять»). Вторая: поле состояния в запросе PUT/PATCH — `status-in-update-request`; фильтр списка — не находка.
+   Первая: экспортируемое поле состояния у новой сущности — `state-field-exported` (у существующей анемичной и у сущности только для чтения — не находка, `regulations/entity.md`, «Когда применять»). Вторая: поле состояния в запросе PUT/PATCH — `status-in-update-request`; фильтр списка — не находка.
 1. **Разъезд списков, новый статус без потребителя, данные под миграцию, гигиена MR** — правила общие, `approaches/process/review.md`, «За пределами дифа»; здесь только что искать в Go: `switch`/`map` по типу статуса, `enums:` в swagger-аннотациях DTO, строковые литералы значений; `go.sum` вместе с `go.mod`; локальной базы в репозитории может не быть — тогда проверку колонок явно поручать автору.
 2. **Инструменты.** Прогон Go — по `approaches/process/self-check.md` (команды, `-race`, CI без гейтов). Падение e2e из-за окружения (нет `APP_URL`) — не сигнал о коде, но в итог — что не запускалось (`approaches/process/testing.md`). Swagger: `swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1`.
 3. **Платёжные пути** — раздел «Платёжные пути» выше.

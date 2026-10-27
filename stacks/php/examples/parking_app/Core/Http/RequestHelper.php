@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\ParkingApp\Core\Http;
 
 use App\ParkingApp\Core\Enums\RequestAttributeEnum;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use Illuminate\Http\Request;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
  * Чтение контекста, который middleware подпроекта положила в атрибуты запроса.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class RequestHelper
 {
@@ -21,12 +21,12 @@ final class RequestHelper
      *
      * @return ?list<int>
      *
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public static function getParkingIds(Request $request): ?array
     {
         if (! $request->attributes->has(RequestAttributeEnum::PARKING_IDS->value)) {
-            throw new InvalidConfigurationAppException('На маршруте нет middleware resolve.admin.parkings');
+            throw new ServerConfigurationException('На маршруте нет middleware resolve.admin.parkings');
         }
 
         /** @var ?list<int> */

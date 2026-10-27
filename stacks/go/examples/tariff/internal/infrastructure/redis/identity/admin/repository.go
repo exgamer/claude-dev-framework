@@ -32,20 +32,20 @@ func (r *RedisRepository) Get(ctx context.Context, adminID uint) (*admindomain.A
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	admin, err := rediscore.NewHelper[admindomain.Admin](ctx, r.client).GetStruct(key(adminID))
+	model, err := rediscore.NewHelper[admin](ctx, r.client).GetStruct(key(adminID))
 	if err != nil {
 		return nil, fmt.Errorf("get admin cache failed (admin_id=%d): %w", adminID, err)
 	}
 
-	return admin, nil
+	return adminToEntity(model), nil
 }
 
-func (r *RedisRepository) Set(ctx context.Context, admin *admindomain.Admin, ttl time.Duration) error {
+func (r *RedisRepository) Set(ctx context.Context, entity *admindomain.Admin, ttl time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if err := rediscore.NewHelper[admindomain.Admin](ctx, r.client).SetStruct(key(admin.ID), *admin, ttl); err != nil {
-		return fmt.Errorf("set admin cache failed (admin_id=%d): %w", admin.ID, err)
+	if err := rediscore.NewHelper[admin](ctx, r.client).SetStruct(key(entity.ID), *adminFromEntity(entity), ttl); err != nil {
+		return fmt.Errorf("set admin cache failed (admin_id=%d): %w", entity.ID, err)
 	}
 
 	return nil

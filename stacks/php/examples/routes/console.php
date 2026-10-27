@@ -11,3 +11,9 @@ Schedule::command('billing:outbox-tariff-events:retry')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->onOneServer();
+
+// Страховка отложенной активации тарифов: Job потерян или не поставлен — тариф активирует этот прогон
+Schedule::command('billing:tariffs:activate-due')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();

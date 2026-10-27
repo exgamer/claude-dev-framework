@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Парковки администратора в контекст запроса (алиас resolve.admin.parkings, после auth:admin-api).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class ResolveAdminParkings
 {

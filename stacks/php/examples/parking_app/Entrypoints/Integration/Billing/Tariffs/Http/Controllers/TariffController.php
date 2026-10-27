@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
 /**
  * Чтение тарифа партнёром по подписи запроса: без скоупа администратора, ответ без служебных полей.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Tag(name: 'Integration Parking: Тарифы', description: 'Тарифы для партнёров, вызов с HMAC-подписью')]
 class TariffController extends Controller

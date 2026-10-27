@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
 /**
  * Формат тела создания тарифа: без scheduled_at — действующий сразу, с ним — запланированный; currency не передана — KZT.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(
     schema: 'TariffCreateRequest',

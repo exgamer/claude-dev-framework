@@ -11,7 +11,7 @@ use OpenApi\Attributes as OA;
 /**
  * Жизненный цикл тарифа: запланированный (ждёт даты активации) → действующий → архивный.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(schema: 'TariffStatusEnum', type: 'string', enum: [
     TariffStatusEnum::ACTIVE->value,

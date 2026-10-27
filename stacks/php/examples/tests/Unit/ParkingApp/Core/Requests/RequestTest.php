@@ -12,7 +12,7 @@ use Tests\TestCase;
 /**
  * id пути проверяется rules() запроса: 0, отрицательный, не число и больше предела bigint — 422, а не 404 маршрута или 500; query не подменяет id пути.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class RequestTest extends TestCase
 {

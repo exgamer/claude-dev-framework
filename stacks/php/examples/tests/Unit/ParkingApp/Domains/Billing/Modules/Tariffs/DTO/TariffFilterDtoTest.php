@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Domains\Billing\Modules\Tariffs\DTO;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Скоуп парковок в TariffFilterDto: без умолчания «без ограничения».
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffFilterDtoTest extends TestCase
 {
     public function test_scope_not_set_throws_instead_of_unrestricted(): void
     {
-        $this->expectException(InvalidConfigurationAppException::class);
+        $this->expectException(ServerConfigurationException::class);
 
         TariffFilterDto::make()->getParkingIds();
     }

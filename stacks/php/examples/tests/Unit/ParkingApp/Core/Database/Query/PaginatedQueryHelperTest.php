@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Форма (1) пагинации: perPage не целое ≥ 1 — 400 без запроса, page доходит до search(), ключи ответа — items/pagination, набор по id — allByIds().
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PaginatedQueryHelperTest extends TestCase
 {

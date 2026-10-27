@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
 /**
  * Формат тела PUT: каждое поле обязательно к передаче (неприсланное — 422), null очищает grace_minutes.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(
     schema: 'TariffUpdateRequest',

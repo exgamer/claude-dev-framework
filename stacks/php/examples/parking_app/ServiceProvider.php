@@ -10,7 +10,7 @@ use MPS\Utils\Components\HealthCheck\ServiceProvider as HealthCheckServiceProvid
 /**
  * Корневой провайдер подпроекта: регистрирует провайдеры доменов, инфраструктуры и точек входа.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ServiceProvider extends BaseServiceProvider
 {

@@ -41,10 +41,13 @@ class IndexRequest extends SearchRequest
 }
 
 // контроллер: скоуп из middleware — обязательным ключом params, после полей запроса (клиент его не подменит, ../conventions.md п. 19a)
+// page из query — строка: прямой сеттер при strict_types=1 не приводит ('2' в setPage(?int) — TypeError и 500), приводится явно
+$page = $request->validated('page');
+
 $search = SearchDataObject::make()
     ->setParams([...$request->validated(), 'parking_ids' => RequestHelper::getParkingIds($request)])
     ->setPerPage((int) $request->validated('per_page', Page::DEFAULT_PER_PAGE))
-    ->setPage($request->validated('page'));
+    ->setPage($page === null ? null : (int) $page);
 
 $paginated = $this->service->search($search);
 
@@ -58,6 +61,7 @@ use App\YourApp\Domains\YourDomain\Modules\YourModule\Repositories\YourRepositor
 use Illuminate\Contracts\Database\Query\Builder as BuilderContract;
 use Illuminate\Support\Collection;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
+use App\YourApp\Core\Exceptions\ServerConfigurationException;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Utils\Components\QueryFilters\V2\IntFilter;
 use MPS\Utils\Components\QueryFilters\V2\StringFilter;
@@ -77,14 +81,14 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
     /**
      * Скоуп parking_ids обязателен: нет ключа — запрос собран без контекста middleware, а не «все парковки».
      *
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     protected function filterSearch(BuilderContract $query, array &$params = []): void
     {
         $tableName = $this->getTableName();
 
         if (! array_key_exists('parking_ids', $params)) {
-            throw new InvalidConfigurationAppException('Скоуп парковок в params поиска не выставлен: нужен parking_ids');
+            throw new ServerConfigurationException('Скоуп парковок в params поиска не выставлен: нужен parking_ids');
         }
 
         if ($params['parking_ids'] !== null) {
@@ -130,7 +134,7 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
 Интерфейс репозитория формы (1) наследует `Core/Database/Query/SearchRepositoryInterface` подпроекта (`search()` с `$page`, `allByIds()`); `PaginatedQueryHelper::searchByIds()` берёт записи его методом `allByIds(array $ids)`, а не собирает условие сам (`allByCondition(fn …)`): запрос — только в репозитории (`../conventions.md` п. 2).
 
 **Правила filterSearch:**
-- Скоуп владельца (`parking_ids` и т. п.) — обязательный ключ `params`: нет ключа — `InvalidConfigurationAppException`, не `null` — `whereIn`, `null` — без ограничения, выставленный явно; `$params['parking_ids'] ?? null` и ключ в `params`, который `filterSearch()` не применяет, — тег `scope-param-defaults-unrestricted` (`../conventions.md` п. 19a)
+- Скоуп владельца (`parking_ids` и т. п.) — обязательный ключ `params`: нет ключа — `ServerConfigurationException` (500, `exceptions.md`), не `null` — `whereIn`, `null` — без ограничения, выставленный явно; `$params['parking_ids'] ?? null` и ключ в `params`, который `filterSearch()` не применяет, — тег `scope-param-defaults-unrestricted` (`../conventions.md` п. 19a)
 - Всегда явно указывать `select` — не `select *`; `select` — после условий (`../conventions.md` п. 2a)
 - Значение фильтра проверяется `!== null` (или `array_key_exists`), не присваиванием в условии: `if ($id = …)` пропускает `0` и `'0'` (`../conventions.md` п. 11b)
 - JOIN'ы до WHERE условий
@@ -160,7 +164,7 @@ class YourRepository extends CRUDRepository implements YourRepositoryInterface
 - Выборку данных по фильтрам
 - Запись / обновление / удаление
 - JOIN-ы и агрегации на уровне SQL
-- Запись принимает DTO или типизированные аргументы (`createFromDto`, `updateFromDto`, `setDefault(int, bool)`), колонки собирает сам — не массив от сервиса (`../conventions.md` п. 11a)
+- Запись принимает DTO или типизированные аргументы (`createFromDto`, `updateFromDto`; переход — свой метод с условием в `UPDATE`: `setDefault(int): bool`, `unsetDefault(int)`, не общий сеттер значением аргумента — `regulations/entity.md`, «Переход состояния»), колонки собирает сам — не массив от сервиса (`../conventions.md` п. 11a)
 
 **Репозиторий НЕ делает:**
 - Не применяет бизнес-правила (`if order.status == PAID then ...`)
@@ -183,6 +187,7 @@ public function getActiveWithDiscount(int $id): ?Tariff
 }
 
 // ✅ Репозиторий возвращает сырые данные по условию, решение — в Service
+// одна модель, нужная целиком (кеш, ответ), — без select; список — колонки явно (../conventions.md п. 2a)
 public function getDefaultByParkingId(int $parkingId): ?Tariff
 {
     /** @var ?Tariff */
@@ -198,6 +203,13 @@ public function allByParkingId(int $parkingId): Collection
     return $this->getQuery()
         ->where('parking_id', $parkingId)
         ->orderBy('id')
+        ->select([
+            'id',
+            'parking_id',
+            'name',
+            'status',
+            'is_default',
+        ])
         ->get();
 }
 ```

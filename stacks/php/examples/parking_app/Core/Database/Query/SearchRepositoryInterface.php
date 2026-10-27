@@ -9,15 +9,15 @@ use Illuminate\Support\Collection;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterface;
 
 /**
- * Репозиторий формы (1) пагинации для PaginatedQueryHelper: CRUD ядра + выборка по набору id.
- * search() объявлен заново ради $page: у CRUDRepository ядра 1.6.0 он есть, у CRUDRepositoryInterface — нет.
- * Реализация — extends CRUDRepository + allByIds(): условие whereIn — в репозитории, не в хелпере.
+ * Репозиторий списка с пагинацией по SearchDataObject и выборкой по набору id.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface SearchRepositoryInterface extends CRUDRepositoryInterface
 {
     /**
+     * search() CRUDRepository ядра с номером страницы: в интерфейсе ядра параметра $page нет.
+     *
      * @param array<string, mixed> $params
      *
      * @return LengthAwarePaginatorContract<int, mixed>|Collection<int, mixed>

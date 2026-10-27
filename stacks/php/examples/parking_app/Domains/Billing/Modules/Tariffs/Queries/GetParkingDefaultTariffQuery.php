@@ -9,9 +9,9 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffEventStatu
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 
 /**
- * Тариф по умолчанию парковки вместе со статусом доставки последнего события о нём: статус — от модуля OutboxTariffEvents через свой интерфейс (O-6).
+ * Тариф по умолчанию парковки вместе со статусом доставки последнего события о нём.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class GetParkingDefaultTariffQuery
 {

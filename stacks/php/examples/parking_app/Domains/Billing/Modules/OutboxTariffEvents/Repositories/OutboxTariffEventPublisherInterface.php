@@ -11,7 +11,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 /**
  * Порт публикации события о тарифе в брокер.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface OutboxTariffEventPublisherInterface
 {

@@ -6,7 +6,7 @@
   - `mps-core-v1.6.0.md`, `mps-utils-v2.6.2.md` — версии из `vendor/` PHP-монолита;
   - `mps-core-v1.10.2.md` — последний тег `mps/core` (2026-09-25);
   - `mps-utils-v2.8.4.md` — исходники `mps/utils` (v2.8.4 + 16 коммитов).
-- Официальная документация пакетов — `official/core-v1.10.2/`, `official/utils-v2.8.4/`: как пользоваться компонентом подробно. При расхождении с этим файлом — верна официальная дока нужной версии.
+- Официальная документация пакетов — `official/core-v1.10.2/`, `official/utils-v2.8.4/`: как пользоваться компонентом подробно. При расхождении с этим файлом — верна официальная дока нужной версии, кроме фактов, сверенных по исходнику ядра и помеченных здесь как ошибка доки (коды исключений — `exceptions.md`).
 - Версия в проекте — из `composer.lock`; методы сверять с `vendor/mps/*` проекта. Пересобрать справочник под проект: `tools/sdk-ref/php.sh <out> <project-dir>`. Метода нет в справочнике версии проекта — его нет.
 - Пометка «utils ≥ 2.6.4» и т.п. — с какой версии есть; в более старом проекте не использовать.
 
@@ -47,7 +47,7 @@
 
 | Задача | Что взять |
 |---|---|
-| 404 / 422 / 400 / 403 / 401 / 429 / 500-операция / конфиг | `NotFoundAppException`, `ValidationAppException(msg, details)`, `BadRequestAppException`, `AccessDeniedAppException`, `UnAuthorizeAppException`, `TooManyRequestsAppException`, `OperationFailedAppException`, `InvalidConfigurationAppException` |
+| Ошибка с HTTP-кодом (коды — по исходнику ядра, `exceptions.md`) | `NotFoundAppException` 404, `ValidationAppException(msg, details)` 422, `BadRequestAppException` 400, `AccessDeniedAppException` 403, `UnAuthorizeAppException` 401, `TooManyRequestsAppException` 429, `OperationFailedAppException` 503, `InvalidConfigurationAppException` 400 и warning (пропал или битый конфиг, объект собран неправильно — свой наследник с 500, `exceptions.md`) |
 | Ошибка без отправки в Sentry | `UnTrackableAppException` / `setIsTrackable(false)` |
 | Свой код ошибки | `AppException::setAppErrorCode()` + enum `AppErrorCodeEnumInterface` |
 
@@ -55,7 +55,7 @@
 
 | Задача | Что взять |
 |---|---|
-| Базовый FormRequest | `MPS\Core\Http\Requests\FormRequest`, поиск — `SearchRequest` (в форме (1) списка наследуется `Core/Requests/SearchRequest` подпроекта, P-19), по ID-шникам — `ByIdsSearchRequest`, смена статуса — `StatusChangeRequest` |
+| Базовый FormRequest | `MPS\Core\Http\Requests\FormRequest`, поиск — `SearchRequest` (в форме (1) списка наследуется `Core/Requests/SearchRequest` подпроекта, P-19), по ID-шникам — `ByIdsSearchRequest`, смена статуса — `StatusChangeRequest` (в обычном модуле не использовать, O-28) |
 | Ответ | `MPS\Core\Http\Responses\Response` / `JsonResponse` (JsonResource); обёртка `success/data` — middleware `MPS\Utils\Http\Middleware\ApiResponseMiddleware` |
 | Локаль из запроса | `MPS\Utils\Http\Middleware\LocaleMiddleware` |
 | Basic Auth на группу маршрутов | `MPS\Utils\Components\Authenticate\Basic\BasicAuthMiddleware` |
@@ -124,7 +124,7 @@
 
 | Задача | Что взять |
 |---|---|
-| Смена статуса сущности | `Components\StatusChange\Services\StatusChangeServiceTrait` (`statusChange`) + `StatusChangeRequest`; исключения — `EntityAlreadyThisStatusException`, `StatusNotDefinedException` |
+| Смена статуса сущности | `Components\StatusChange\Services\StatusChangeServiceTrait` (`statusChange`) + `StatusChangeRequest`; исключения — `EntityAlreadyThisStatusException`, `StatusNotDefinedException`. **В обычном модуле не использовать** (O-28): переход — Command, эндпоинт и метод репозитория на каждый переход, общий «сменить статус» — `status-in-update-request` (`regulations/entity.md`, «Переход состояния») |
 | Поиск по UUID | `Components\Uuid\Services\UuidServiceTrait` (`getByUuid`, `getByUuids`; `getByUuidOrFail` не вызывать — `conventions.md` п. 12a) |
 | Slug | `Components\Slug\Services\SlugServiceTrait` (`generateSlug`, `getBySlug`, `checkSlugUnique`) |
 | Переводы (kk/ru/en) | `Components\MultiLanguage` — `TranslationModelTrait`, `TranslatableServiceTrait`, `TranslatableRequest` |

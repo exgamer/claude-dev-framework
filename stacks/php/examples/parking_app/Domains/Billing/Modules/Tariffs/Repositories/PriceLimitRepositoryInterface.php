@@ -10,7 +10,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 /**
  * Источник лимитов цены парковок (внешний реестр).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface PriceLimitRepositoryInterface
 {

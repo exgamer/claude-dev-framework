@@ -11,7 +11,7 @@ use MPS\Core\Http\Requests\SearchRequest as CoreSearchRequest;
 /**
  * Запрос списка формы (1) пагинации: правила SearchRequest ядра + filterRules() наследника.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class SearchRequest extends CoreSearchRequest
 {

@@ -9,9 +9,9 @@
 | Тип | Когда писать |
 |---|---|
 | Unit | Helpers, Traits, DataObjects, Services с мокированными зависимостями |
-| Feature | HTTP-эндпоинты, интеграционные сценарии с реальной БД |
+| Feature | HTTP-эндпоинты через приложение (маршрут, middleware, Request, ответ); с реальной БД — на базе проекта, если она есть |
 
-**Правило:** Unit тест не обращается к БД и не делает HTTP-запросы. Если нужна БД или реальные сервисы — это Feature тест.
+**Правило:** Unit тест не обращается к БД и не делает HTTP-запросы. Если нужна БД, HTTP через приложение или реальные сервисы — это Feature тест.
 
 ## Структура
 
@@ -40,8 +40,8 @@ class YourHelperTest extends TestCase
 ```
 
 ```php
-// Unit с мокированием зависимостей — Service, Command
-namespace Tests\Unit\YourApp\Domains\YourDomain\YourModule;
+// Unit с мокированием зависимостей — Service, Command; namespace и путь повторяют класс (../structure.md, «Тесты»)
+namespace Tests\Unit\YourApp\Domains\YourDomain\Modules\YourModule\Services;
 
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
@@ -66,39 +66,49 @@ class YourServiceTest extends TestCase
 
 ## Feature тест
 
-Полный стек с реальной БД. Каждый тест откатывается в транзакцию.
+HTTP через приложение: маршрут, middleware, Request, контроллер, обёртка ответа. В эталоне — `Tests\TestCase` (testbench) с моками сервисов и портов; Feature на реальной БД с откатом транзакции — только на базе проекта (`Tests\Feature\FeatureTestCase` и подобные), если она есть: её форма — по проекту.
 
 ```php
 namespace Tests\Feature\YourApp\Admin\YourDomain;
 
-use Tests\Feature\FeatureTestCase;
+use Mockery\MockInterface;
+use Tests\TestCase;
 
-class TariffsTest extends FeatureTestCase
+class TariffsTest extends TestCase
 {
-    // URL — {подпроект}/{context}/… (../conventions.md п. 20); ответ — в обёртке success/data от api.response (п. 19)
-    public function test_create(): void
-    {
-        $response = $this->json('POST', '/parking/admin/tariffs', [
-            'parking_id' => 15,
-            'name' => 'Test',
-        ]);
+    private TariffCrudServiceInterface&MockInterface $service;
 
-        $response->assertStatus(201)
-            ->assertJsonPath('success', true)
-            ->assertJsonStructure(['success', 'data' => ['id', 'name', 'status']]);
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->service = $this->mock(TariffCrudServiceInterface::class);   // остальные зависимости контроллера — тоже моками (эталон)
     }
 
-    public function test_index(): void
+    // URL — {подпроект}/{context}/… (../conventions.md п. 20); ответ — в обёртке success/data от api.response (п. 19)
+    public function test_update(): void
     {
-        $response = $this->json('GET', '/parking/admin/tariffs');
+        $this->service->shouldReceive('update')
+            ->once()
+            ->andReturn($this->tariff());   // модель со всеми полями ответа, как tariff() в эталоне
 
-        $response->assertStatus(200)
-            ->assertJsonStructure(['success', 'data' => ['items', 'pagination']]);
+        // тело — валидное по UpdateRequest (PUT — все поля, п. 12): без обязательного поля ответ — 422, сервис не вызывается
+        $response = $this->json('PUT', '/parking/admin/tariffs/42', [
+            'parking_id' => 15,
+            'name' => 'Test',
+            'currency' => 'KZT',
+            'price' => 1500,
+            'grace_minutes' => null,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.id', 42);
     }
 }
 ```
 
-Эталон — `../examples/tests/Feature/ParkingApp/Integration/Billing/TariffSignatureTest.php` (`assertJsonPath('data.id', …)`, ошибка — `assertJsonPath('success', false)`).
+Эталон — `../examples/tests/Feature/ParkingApp/Admin/Billing/TariffRouteTest.php` (моки, алиасы middleware хоста, неверный id пути — 422) и `../examples/tests/Feature/ParkingApp/Integration/Billing/TariffSignatureTest.php` (`assertJsonPath('data.id', …)`, ошибка — `assertJsonPath('success', false)`).
 
 ## Mock-классы
 
@@ -133,7 +143,7 @@ class YourProviderYourProductRepositoryMock implements YourProductRepositoryInte
 [
     'abstract' => YourProductRepositoryInterface::class,
     'concrete' => YourProviderYourProductRepository::class,
-    'mock'     => YourProviderYourProductRepositoryMock::class,
+    'mock' => YourProviderYourProductRepositoryMock::class,
 ],
 ```
 
@@ -141,7 +151,7 @@ class YourProviderYourProductRepositoryMock implements YourProductRepositoryInte
 
 ```php
 // ❌ Unit тест наследует FeatureTestCase — переместить в Feature/
-namespace Tests\Unit\YourApp\Domains\YourDomain\YourModule;
+namespace Tests\Unit\YourApp\Domains\YourDomain\Modules\YourModule\Services;
 
 use Tests\Feature\FeatureTestCase; // ← нельзя в Unit/
 

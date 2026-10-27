@@ -17,7 +17,7 @@ use RuntimeException;
 /**
  * Кеш тарифов: промах — null, строка кеша — модель; исключение драйвера на чтении, записи и сбросе — OperationFailedAppException.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffCacheRepositoryTest extends TestCase
 {

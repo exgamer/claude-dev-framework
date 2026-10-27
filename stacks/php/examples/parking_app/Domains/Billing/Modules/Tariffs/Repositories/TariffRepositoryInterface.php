@@ -5,19 +5,18 @@ declare(strict_types=1);
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories;
 
 use App\ParkingApp\Core\Database\Query\Page;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterface;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Запросы к тарифам для домена Billing: чтение со скоупом парковок, список по TariffFilterDto и Page; смена статуса и флага
- * по умолчанию — только методами переходов, каждый — условный UPDATE (0 строк — false, параллельная смена).
+ * Тарифы для домена Billing: смена статуса и флага по умолчанию — только методами переходов с условным UPDATE.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface TariffRepositoryInterface extends CRUDRepositoryInterface
 {
@@ -31,7 +30,7 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
     /**
      * Скоуп парковок — полем фильтра (setParkingIds); не выставлен — исключение, а не «все парковки».
      *
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function paginateTariffs(TariffFilterDto $filter, Page $page): LengthAwarePaginator;
 
@@ -45,11 +44,11 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
     public function allActiveByParkingId(int $parkingId): Collection;
 
     /**
-     * ID действующих и запланированных тарифов парковки — те, что снимет archiveNotArchivedByParkingId.
+     * ID запланированных тарифов, дата активации которых наступила, — до $limit, по дате активации.
      *
      * @return list<int>
      */
-    public function allNotArchivedIdsByParkingId(int $parkingId): array;
+    public function allDueScheduledIds(int $limit): array;
 
     /**
      * Колонки из DTO, начальное состояние — Tariff::initState() по дате активации.
@@ -87,7 +86,9 @@ interface TariffRepositoryInterface extends CRUDRepositoryInterface
     public function archive(int $id): bool;
 
     /**
-     * Действующие и запланированные тарифы парковки — в архив; возвращает число изменённых.
+     * Действующие и запланированные тарифы парковки — в архив одним UPDATE; возвращает ID изменённых.
+     *
+     * @return list<int>
      */
-    public function archiveNotArchivedByParkingId(int $parkingId): int;
+    public function archiveNotArchivedByParkingId(int $parkingId): array;
 }

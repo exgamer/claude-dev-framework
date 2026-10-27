@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Тариф по умолчанию парковки со статусом последнего события о нём; нет тарифа — нет результата.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class GetParkingDefaultTariffQueryTest extends TestCase
 {

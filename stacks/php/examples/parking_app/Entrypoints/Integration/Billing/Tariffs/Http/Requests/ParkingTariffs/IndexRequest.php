@@ -9,7 +9,7 @@ use App\ParkingApp\Core\Requests\Request;
 /**
  * Тарифы парковки для партнёра: id парковки в пути — положительное целое (0 — 422).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class IndexRequest extends Request
 {

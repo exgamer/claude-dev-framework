@@ -8,7 +8,7 @@
 
 | Что | Где |
 |---|---|
-| `#[OA\Info]`, общие параметры (`Authorization`, `Accept-Language`), общие ответы — `Unauthorized401`, `AccessDenied403`, `NotFound404`, `ValidationError422`, `ServerError500` (каждый — классом, как `ValidationErrorResponse`), схемы ошибок, схемы enum ядра (`CurrencyEnum`) | `Core/OpenApi/` подпроекта (`../structure.md`); общий ответ не описывается inline в контроллере и не берётся «из хоста» |
+| `#[OA\Info]`, общие параметры (`Authorization`, `Accept-Language`), общие ответы — `Unauthorized401`, `AccessDenied403`, `NotFound404`, `ValidationError422`, `ServiceUnavailable503`, `ServerError500` (каждый — классом, как `ValidationErrorResponse`), схемы ошибок, схемы enum ядра (`CurrencyEnum`) | `Core/OpenApi/` подпроекта (`../structure.md`); общий ответ не описывается inline в контроллере и не берётся «из хоста» |
 | `#[OA\Tag]` на классе, `#[OA\Get|Post|Put|Delete]` на методах | Controller в `Entrypoints/{Context}/{Domain}/{Module}/Http/Controllers/` |
 | `#[OA\Schema]` полей тела запроса | Request (`Create`/`Update`) |
 | `#[OA\Parameter]` query-параметров | `IndexRequest` (ссылки из контроллера — `ref: '#/components/parameters/…'`) |
@@ -39,12 +39,13 @@
         new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
         new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
         new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
+        new OA\Response(ref: '#/components/responses/ServiceUnavailable503', response: 503),   // реестр недоступен — OperationFailedAppException
     ]
 )]
 public function create(CreateRequest $request): JsonResponse { … }
 ```
 
-- У каждого метода — `500`; маршрут под `auth`/подписью — `401`, под `permission:`/скоупом — `403` (`regulations/rest-api.md`: все коды ответа); общие ответы — ссылкой на `Core/OpenApi`; `404` — по `../conventions.md` п. 18 (только у поиска записи по ID).
+- У каждого метода — `500`; маршрут под `auth`/подписью — `401`, под `permission:`/скоупом — `403` (`regulations/rest-api.md`: все коды ответа); общие ответы — ссылкой на `Core/OpenApi`; `404` — по `../conventions.md` п. 18 (только у поиска записи по ID); где `OperationFailedAppException` доходит до ответа (внешняя система недоступна) — `503`: ядро отдаёт его 503, не 500 (`exceptions.md`), пример `500` — без внешней системы.
 - Обёртка `success`/`data` в ответе описывается: её даёт `ApiResponseMiddleware`, и это фактический формат (`../conventions.md` п. 19); сам код обёртку не собирает.
 
 ## Request — схема
@@ -56,7 +57,7 @@ public function create(CreateRequest $request): JsonResponse { … }
     properties: [
         new OA\Property(property: 'parking_id', description: 'ID парковки', type: 'integer', example: 15),
         new OA\Property(property: 'name', description: 'Название тарифа', type: 'string', example: 'Стандарт'),
-        new OA\Property(property: 'status', ref: '#/components/schemas/TariffStatusEnum', nullable: true),
+        new OA\Property(property: 'currency', ref: '#/components/schemas/CurrencyEnum', description: 'Валюта, по умолчанию KZT'),   // начальный статус — модель, не Request (regulations/entity.md)
     ],
     type: 'object'
 )]

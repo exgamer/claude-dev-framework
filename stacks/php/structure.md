@@ -21,7 +21,7 @@ parking_app/                                   ← корень подпроек
 │   ├── Requests/Request.php                   ← базовый FormRequest, от него и IndexRequest; `Requests/SearchRequest.php` — форма (1) списка (P-19), эталон — `examples/parking_app/Core/Requests/SearchRequest.php`
 │   ├── Resources/                             ← `PaginatedResource` — форма пагинации (items/pagination), от неё наследуется {E}PaginatedResponse (форма (2), P-22); `PaginateResource` — форма (1) (P-19), эталон — `examples/parking_app/Core/Resources/PaginateResource.php`; `PaginationMeta` — поля `pagination` обеих форм (`regulations/rest-api.md`)
 │   ├── Http/Middleware/
-│   ├── Http/RequestHelper.php                 ← чтение контекста, положенного middleware в атрибуты запроса (`getParkingIds()`; нет атрибута — `InvalidConfigurationAppException`)
+│   ├── Http/RequestHelper.php                 ← чтение контекста, положенного middleware в атрибуты запроса (`getParkingIds()`; нет атрибута — `ServerConfigurationException`, 500)
 │   ├── Http/Signature/                        ← value-объекты подписи запроса (`SignedMessage`, `SignedRequest`, `RequestSignature`) и порт хранилища nonce `SignatureNonceRepositoryInterface`
 │   ├── Rules/                                 ← свои правила валидации — только когда нет в ядре (RegexRule + RegexEnum::MOBILE_PHONE, mps-core/capabilities.md)
 │   └── Enums/, Helpers/, OpenApi/
@@ -78,7 +78,7 @@ config/database.php                            ← у приложения, не
 ```
 
 **Биндинги DI — только в `definitions.php` (полный перечень мест; `conventions.md` п. 7, `mps-core/rules.md` и памятка ссылаются сюда):**
-- `Domains/{D}/definitions.php` — сервисы домена (`Interface → класс`); Command/Query — интерфейс и биндинг только если их подменяют в тестах (`conventions.md` п. 5);
+- `Domains/{D}/definitions.php` — сервисы домена (`Interface → класс`); Command/Query — интерфейс и биндинг только если их подменяют в тестах или инжектируют через границу домена (`conventions.md` п. 5);
 - `Infrastructure/Postgres/{D}/Providers/definitions.php` — репозитории домена (`RepositoryInterface → Repository`);
 - `Infrastructure/{Cache,RabbitMQ}/{D}/Providers/definitions.php` — кэш-репозитории и публикаторы домена; `Infrastructure/{Postgres,Cache}/Common/Providers/definitions.php` — общие для доменов (как в эталоне);
 - `Infrastructure/Http/{Provider}/Providers/definitions.php` — интерфейс порта → адаптер внешней системы (+ `mock`), ниже;

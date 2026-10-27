@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Core\Http\Middleware;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Core\Http\Middleware\ResolveAdminParkings;
 use App\ParkingApp\Core\Http\RequestHelper;
 use Illuminate\Http\Request;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use MPS\Core\Exceptions\AccessDeniedAppException;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\UnAuthorizeAppException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Парковки администратора — в атрибуты запроса; чужой parking_id из query или тела — 403.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ResolveAdminParkingsTest extends TestCase
 {
@@ -87,7 +87,7 @@ class ResolveAdminParkingsTest extends TestCase
 
     public function test_route_without_middleware_is_configuration_error(): void
     {
-        $this->expectException(InvalidConfigurationAppException::class);
+        $this->expectException(ServerConfigurationException::class);
 
         RequestHelper::getParkingIds(Request::create('/parking/admin/tariffs'));
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Commands;
 
 use App\ParkingApp\Core\Database\Managers\NoopTransactionManager;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Commands\PublishOutboxTariffEventCommand;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEventDto;
@@ -18,14 +19,13 @@ use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Отправка outbox-события: доставленное и исчерпавшее попытки не отправляется, сбой брокера — AWAITING_RETRY, на лимите — FAILED.
+ * Отправка outbox-события: доставленное и исчерпавшее попытки не отправляется, сбой брокера — AWAITING_RETRY, на лимите — FAILED, битая запись — FAILED сразу.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PublishOutboxTariffEventCommandTest extends TestCase
 {
@@ -147,9 +147,29 @@ class PublishOutboxTariffEventCommandTest extends TestCase
         }
     }
 
+    public function test_broken_record_is_failed_at_once_without_attempt(): void
+    {
+        $event = $this->expectEvent(OutboxTariffEventStatusEnum::PENDING);
+        // Значение валюты не из enum: запись не собрать в сообщение ни сейчас, ни при повторе
+        $event->setRawAttributes(array_merge($event->getAttributes(), ['currency' => 'XXX']));
+        $this->repository->shouldReceive('markFailed')->once()->with(self::OUTBOX_ID);
+        $this->repository->shouldNotReceive('incrementAttempts');
+        $this->repository->shouldNotReceive('markPublished');
+
+        try {
+            $command = $this->command(brokerFails: false);
+            $command->execute(self::OUTBOX_ID);
+            $this->fail('Ожидался OperationFailedAppException');
+        } catch (OperationFailedAppException $e) {
+            $this->assertSame(['outbox_id' => self::OUTBOX_ID], $e->getDetails());
+        }
+
+        $this->assertSame([], $this->published->getArrayCopy());
+    }
+
     public function test_missing_max_attempts_config_is_rejected(): void
     {
-        $this->expectException(InvalidConfigurationAppException::class);
+        $this->expectException(ServerConfigurationException::class);
 
         new PublishOutboxTariffEventCommand(
             $this->repository,
@@ -159,7 +179,7 @@ class PublishOutboxTariffEventCommandTest extends TestCase
         );
     }
 
-    private function expectEvent(OutboxTariffEventStatusEnum $status): void
+    private function expectEvent(OutboxTariffEventStatusEnum $status): OutboxTariffEvent
     {
         $event = new OutboxTariffEvent();
         $event->id = self::OUTBOX_ID;
@@ -177,6 +197,8 @@ class PublishOutboxTariffEventCommandTest extends TestCase
             ->once()
             ->with(self::OUTBOX_ID)
             ->andReturn($event);
+
+        return $event;
     }
 
     private function command(bool $brokerFails): PublishOutboxTariffEventCommand

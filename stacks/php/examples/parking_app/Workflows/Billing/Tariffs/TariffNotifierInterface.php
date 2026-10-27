@@ -10,7 +10,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 /**
  * Уведомление внешней биллинговой системы о тарифах.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface TariffNotifierInterface
 {

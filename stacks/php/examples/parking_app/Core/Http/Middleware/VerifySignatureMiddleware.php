@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\ParkingApp\Core\Http\Middleware;
 
 use App\ParkingApp\Core\Enums\RequestHeaderEnum;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Core\Helpers\SignatureHelper;
 use App\ParkingApp\Core\Http\Signature\SignatureNonceRepositoryInterface;
 use App\ParkingApp\Core\Http\Signature\SignedMessage;
@@ -12,14 +13,13 @@ use Carbon\Carbon;
 use Closure;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Request;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\UnAuthorizeAppException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Подпись машинного вызова (алиас verify.signature, контекст Integration).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class VerifySignatureMiddleware
 {
@@ -28,7 +28,7 @@ final class VerifySignatureMiddleware
     private readonly int $toleranceSeconds;
 
     /**
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function __construct(
         private readonly SignatureNonceRepositoryInterface $nonceRepository,
@@ -37,13 +37,22 @@ final class VerifySignatureMiddleware
         $secret = $config->get('parking-app.integration_signature.secret');
 
         if (! is_string($secret) || $secret === '') {
-            throw new InvalidConfigurationAppException('Не задан INTEGRATION_SIGNATURE_SECRET');
+            throw new ServerConfigurationException('Не задан INTEGRATION_SIGNATURE_SECRET');
         }
 
         $toleranceSeconds = $config->get('parking-app.integration_signature.tolerance_seconds');
 
         if (! is_numeric($toleranceSeconds) || (int) $toleranceSeconds <= 0) {
-            throw new InvalidConfigurationAppException('Не задан INTEGRATION_SIGNATURE_TOLERANCE_SECONDS');
+            throw new ServerConfigurationException('Не задан INTEGRATION_SIGNATURE_TOLERANCE_SECONDS');
+        }
+
+        $nonceTtlSeconds = $config->get('parking-app.integration_signature.nonce_ttl_seconds');
+
+        // Подпись принимается в ±окне: nonce, забытый раньше двух окон, пропустит повтор той же подписи
+        if (! is_numeric($nonceTtlSeconds) || (int) $nonceTtlSeconds < 2 * (int) $toleranceSeconds) {
+            throw new ServerConfigurationException(
+                'INTEGRATION_SIGNATURE_NONCE_TTL_SECONDS меньше двух INTEGRATION_SIGNATURE_TOLERANCE_SECONDS',
+            );
         }
 
         $this->secret = $secret;

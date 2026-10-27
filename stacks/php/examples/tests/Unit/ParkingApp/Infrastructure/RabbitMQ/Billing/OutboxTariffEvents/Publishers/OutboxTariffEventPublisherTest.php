@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Infrastructure\RabbitMQ\Billing\OutboxTariffEvents\Publishers;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEventDto;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventRoutingKeyEnum;
 use App\ParkingApp\Infrastructure\RabbitMQ\Billing\OutboxTariffEvents\Publishers\OutboxTariffEventPublisher;
@@ -12,7 +13,6 @@ use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Utils\Components\Queue\RabbitMQ\DataObject\MessageConfig;
 use MPS\Utils\Components\Queue\RabbitMQ\V2\Interfaces\QueueManagerInterface;
@@ -21,7 +21,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Публикация события о тарифе: exchange из конфига, event_id в теле и заголовке; брокер не принял — OperationFailedAppException.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class OutboxTariffEventPublisherTest extends TestCase
 {
@@ -69,7 +69,7 @@ class OutboxTariffEventPublisherTest extends TestCase
 
     public function test_missing_exchange_is_configuration_error(): void
     {
-        $this->expectException(InvalidConfigurationAppException::class);
+        $this->expectException(ServerConfigurationException::class);
 
         new OutboxTariffEventPublisher($this->queueManager, new Config([]));
     }

@@ -53,7 +53,8 @@ parameters:
                 - 'resolve()'
             message: 'зависимость — через конструктор, не из контейнера в бизнес-коде'
             allowIn:
-                - '*/ServiceProvider.php'
+                - '*ServiceProvider.php'
+                - '*/definitions.php'
                 - '*/Providers/*'
                 - '*/config/*'
                 - '*/routes/*'

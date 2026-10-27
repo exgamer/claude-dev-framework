@@ -10,7 +10,7 @@ use MPS\Core\Enums\CurrencyEnum;
 /**
  * Строка списка для партнёра: цена в минимальных единицах, льготные минуты, признак «по умолчанию»; без статуса и дат.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingTariffDto extends DataObject
 {

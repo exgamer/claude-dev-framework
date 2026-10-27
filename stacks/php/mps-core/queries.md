@@ -8,7 +8,7 @@ Query — большая операция **чтения** одного доме
 
 ```
 Domains/{Domain}/Modules/{Module}/Queries/
-└── {Action}Query.php            — final без базового класса ядра, метод execute(...); интерфейс — только если Query подменяется в тестах или инжектируется через границу (../conventions.md п. 5)
+└── {Action}Query.php            — final без базового класса ядра, метод execute(...); интерфейс — только если Query подменяется в тестах или инжектируется через границу домена (../conventions.md п. 5)
 ```
 
 ## Implementation
@@ -27,16 +27,24 @@ final class ListYourItemsWithRelatedQuery
     }
 
     /**
-     * @return list<YourItemView>
+     * @return list<YourItemWithRelatedDto>
      */
     public function execute(YourItemsFilterDto $filter): array
     {
         $items = $this->repository->listByFilter($filter);
-        $relatedByItemId = $this->relatedRepository->allByItemIds(array_column($items, 'id'));
+        $itemIds = $items->pluck('id')->all();
+        $related = $this->relatedRepository->allByItemIds($itemIds);   // список: карту по id строит Query, не репозиторий (repository-returns-mapped-structure)
+
+        $relatedByItemId = [];
+        foreach ($related as $relatedItem) {
+            $relatedByItemId[$relatedItem->item_id][] = $relatedItem;
+        }
 
         $result = [];
         foreach ($items as $item) {
-            $result[] = new YourItemView($item, $relatedByItemId[$item->id] ?? []);
+            $result[] = YourItemWithRelatedDto::make()   // результат — DataObject (../conventions.md п. 11)
+                ->setItem($item)
+                ->setRelated($relatedByItemId[$item->id] ?? []);
         }
 
         return $result;

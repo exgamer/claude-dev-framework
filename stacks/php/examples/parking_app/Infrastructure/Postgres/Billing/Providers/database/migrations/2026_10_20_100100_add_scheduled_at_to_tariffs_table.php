@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use MPS\Core\Exceptions\OperationFailedAppException;
 
+/**
+ * Дата активации запланированного тарифа и статус scheduled.
+ */
 return new class () extends Migration {
     private string $tableName = 'parking.tariffs';
 

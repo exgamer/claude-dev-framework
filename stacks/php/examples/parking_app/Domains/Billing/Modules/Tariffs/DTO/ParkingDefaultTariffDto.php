@@ -11,7 +11,7 @@ use MPS\Core\DataObjects\DataObject;
 /**
  * Тариф по умолчанию парковки и статус доставки последнего события о нём.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingDefaultTariffDto extends DataObject
 {

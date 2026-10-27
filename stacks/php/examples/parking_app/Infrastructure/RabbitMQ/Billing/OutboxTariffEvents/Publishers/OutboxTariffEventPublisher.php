@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Infrastructure\RabbitMQ\Billing\OutboxTariffEvents\Publishers;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEventDto;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Enums\OutboxTariffEventRoutingKeyEnum;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventPublisherInterface;
 use Illuminate\Contracts\Config\Repository as Config;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Utils\Components\Queue\RabbitMQ\DataObject\MessageConfig;
 use MPS\Utils\Components\Queue\RabbitMQ\V2\Interfaces\QueueManagerInterface;
@@ -16,14 +16,14 @@ use MPS\Utils\Components\Queue\RabbitMQ\V2\Interfaces\QueueManagerInterface;
 /**
  * Публикация событий о тарифах в topic exchange биллинга; routing key — тип события.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class OutboxTariffEventPublisher implements OutboxTariffEventPublisherInterface
 {
     private readonly string $exchange;
 
     /**
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function __construct(
         private readonly QueueManagerInterface $queueManager,
@@ -32,7 +32,7 @@ class OutboxTariffEventPublisher implements OutboxTariffEventPublisherInterface
         $exchange = $config->get('app.rabbit-config.billing.tariff-events.exchange');
 
         if (! is_string($exchange) || $exchange === '') {
-            throw new InvalidConfigurationAppException('Не задан exchange событий тарифов: app.rabbit-config.billing.tariff-events.exchange');
+            throw new ServerConfigurationException('Не задан exchange событий тарифов: app.rabbit-config.billing.tariff-events.exchange');
         }
 
         $this->exchange = $exchange;

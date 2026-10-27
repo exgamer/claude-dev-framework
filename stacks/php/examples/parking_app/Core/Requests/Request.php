@@ -10,7 +10,7 @@ use MPS\Core\Http\Requests\FormRequest as CoreFormRequest;
 /**
  * Общее для запросов подпроекта: параметры пути проверяются rules() как поля (id ≤ 0 — 422), верх id — предел bigint.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class Request extends CoreFormRequest
 {

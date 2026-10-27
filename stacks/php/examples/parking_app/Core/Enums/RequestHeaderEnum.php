@@ -10,7 +10,7 @@ use MPS\Core\Enums\EnumerableTrait;
 /**
  * Заголовки запроса, которые читает middleware подпроекта.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 enum RequestHeaderEnum: string implements Enumerable
 {

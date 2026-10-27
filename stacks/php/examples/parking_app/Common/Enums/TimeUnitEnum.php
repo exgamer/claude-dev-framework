@@ -10,7 +10,7 @@ use MPS\Core\Enums\EnumerableTrait;
 /**
  * Единица времени: льготный период, длительность стоянки, расчётный интервал тарифа.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 enum TimeUnitEnum: string implements Enumerable
 {

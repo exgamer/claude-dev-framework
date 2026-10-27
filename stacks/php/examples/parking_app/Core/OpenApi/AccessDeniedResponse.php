@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 /**
  * Ответ 403 для Swagger: формат ошибки ApiResponseMiddleware; нет права (permission: на маршруте) или parking_id недоступной парковки (resolve.admin.parkings).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Response(
     response: 'AccessDenied403',

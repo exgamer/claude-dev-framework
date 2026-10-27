@@ -9,7 +9,7 @@ use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 /**
  * Подключает routes.php админки Billing автозагрузкой ModuleServiceProvider; middleware и права — в самих маршрутах.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ServiceProvider extends CoreServiceProvider
 {

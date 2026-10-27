@@ -12,13 +12,13 @@ use PHPat\Test\PHPat;
 /**
  * Границы слоёв и доменов подпроекта — проверяет phpstan (phpat); собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class LayersArchitecture
 {
     private const ROOT = 'App\ParkingApp';
 
-    /** Eloquent-модель — доменная модель (P-4): лежит в Infrastructure, но домен и Response её знают. */
+    /** Eloquent-модель — доменная модель: лежит в Infrastructure, но домен и Response её знают. */
     private const MODELS = '/^App\\\\ParkingApp\\\\Infrastructure\\\\.+\\\\Models\\\\/';
 
     public function test_domain_does_not_know_outer_layers(): Rule
@@ -31,7 +31,7 @@ final class LayersArchitecture
                 Selector::inNamespace(self::ROOT . '\Entrypoints'),
                 Selector::inNamespace(self::ROOT . '\Workflows'),
             )
-            ->because('домен не знает инфраструктуру (кроме Eloquent-модели, P-4), точки входа и workflow — порт в домене, адаптер в Infrastructure');
+            ->because('домен не знает инфраструктуру (кроме Eloquent-модели), точки входа и workflow — порт в домене, адаптер в Infrastructure');
     }
 
     public function test_billing_does_not_know_other_domains(): Rule
@@ -64,7 +64,7 @@ final class LayersArchitecture
             ->classes(
                 Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\Tariffs'),
             )
-            ->because('соседний модуль домена Billing — интерфейс у потребителя, DI связывает его с соседом (O-6); общее модулей — Domains/Billing/Common');
+            ->because('соседний модуль домена Billing — интерфейс у потребителя, DI связывает его с соседом; общее модулей — Domains/Billing/Common');
     }
 
     public function test_billing_tariffs_does_not_know_other_modules(): Rule
@@ -75,7 +75,7 @@ final class LayersArchitecture
             ->classes(
                 Selector::inNamespace(self::ROOT . '\Domains\Billing\Modules\OutboxTariffEvents'),
             )
-            ->because('соседний модуль домена Billing — интерфейс у потребителя, DI связывает его с соседом (O-6); общее модулей — Domains/Billing/Common');
+            ->because('соседний модуль домена Billing — интерфейс у потребителя, DI связывает его с соседом; общее модулей — Domains/Billing/Common');
     }
 
     public function test_billing_common_does_not_know_modules(): Rule
@@ -120,7 +120,7 @@ final class LayersArchitecture
             ->classes(Selector::inNamespace(self::ROOT . '\Entrypoints'))
             ->shouldNotDependOn()
             ->classes(self::infrastructureWithoutModels())
-            ->because('точка входа — через сервис или workflow, инфраструктуру связывает DI; Eloquent-модель в Response — допустима (P-4)');
+            ->because('точка входа — через сервис или workflow, инфраструктуру связывает DI; Eloquent-модель в Response — допустима');
     }
 
     private static function infrastructureWithoutModels(): SelectorInterface

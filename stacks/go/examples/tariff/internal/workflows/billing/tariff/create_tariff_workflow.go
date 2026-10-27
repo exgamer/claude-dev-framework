@@ -38,7 +38,6 @@ type CreateTariffWorkflow struct {
 }
 
 func (w *CreateTariffWorkflow) Exec(ctx context.Context, params *CreateTariffParams) (*tariffdomain.Tariff, error) {
-	// Начальное состояние задаёт сущность: активный, не по умолчанию — флаг ставится отдельным переходом
 	tariff := tariffdomain.NewTariff(tariffdomain.Tariff{
 		ParkingID:    params.ParkingID,
 		Name:         params.Name,
@@ -47,12 +46,10 @@ func (w *CreateTariffWorkflow) Exec(ctx context.Context, params *CreateTariffPar
 		Price:        params.Price,
 	})
 
-	// Инварианты — до обращения к реестру и БД: тот же сценарий вызывается не только из HTTP
 	if fieldErrors := tariffdomain.ValidateTariff(tariff); len(fieldErrors) > 0 {
 		return nil, exception.NewValidationException(fieldErrors, false)
 	}
 
-	// Парковка — своя БД, дешевле внешнего реестра: проверяется первой
 	parking, err := w.parkingRepository.GetByID(ctx, params.ParkingID)
 	if err != nil {
 		return nil, err
@@ -62,7 +59,6 @@ func (w *CreateTariffWorkflow) Exec(ctx context.Context, params *CreateTariffPar
 		return nil, exception.NewValidationException(map[string]any{"parking_id": "парковка не найдена"}, false)
 	}
 
-	// Отключённая парковка — состояние данных, не доступ: 422, как «не найдена»
 	if !parking.IsActive {
 		return nil, exception.NewValidationException(map[string]any{"parking_id": "парковка отключена"}, false)
 	}

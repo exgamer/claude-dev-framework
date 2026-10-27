@@ -10,7 +10,7 @@ use OpenApi\Attributes as OA;
 /**
  * Блок pagination ответа списка — ключи и значения как у Go SDK (gosdk-db-core, pagination.Pagination): клиент читает списки обоих стеков одинаково.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(
     schema: 'PaginationMeta',

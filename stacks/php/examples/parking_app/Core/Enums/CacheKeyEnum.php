@@ -10,7 +10,7 @@ use MPS\Core\Enums\EnumerableTrait;
 /**
  * Префиксы ключей кеша подпроекта: Redis общий, префикс подпроекта обязателен.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 enum CacheKeyEnum: string implements Enumerable
 {

@@ -12,7 +12,7 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterf
 /**
  * Интерфейс репозитория outbox событий о тарифах. Владельца у события нет — поиск по ID — `oneById` ядра.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface OutboxTariffEventRepositoryInterface extends CRUDRepositoryInterface
 {

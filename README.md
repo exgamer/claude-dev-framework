@@ -90,7 +90,7 @@
 - **Рефактор легаси:** `/dev отрефактори <модуль>` — `approaches/process/legacy-refactor.md`.
 - **Перенос на другой стек:** `/dev перенеси <модуль> из php в go` — `approaches/process/stack-migration.md`.
 - **Баг:** `/dev-fix <баг или ключ>` — `approaches/process/bugfix.md`; `--hotfix` — ветка от `production`.
-- **Мелкая правка без новых эндпойнтов, таблиц, событий и контрактов:** сразу `/dev-go` или `/dev-php`.
+- **Мелкая правка:** сразу `/dev-go` или `/dev-php` — что считается мелкой, `skills/dev-go/SKILL.md` (`skills/dev-php/SKILL.md`), Шаг 2.
 - **Ревью MR:** `/dev-review --mr <id>`.
 - **Замечания ревьюеров в нашем MR:** `/dev-mr <id или url>` — `approaches/process/mr-threads.md`.
 - **Аудит безопасности сервиса:** `/dev-security audit`.
@@ -119,7 +119,7 @@ install.sh       установка в проект
 
 - **Приоритет:** правила проекта (`.claude/dev-rules.md` в корне проекта) > стек > архитектура > core.
 - **Памятка стека** (`stacks/<stack>/checklist.md`) — жёсткие правила одной строкой со ссылкой на подробности; по ней работают и разработчик, и ревьюер.
-- **Уровень находки ревью** ([ОШИБКА]/[ВНИМАНИЕ]/[ИНФО]) задаётся только в каталогах тегов: `approaches/process/review-tags.md`, `stacks/<stack>/review-tags.md`, теги безопасности — `approaches/process/security.md`.
+- **Уровень находки ревью** ([БЕЗОПАСНОСТЬ]/[ОШИБКА]/[ВНИМАНИЕ]/[ИНФО]) задаётся только в каталогах тегов: `approaches/process/review-tags.md`, `stacks/<stack>/review-tags.md`, теги безопасности — `approaches/process/security.md`.
 - **Одно правило — одно место**, в остальных файлах — ссылка. Роли загружают правила по задетым слоям, а не всё сразу.
 - **Справочники SDK/ядра** (`capabilities.md` — что есть, `reference/` — полный API, `official/` — документация пакетов) — в `stacks/go/go-sdk/` и `stacks/php/mps-core/`.
 

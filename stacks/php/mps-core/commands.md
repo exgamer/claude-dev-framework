@@ -41,9 +41,10 @@ final class ReplaceYourEntityCommand
     /**
      * @throws NotFoundAppException
      */
-    public function execute(int $id, YourDto $dto): YourModel
+    public function execute(int $id, ?array $buildingIds, YourDto $dto): YourModel
     {
-        $current = $this->repository->oneById($id);   // проверка — до run(), гонку закрывает concurrency.md
+        // данные с владельцем — чтение со скоупом (../conventions.md п. 12a, 19a); проверка — до run(), гонку закрывает concurrency.md
+        $current = $this->repository->getByIdInBuildings($id, $buildingIds);
         if (! $current) {
             throw new NotFoundAppException('Запись не найдена');
         }

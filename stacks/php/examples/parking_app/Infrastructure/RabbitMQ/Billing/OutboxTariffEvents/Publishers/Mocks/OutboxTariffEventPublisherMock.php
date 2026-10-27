@@ -11,7 +11,7 @@ use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\Outbo
 /**
  * Публикация без брокера для тестов: событие считается принятым.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class OutboxTariffEventPublisherMock implements OutboxTariffEventPublisherInterface
 {

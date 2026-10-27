@@ -15,7 +15,7 @@ use SplFileInfo;
 /**
  * Common — бизнес-словарь без зависимостей: не импортирует слои подпроекта и фреймворк, конструкторы — без сервисов.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class CommonBoundaryTest extends TestCase
 {

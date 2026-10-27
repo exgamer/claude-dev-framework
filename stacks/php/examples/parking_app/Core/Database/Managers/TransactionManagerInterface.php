@@ -9,7 +9,7 @@ use Throwable;
 /**
  * Менеджер транзакций подпроекта: в mps/core он есть только с 1.10.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface TransactionManagerInterface
 {

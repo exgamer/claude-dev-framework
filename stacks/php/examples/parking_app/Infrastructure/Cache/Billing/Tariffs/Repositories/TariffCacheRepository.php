@@ -14,7 +14,7 @@ use MPS\Utils\Components\Cache\CacheManagerInterface;
 /**
  * Кеш тарифов по ID: в кеше — колонки строки, при чтении из них собирается модель.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffCacheRepository implements TariffCacheRepositoryInterface
 {

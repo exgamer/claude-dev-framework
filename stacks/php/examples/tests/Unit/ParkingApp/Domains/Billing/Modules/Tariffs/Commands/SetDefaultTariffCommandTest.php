@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Тариф по умолчанию у парковки один: назначается только действующий, прежний теряет флаг; кеш обоих сбрасывается после записи, сбой кеша — в Sentry.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class SetDefaultTariffCommandTest extends TestCase
 {

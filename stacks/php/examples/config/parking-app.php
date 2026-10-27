@@ -18,7 +18,7 @@ return [
         'secret' => env('INTEGRATION_SIGNATURE_SECRET'),
         // Допустимый разбег часов партнёра и сервиса, секунды
         'tolerance_seconds' => env('INTEGRATION_SIGNATURE_TOLERANCE_SECONDS'),
-        // Сколько секунд хранится использованный nonce; не меньше двух окон времени (подпись принимается в ±окне), иначе повтор пройдёт
+        // Сколько секунд хранится использованный nonce; не меньше двух окон времени — меньше middleware не запустится
         'nonce_ttl_seconds' => env('INTEGRATION_SIGNATURE_NONCE_TTL_SECONDS'),
     ],
 ];

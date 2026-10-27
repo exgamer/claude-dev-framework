@@ -18,23 +18,29 @@ def regex_root(root: str) -> str:
     return root.replace("\\", "\\\\\\\\")
 
 
-def domain_modules(dom_dir: Path) -> dict[str, list[str]]:
-    """Модули каждого домена — каталоги `Domains/{Домен}/Modules/*`; `Common` в списке — у домена есть `Domains/{Домен}/Common/`."""
+# Общий модуль проекта внутри Domains (старая раскладка) — не домен: его знает любой домен, сам он доменов не знает
+SHARED = ("Common", "Shared")
+
+
+def domain_modules(dom_dir: Path, src_domains=frozenset()) -> dict[str, list[str]]:
+    """Модули каждого домена — каталоги `Domains/{Домен}/Modules/*`; `Common` в списке — у домена есть `Domains/{Домен}/Common/`.
+    Домены из `src_domains` — раскладка `Domains/{Домен}/src/Modules/*` (и `src/Common/`): psr-4 проекта отображает
+    `Domains/{Домен}/src` на `…\\Domains\\{Домен}`, поэтому неймспейс модуля тот же, что у `Domains/{Домен}/Modules/*`."""
     out = {}
     for d in sorted(p for p in dom_dir.iterdir() if p.is_dir()) if dom_dir.is_dir() else []:
-        mods = d / "Modules"
-        names = sorted(p.name for p in mods.iterdir() if p.is_dir()) if mods.is_dir() else []
-        out[d.name] = names + (["Common"] if (d / "Common").is_dir() else [])
+        bases = [d] + ([d / "src"] if d.name in src_domains else [])
+        names = sorted({p.name for b in bases if (b / "Modules").is_dir() for p in (b / "Modules").iterdir() if p.is_dir()})
+        out[d.name] = names + (["Common"] if any((b / "Common").is_dir() for b in bases) else [])
     return out
 
 
 def render_arch(namespace: str, root: str, domains: list[str], modules: dict[str, list[str]] | None = None) -> str:
     modules = modules or {}
     rr = regex_root(root)
-    # Domains/Common — общий модуль проекта внутри Domains (старая раскладка), не домен: его знает любой домен,
+    # Domains/Common, Domains/Shared — общий модуль проекта внутри Domains (старая раскладка), не домен: его знает любой домен,
     # а сам он не знает ни доменов, ни внешних слоёв
-    shared = "Common" in domains
-    domains = [d for d in domains if d != "Common"]
+    shared = [d for d in domains if d in SHARED]
+    domains = [d for d in domains if d not in SHARED]
     out = [f"""<?php
 
 declare(strict_types=1);
@@ -49,13 +55,13 @@ use PHPat\\Test\\PHPat;
 /**
  * Границы слоёв и доменов подпроекта — проверяет phpstan (phpat); собран tools/lint/php_rules.py фреймворка, правка — в генераторе.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class LayersArchitecture
 {{
     private const ROOT = '{root}';
 
-    /** Eloquent-модель — доменная модель (P-4): лежит в Infrastructure, но домен и Response её знают. */
+    /** Eloquent-модель — доменная модель: лежит в Infrastructure, но домен и Response её знают. */
     private const MODELS = '/^{rr}\\\\\\\\Infrastructure\\\\\\\\.+\\\\\\\\Models\\\\\\\\/';
 
     public function test_domain_does_not_know_outer_layers(): Rule
@@ -68,7 +74,7 @@ final class LayersArchitecture
                 Selector::inNamespace(self::ROOT . '\\Entrypoints'),
                 Selector::inNamespace(self::ROOT . '\\Workflows'),
             )
-            ->because('домен не знает инфраструктуру (кроме Eloquent-модели, P-4), точки входа и workflow — порт в домене, адаптер в Infrastructure');
+            ->because('домен не знает инфраструктуру (кроме Eloquent-модели), точки входа и workflow — порт в домене, адаптер в Infrastructure');
     }}
 """]
     for d in domains:
@@ -99,7 +105,7 @@ final class LayersArchitecture
             src = f"Domains\\{d}\\Common" if m == "Common" else f"Domains\\{d}\\Modules\\{m}"
             name = f"test_{snake(d)}_common_does_not_know_modules" if m == "Common" else f"test_{snake(d)}_{snake(m)}_does_not_know_other_modules"
             why = (f"Common домена {d} — общее его модулей: модули его знают, он их — нет" if m == "Common"
-                   else f"соседний модуль домена {d} — интерфейс у потребителя, DI связывает его с соседом (O-6); общее модулей — Domains/{d}/Common")
+                   else f"соседний модуль домена {d} — интерфейс у потребителя, DI связывает его с соседом; общее модулей — Domains/{d}/Common")
             targets = "\n".join(f"                Selector::inNamespace(self::ROOT . '\\Domains\\{d}\\Modules\\{o}')," for o in others)
             out.append(f"""
     public function {name}(): Rule
@@ -113,18 +119,18 @@ final class LayersArchitecture
             ->because('{why}');
     }}
 """)
-    if shared and domains:
+    for s in shared if domains else []:
         targets = "\n".join(f"                Selector::inNamespace(self::ROOT . '\\Domains\\{o}')," for o in domains)
         out.append(f"""
-    public function test_domains_common_has_no_domain_dependencies(): Rule
+    public function test_domains_{snake(s)}_has_no_domain_dependencies(): Rule
     {{
         return PHPat::rule()
-            ->classes(Selector::inNamespace(self::ROOT . '\\Domains\\Common'))
+            ->classes(Selector::inNamespace(self::ROOT . '\\Domains\\{s}'))
             ->shouldNotDependOn()
             ->classes(
 {targets}
             )
-            ->because('Domains/Common — общий модуль проекта: его знают домены, сам он доменов не знает — то же правило, что Common/ (common-with-logic)');
+            ->because('Domains/{s} — общий модуль проекта: его знают домены, сам он доменов не знает — то же правило, что Common/ (common-with-logic)');
     }}
 """)
     layers = "\n".join(f"                Selector::inNamespace(self::ROOT . '\\{l}')," for l in LAYERS)
@@ -155,7 +161,7 @@ final class LayersArchitecture
             ->classes(Selector::inNamespace(self::ROOT . '\\Entrypoints'))
             ->shouldNotDependOn()
             ->classes(self::infrastructureWithoutModels())
-            ->because('точка входа — через сервис или workflow, инфраструктуру связывает DI; Eloquent-модель в Response — допустима (P-4)');
+            ->because('точка входа — через сервис или workflow, инфраструктуру связывает DI; Eloquent-модель в Response — допустима');
     }}
 
     private static function infrastructureWithoutModels(): SelectorInterface
@@ -533,7 +539,8 @@ parameters:
                 - 'resolve()'
             message: 'зависимость — через конструктор, не из контейнера в бизнес-коде'
             allowIn:
-                - '*/ServiceProvider.php'
+                - '*ServiceProvider.php'
+                - '*/definitions.php'
                 - '*/Providers/*'
                 - '*/config/*'
                 - '*/routes/*'

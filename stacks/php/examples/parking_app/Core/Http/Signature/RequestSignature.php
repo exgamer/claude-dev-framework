@@ -7,7 +7,7 @@ namespace App\ParkingApp\Core\Http\Signature;
 /**
  * Разобранный заголовок подписи машинного вызова.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final readonly class RequestSignature
 {

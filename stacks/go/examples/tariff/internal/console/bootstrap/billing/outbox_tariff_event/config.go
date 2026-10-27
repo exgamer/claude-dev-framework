@@ -9,8 +9,7 @@ import (
 	outboxdomain "example.com/parking-service/internal/domains/billing/outbox_tariff_event"
 )
 
-// retryConfig Повтор событий тарифов: все значения обязательны, без них модуль не стартует; предел отправок — у владельца
-// настройки, outbox_tariff_event.LoadMaxAttempts серверного bootstrap
+// retryConfig Повтор событий тарифов: все значения обязательны, без них модуль не стартует
 type retryConfig struct {
 	BatchSize         uint `mapstructure:"OUTBOX_TARIFF_EVENT_BATCH_SIZE" json:"OUTBOX_TARIFF_EVENT_BATCH_SIZE"`
 	StaleAfterSeconds uint `mapstructure:"OUTBOX_TARIFF_EVENT_STALE_AFTER_SECONDS" json:"OUTBOX_TARIFF_EVENT_STALE_AFTER_SECONDS"`

@@ -21,7 +21,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Отложенная активация: запланированный тариф — действующим и по умолчанию, прежний — в архив, повтор — без записи.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ActivatePlannedTariffJobTest extends TestCase
 {

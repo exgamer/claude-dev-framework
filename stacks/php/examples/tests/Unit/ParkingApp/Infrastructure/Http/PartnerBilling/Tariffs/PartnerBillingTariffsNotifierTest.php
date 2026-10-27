@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Infrastructure\Http\PartnerBilling\Tariffs;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Infrastructure\Http\PartnerBilling\Tariffs\PartnerBillingTariffsNotifier;
 use GuzzleHttp\Psr7\Response as PsrResponse;
@@ -15,7 +16,6 @@ use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Utils\Components\Http\DataObjects\HttpRequest;
 use MPS\Utils\Components\Http\Enums\HttpRequestTypeEnum;
@@ -25,7 +25,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Отправка тарифа партнёру: тело — контракт партнёра (DTO интеграции), отказ и ошибка сети — OperationFailedAppException.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PartnerBillingTariffsNotifierTest extends TestCase
 {
@@ -85,7 +85,7 @@ class PartnerBillingTariffsNotifierTest extends TestCase
     {
         $config = new Config(['services' => ['partner_billing' => ['base_url' => 'https://partner.example']]]);
 
-        $this->expectException(InvalidConfigurationAppException::class);
+        $this->expectException(ServerConfigurationException::class);
 
         new PartnerBillingTariffsNotifier($this->client, $config);
     }

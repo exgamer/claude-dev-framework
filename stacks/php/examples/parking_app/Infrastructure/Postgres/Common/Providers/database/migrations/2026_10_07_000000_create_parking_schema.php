@@ -5,6 +5,9 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Схема parking подпроекта.
+ */
 return new class () extends Migration {
     private string $schemaName = 'parking';
 

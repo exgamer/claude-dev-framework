@@ -10,7 +10,7 @@ use MPS\Core\Enums\CurrencyEnum;
 /**
  * Данные тарифа в событии: снимок на момент события, тело сообщения.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class OutboxTariffEventDto extends DataObject
 {

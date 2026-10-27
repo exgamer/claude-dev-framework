@@ -4,9 +4,13 @@
     python3 tools/lint/php_routes.py <каталог подпроекта> <корневой namespace> [--base REV]
 
 Правила (имя — в `tools/check/lint-proof/RULES.md`, колонка «Правило конфига»):
-- `routes:api-response-first` — группа или маршрут верхнего уровня routes.php: первый middleware — `api.response`
-  (тег `api-response-not-first`); алиаса `api.response` нет ни в одном routes.php подпроекта — правило не проверяется
-  (в проекте другой алиас), об этом строка в выводе;
+- `routes:api-response-first` — группа или маршрут верхнего уровня routes.php: первый middleware — middleware ответа
+  (тег `api-response-not-first`): `api.response`, алиас `ApiResponseMiddleware` из `bootstrap/app.php` проекта, сам
+  `ApiResponseMiddleware::class` или группа `$middleware->group(…)`, в которой он есть; группа, где он не первым, — одна
+  находка в `bootstrap/app.php`; middleware ответа нет ни в routes.php подпроекта, ни в `bootstrap/app.php` — правило
+  не проверяется, об этом строка в выводе;
+- `routes:middleware-alias` — middleware маршрута `X::class`, у которого есть алиас в `bootstrap/app.php`
+  (тег `route-middleware-not-aliased`);
 - `routes:no-id-constraint` — ограничение параметра-id в пути (`whereNumber`/`where`/`whereIn`/`whereAlphaNumeric`/
   `whereUuid`/`whereUlid` по `id`, `*_id`, `*Id`; `Route::pattern(s)`) — id ≤ 0 и не число дают 404 вместо 422 (тег `route-id-constrained`);
 - `routes:permission-403` — маршрут под `permission:…` (свой или группы) на методе контроллера `[X::class, 'метод']`:
@@ -21,6 +25,9 @@ import sys
 from pathlib import Path
 
 API = "api.response"
+API_CLASS = "ApiResponseMiddleware"
+# элемент списка middleware: `X::class` (с `. ':параметр'` или без) или строка
+TOKEN = re.compile(r"""\\?([A-Za-z_][\w\\]*)::class(?:\s*\.\s*(['"])(?:\\.|(?!\2).)*\2)?|(['"])((?:\\.|(?!\3).)*)\3""")
 VERBS = r"get|post|put|patch|delete|options|any|match"
 ID_PARAM = re.compile(r"^(id|\w+_id|\w+Id)$")
 CONSTRAINTS = r"whereNumber|whereAlphaNumeric|whereAlpha|whereUuid|whereUlid|whereIn|where"
@@ -99,15 +106,81 @@ def statements(src: Source) -> list[dict]:
     return out
 
 
-def middlewares(src: Source, st: dict) -> list[str]:
+def tokens(src: Source, start: int, end: int, imports: dict[str, str]) -> list[tuple[str, str | None, int]]:
+    """Элементы списка middleware по порядку: (как написан, полное имя класса для `X::class` или None, позиция)."""
+    out = []
+    for m in TOKEN.finditer(src.code[start:end]):
+        if m.group(1):
+            out.append((m.group(1) + "::class", resolve(m.group(1), imports), start + m.start()))
+        else:
+            out.append((m.group(4), None, start + m.start()))
+    return out
+
+
+def resolve(name: str, imports: dict[str, str]) -> str:
+    head, _, rest = name.partition("\\")
+    return imports[head] + ("\\" + rest if rest else "") if head in imports else name
+
+
+def middleware_tokens(src: Source, st: dict, imports: dict[str, str]) -> list[tuple[str, str | None, int]]:
     """Middleware цепочки в порядке объявления (без вложенных групп)."""
     out = []
     for p, m in src.code_matches(r"(?:Route::|->)\s*middleware\s*\(", st["pos"], st["chain_end"]):
         if src.depth[p] != st["depth"]:
             continue
         op = p + len(m.group(0)) - 1
-        out += src.strings(op, src.close(op))
+        out += tokens(src, op, src.close(op), imports)
     return out
+
+
+def middlewares(src: Source, st: dict) -> list[str]:
+    """Строковые middleware цепочки в порядке объявления (без вложенных групп)."""
+    return [t for t, cls, _ in middleware_tokens(src, st, {}) if cls is None]
+
+
+class App:
+    """Регистрация middleware в `bootstrap/app.php` проекта: алиасы (`$middleware->alias`) и группы (`group`,
+    `appendToGroup`, `prependToGroup`). Файл ищется от каталога подпроекта вверх до корня проекта (`composer.json`)."""
+
+    def __init__(self, sub: Path):
+        self.path, self.aliases, self.groups, self.lines = None, {}, {}, {}
+        for d in [sub, *sub.parents]:
+            if (d / "bootstrap" / "app.php").is_file():
+                self.path = d / "bootstrap" / "app.php"
+                break
+            if (d / "composer.json").is_file() or (d / ".git").exists():
+                break
+        if not self.path:
+            return
+        text = self.path.read_text(encoding="utf-8")
+        src, imports = Source(text), uses(text)
+        for p, m in src.code_matches(r"->\s*alias\s*\(\s*\["):
+            op = p + len(m.group(0)) - 1
+            for a in re.finditer(r"""(['"])([^'"]+)\1\s*=>\s*\\?([A-Za-z_][\w\\]*)::class""", src.code[op:src.close(op)]):
+                self.aliases[a.group(2)] = resolve(a.group(3), imports)
+        for p, m in src.code_matches(r"""->\s*(group|appendToGroup|prependToGroup)\s*\(\s*(['"])([\w.:-]+)\2\s*,"""):
+            op = src.code.index("(", p)
+            items = tokens(src, p + len(m.group(0)), src.close(op), imports)
+            name, kind = m.group(3), m.group(1)
+            cur = self.groups.get(name, [None] if kind != "group" else [])  # None — состав группы Laravel по умолчанию не известен
+            self.groups[name] = items + cur if kind == "prependToGroup" else (cur + items if kind == "appendToGroup" else items)
+            self.lines.setdefault(name, src.line(p))
+
+    def is_api(self, token: str, cls: str | None, seen=()) -> bool:
+        """Элемент — middleware ответа: `api.response`, его алиас, сам класс или группа, где он первым."""
+        if cls is not None:
+            return cls.rsplit("\\", 1)[-1] == API_CLASS
+        if token == API or (token in self.aliases and self.aliases[token].rsplit("\\", 1)[-1] == API_CLASS):
+            return True
+        group = self.groups.get(token)
+        return bool(group) and group[0] is not None and token not in seen and self.is_api(group[0][0], group[0][1], seen + (token,))
+
+    def api_inside(self, token: str) -> bool:
+        """Группа, в которой middleware ответа есть, но не первым."""
+        return any(x is not None and self.is_api(x[0], x[1]) for x in self.groups.get(token, [])[1:])
+
+    def alias_of(self, cls: str) -> str | None:
+        return next((a for a, c in sorted(self.aliases.items()) if c == cls), None)
 
 
 def uses(text: str) -> dict[str, str]:
@@ -125,8 +198,7 @@ def check_403(sub: Path, root: str, routes: Path, src: Source, st: dict, own: li
     if not act:
         return None
     name, method = act.groups()
-    head, _, rest = name.partition("\\")
-    fqcn = imports[head] + ("\\" + rest if rest else "") if head in imports else name
+    fqcn = resolve(name, imports)
     if not fqcn.startswith(root + "\\"):
         return None
     ctrl = sub / (fqcn[len(root) + 1:].replace("\\", "/") + ".php")
@@ -153,20 +225,33 @@ def check(sub: Path, root: str) -> tuple[list[tuple], list[str]]:
     которых задевает находку (для `--base`), и заметки."""
     findings, notes = [], []
     files = sorted(sub.glob("Entrypoints/**/routes.php"))
-    api_known = any(re.search(rf"['\"]{re.escape(API)}['\"]", f.read_text(encoding="utf-8")) for f in files)
+    app = App(sub)
+    texts = {f: f.read_text(encoding="utf-8") for f in files}
+    api_known = any(re.search(rf"['\"]{re.escape(API)}['\"]|\b{API_CLASS}::class", x) for x in texts.values()) \
+        or any(app.is_api(a, None) for a in app.aliases)
     if files and not api_known:
-        notes.append(f"алиаса '{API}' нет ни в одном routes.php — routes:api-response-first не проверялось (в проекте другой алиас?)")
+        notes.append(f"middleware ответа ('{API}', алиас {API_CLASS} в bootstrap/app.php, {API_CLASS}::class) нет ни в одном "
+                     "routes.php и bootstrap/app.php — routes:api-response-first не проверялось")
+    inside = set()  # группы bootstrap/app.php, где middleware ответа не первым и которые стоят первыми в маршрутах
     for f in files:
-        text = f.read_text(encoding="utf-8")
+        text = texts[f]
         src, imports = Source(text), uses(text)
         sts = statements(src)
         for st in sts:
-            own = middlewares(src, st)
+            toks = middleware_tokens(src, st, imports)
+            own = [t for t, cls, _ in toks if cls is None]
+            for tok, cls, p in toks:
+                alias = app.alias_of(cls) if cls else None
+                if alias:
+                    findings.append((f, src.line(p), f"{tok} в middleware — у класса есть алиас '{alias}' ({app.path.parent.name}/app.php): "
+                                     "подключать алиасом (route-middleware-not-aliased)", [(f, src.line(p), src.line(p))]))
             if api_known and st["depth"] == 0 and (st["route"] or st["body"]):
-                if not own or own[0] != API:
-                    first = f"первый — '{own[0]}'" if own else "middleware нет"
+                if toks and app.api_inside(toks[0][0]) and not app.is_api(toks[0][0], toks[0][1]):
+                    inside.add(toks[0][0])
+                elif not toks or not app.is_api(toks[0][0], toks[0][1]):
+                    first = f"первый — '{toks[0][0]}'" if toks else "middleware нет"
                     where = "у группы маршрутов" if st["body"] else "у маршрута вне группы"
-                    findings.append((f, src.line(st["pos"]), f"{API} не первым {where}: {first} (api-response-not-first)",
+                    findings.append((f, src.line(st["pos"]), f"middleware ответа ({API} или алиас {API_CLASS}) не первым {where}: {first} (api-response-not-first)",
                                      [(f, src.line(st["pos"]), src.line(st["chain_end"]))]))
             for p, m in src.code_matches(rf"(?:->\s*(?:{CONSTRAINTS})|Route::\s*patterns?)\s*\(", st["pos"], st["chain_end"]):
                 if src.depth[p] != st["depth"]:
@@ -182,6 +267,11 @@ def check(sub: Path, root: str) -> tuple[list[tuple], list[str]]:
                 hit = check_403(sub, root, f, src, st, own, encl, imports)
                 if hit:
                     findings.append(hit)
+    for g in sorted(inside):
+        first = app.groups[g][0]
+        findings.append((app.path, app.lines[g], f"middleware ответа ({API_CLASS}) не первым в группе middleware '{g}': первый — "
+                         f"'{first[0] if first else 'состав группы Laravel по умолчанию'}' (api-response-not-first)",
+                         [(app.path, app.lines[g], app.lines[g])]))
     return findings, notes
 
 

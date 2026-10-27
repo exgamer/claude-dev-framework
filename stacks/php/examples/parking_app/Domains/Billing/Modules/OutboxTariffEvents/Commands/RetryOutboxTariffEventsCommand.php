@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Commands;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\DTO\OutboxTariffEventRetryResultDto;
 use App\ParkingApp\Domains\Billing\Modules\OutboxTariffEvents\Repositories\OutboxTariffEventRepositoryInterface;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Debug\ExceptionHandler;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
-use MPS\Core\Exceptions\OperationFailedAppException;
 use Throwable;
 
 /**
  * Повтор зависших событий о тарифах (процесс упал после коммита, брокер был недоступен) пачками, пока выборка полная.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class RetryOutboxTariffEventsCommand
 {
@@ -24,7 +23,7 @@ final class RetryOutboxTariffEventsCommand
     private readonly int $staleAfterSeconds;
 
     /**
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function __construct(
         private readonly OutboxTariffEventRepositoryInterface $repository,
@@ -35,14 +34,14 @@ final class RetryOutboxTariffEventsCommand
         $batchSize = $config->get('parking-app.outbox_tariff_events.retry_batch_size');
 
         if (! is_numeric($batchSize) || (int) $batchSize <= 0) {
-            throw new InvalidConfigurationAppException('Не задан OUTBOX_TARIFF_EVENTS_RETRY_BATCH_SIZE');
+            throw new ServerConfigurationException('Не задан OUTBOX_TARIFF_EVENTS_RETRY_BATCH_SIZE');
         }
 
         // Сколько событие не менялось, чтобы считаться зависшим; на столько же взятое скрыто от параллельного прогона
         $staleAfterSeconds = $config->get('parking-app.outbox_tariff_events.retry_stale_after_seconds');
 
         if (! is_numeric($staleAfterSeconds) || (int) $staleAfterSeconds <= 0) {
-            throw new InvalidConfigurationAppException('Не задан OUTBOX_TARIFF_EVENTS_RETRY_STALE_AFTER_SECONDS');
+            throw new ServerConfigurationException('Не задан OUTBOX_TARIFF_EVENTS_RETRY_STALE_AFTER_SECONDS');
         }
 
         $this->batchSize = (int) $batchSize;
@@ -50,7 +49,7 @@ final class RetryOutboxTariffEventsCommand
     }
 
     /**
-     * Сбой отдельного события — в трекер через report(), прогон продолжается; ошибка выборки — наверх, прогон стоп.
+     * Любая ошибка отдельного события — в трекер через report(), прогон продолжается; ошибка выборки — наверх.
      *
      * @throws Throwable
      */
@@ -72,13 +71,9 @@ final class RetryOutboxTariffEventsCommand
     }
 
     /**
-     * Отправка пачки: сбой события — в трекер, остальные отправляются.
-     *
      * @param list<int> $ids
      *
      * @return int сколько опубликовано
-     *
-     * @throws Throwable
      */
     private function publishBatch(array $ids): int
     {
@@ -88,7 +83,8 @@ final class RetryOutboxTariffEventsCommand
             try {
                 $this->publishCommand->execute($id);
                 $published++;
-            } catch (OperationFailedAppException $e) {
+            } catch (Throwable $e) {
+                // Не только сбой брокера: ошибка одного события (данные, БД) не должна останавливать остальные
                 $this->exceptionHandler->report($e);
             }
         }

@@ -10,7 +10,6 @@ func tariffToEntity(model *tariff) *tariffdomain.Tariff {
 		return nil
 	}
 
-	// Состояние — неэкспортируемое поле сущности: собирается только RestoreTariff
 	return tariffdomain.RestoreTariff(tariffdomain.Tariff{
 		ID:           model.ID,
 		ParkingID:    model.ParkingID,

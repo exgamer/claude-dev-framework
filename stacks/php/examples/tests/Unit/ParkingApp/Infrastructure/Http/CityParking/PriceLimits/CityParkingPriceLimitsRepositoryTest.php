@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\ParkingApp\Infrastructure\Http\CityParking\PriceLimits;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Infrastructure\Http\CityParking\PriceLimits\CityParkingPriceLimitsRepository;
 use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Config\Repository as Config;
@@ -14,7 +15,6 @@ use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use MPS\Core\Enums\CurrencyEnum;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Utils\Components\Http\DataObjects\HttpRequest;
 use MPS\Utils\Components\Http\Interfaces\HttpClientInterface;
@@ -24,7 +24,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Адаптер реестра цен: 404 — лимита нет, ответ без целого max_price, ошибка ответа и сети — OperationFailedAppException.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class CityParkingPriceLimitsRepositoryTest extends TestCase
 {
@@ -113,7 +113,7 @@ class CityParkingPriceLimitsRepositoryTest extends TestCase
     {
         $config = new Config(['services' => ['city_parking' => ['timeout' => 3]]]);
 
-        $this->expectException(InvalidConfigurationAppException::class);
+        $this->expectException(ServerConfigurationException::class);
 
         new CityParkingPriceLimitsRepository($this->client, $config);
     }

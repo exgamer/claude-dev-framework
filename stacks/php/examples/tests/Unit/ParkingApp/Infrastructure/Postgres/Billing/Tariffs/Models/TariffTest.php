@@ -13,7 +13,7 @@ use Tests\TestCase;
  * Состояние тарифа решает модель: начальное — по дате активации, допустимость переходов — can*(); fill() состояние не пишет.
  * Tests\TestCase — каст datetime берёт формат даты у соединения.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffTest extends TestCase
 {

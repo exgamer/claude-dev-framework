@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Инварианты TariffDtoValidator.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffDtoValidatorTest extends TestCase
 {

@@ -10,7 +10,7 @@ use App\ParkingApp\Workflows\Billing\Tariffs\TariffNotifierInterface;
 /**
  * Заглушка партнёрского биллинга для тестового окружения: тариф принят.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PartnerBillingTariffsNotifierMock implements TariffNotifierInterface
 {

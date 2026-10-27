@@ -18,14 +18,16 @@
 
 ## Helper методы
 
+Тип хелпера — модель кеша из `model.go`, не доменная сущность: неэкспортируемое состояние сущности (`isActive`, `isDefault`) в JSON не попадает (`../../structure.md`, «Infrastructure Layer»).
+
 ```go
-helper := rediscore.NewHelper[domain.Product](ctx, r.client)
+helper := rediscore.NewHelper[product](ctx, r.client)
 
-helper.SetStruct("key", product, 2*time.Hour)
-product, err := helper.GetStruct("key")   // nil, nil если не найдено
+helper.SetStruct("key", model, 2*time.Hour)
+model, err := helper.GetStruct("key")   // nil, nil если не найдено
 
-helper.SetArray("key", products, 1*time.Hour)
-products, err := helper.GetArray("key")
+helper.SetArray("key", models, 1*time.Hour)
+models, err := helper.GetArray("key")
 
 helper.SetString("key", "value", 30*time.Minute)
 value, err := helper.GetString("key")
@@ -33,9 +35,46 @@ value, err := helper.GetString("key")
 
 ## Пример репозитория
 
-Каждый вызов — со своим коротким таймаутом (`context.WithTimeout`, `../../checklist.md` п. 19; кеш не должен держать запрос дольше БД), ошибка — обёрнута с ID (п. 20). Эталон — `../../examples/tariff/internal/infrastructure/redis/billing/tariff/repository.go`.
+Модуль — `model.go` (модель кеша), `mapper.go` (модель ↔ сущность, сборка через `Restore*`), `repository.go`. Каждый вызов — со своим коротким таймаутом (`context.WithTimeout`, `../../checklist.md` п. 19; кеш не должен держать запрос дольше БД), ошибка — обёрнута с ID (п. 20), ключ — только через константу префикса. Эталон — `../../examples/tariff/internal/infrastructure/redis/billing/tariff/`.
 
 ```go
+// model.go
+type tariff struct {
+	ID        uint
+	ParkingID uint
+	Name      string
+	IsDefault bool
+	IsActive  bool
+}
+
+// mapper.go
+func tariffToEntity(model *tariff) *tariffdomain.Tariff {
+	if model == nil {
+		return nil
+	}
+
+	return tariffdomain.RestoreTariff(tariffdomain.Tariff{
+		ID:        model.ID,
+		ParkingID: model.ParkingID,
+		Name:      model.Name,
+	}, model.IsDefault, model.IsActive)
+}
+
+func tariffFromEntity(entity *tariffdomain.Tariff) *tariff {
+	if entity == nil {
+		return nil
+	}
+
+	return &tariff{
+		ID:        entity.ID,
+		ParkingID: entity.ParkingID,
+		Name:      entity.Name,
+		IsDefault: entity.IsDefault(),
+		IsActive:  entity.IsActive(),
+	}
+}
+
+// repository.go
 const (
 	keyPrefix = "{service}:tariff:"
 	ttl       = 2 * time.Hour
@@ -52,40 +91,39 @@ type RedisRepository struct {
 	client *redis.Client
 }
 
-func (r *RedisRepository) GetByID(ctx context.Context, id uint) (*domain.Tariff, error) {
+func (r *RedisRepository) GetByID(ctx context.Context, id uint) (*tariffdomain.Tariff, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	tariff, err := rediscore.NewHelper[domain.Tariff](ctx, r.client).GetStruct(key(id))
+	model, err := rediscore.NewHelper[tariff](ctx, r.client).GetStruct(key(id))
 	if err != nil {
 		return nil, fmt.Errorf("get tariff cache failed (tariff_id=%d): %w", id, err)
 	}
 
-	return tariff, nil
+	return tariffToEntity(model), nil
 }
 
-func (r *RedisRepository) Set(ctx context.Context, tariff *domain.Tariff) error {
+func (r *RedisRepository) Set(ctx context.Context, entity *tariffdomain.Tariff) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if err := rediscore.NewHelper[domain.Tariff](ctx, r.client).SetStruct(key(tariff.ID), *tariff, ttl); err != nil {
-		return fmt.Errorf("set tariff cache failed (tariff_id=%d): %w", tariff.ID, err)
+	if err := rediscore.NewHelper[tariff](ctx, r.client).SetStruct(key(entity.ID), *tariffFromEntity(entity), ttl); err != nil {
+		return fmt.Errorf("set tariff cache failed (tariff_id=%d): %w", entity.ID, err)
 	}
 
 	return nil
 }
 
-// Invalidate Один UNLINK на все ключи всех записей, а не вызов на запись
+// Invalidate Все ключи одним UNLINK
 func (r *RedisRepository) Invalidate(ctx context.Context, ids ...uint) error {
 	if len(ids) == 0 {
 		return nil
 	}
 
-	keys := make([]string, 0, len(ids)*2)
+	keys := make([]string, 0, len(ids))
 
 	for _, id := range ids {
-		idStr := strconv.FormatUint(uint64(id), 10)
-		keys = append(keys, keyPrefix+idStr, "{service}:tariff-periods:"+idStr)
+		keys = append(keys, key(id))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)

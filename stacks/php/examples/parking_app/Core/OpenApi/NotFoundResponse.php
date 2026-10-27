@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 /**
  * Ответ 404 для Swagger: формат ошибки ApiResponseMiddleware; только у эндпойнтов, ищущих запись по ID.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Response(
     response: 'NotFound404',

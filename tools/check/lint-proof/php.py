@@ -74,6 +74,12 @@ CASES = [  # (имя, путь в parking_app, код класса, ожидае
     ("app() в бизнес-коде", "Domains/Billing/Modules/Tariffs/ZzV.php",
      f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(): void {{ app('cache'); }} }}",
      "app()"),
+    ("разрешено: app() в definitions.php модуля", "Domains/Billing/definitions.php",
+     "return ['x' => static fn () => app('cache')];",
+     None),
+    ("разрешено: app() в провайдере с префиксом имени", "Domains/Billing/ZzEventServiceProvider.php",
+     f"namespace {R}\\Domains\\Billing;\nfinal class ZzEventServiceProvider {{ public function f(): mixed {{ return app('cache'); }} }}",
+     None),
     ("разрешено: фасад DB в репозитории Infrastructure", "Infrastructure/Postgres/Billing/Tariffs/Repositories/ZzV.php",
      f"namespace {R}\\Infrastructure\\Postgres\\Billing\\Tariffs\\Repositories;\nfinal class ZzV {{ public function f(): void {{ \\Illuminate\\Support\\Facades\\DB::raw('1'); }} }}",
      None),
@@ -191,6 +197,23 @@ ROUTE_CASES = [  # (имя, файл в parking_app, было, стало, ож�
     ("разрешено: эталон", "Entrypoints/Admin/Billing/routes.php", "", "", None),
 ]
 
+# Регистрация middleware проекта (`bootstrap/app.php` рядом с подпроектом): алиас и группы middleware ответа
+APP_ALIAS = ("<?php\n\nuse MPS\\Utils\\Http\\Middleware\\ApiResponseMiddleware;\n\n$app->withMiddleware(function ($middleware) {\n"
+             "    $middleware->alias([\n        'api-resp' => ApiResponseMiddleware::class,\n    ]);\n{group}});\n")
+GROUP_FIRST = "    $middleware->group('api-stack', [\n        'api-resp',\n        'auth:admin-api',\n    ]);\n"
+GROUP_INSIDE = "    $middleware->group('api-stack', [\n        'auth:admin-api',\n        'api-resp',\n    ]);\n"
+ADMIN_ROUTES, ADMIN_HEAD = "Entrypoints/Admin/Billing/routes.php", "    'api.response',\n    'auth:admin-api',"
+ROUTE_APP_CASES = [  # (имя, группа в bootstrap/app.php, файл в parking_app, было, стало, ожидаемый тег или None)
+    ("алиас ApiResponseMiddleware из bootstrap/app.php не первым", "", ADMIN_ROUTES, ADMIN_HEAD, "    'auth:admin-api',\n    'api-resp',",
+     "api-response-not-first"),
+    ("ApiResponseMiddleware не первым в группе middleware bootstrap/app.php", GROUP_INSIDE, ADMIN_ROUTES, ADMIN_HEAD, "    'api-stack',",
+     "api-response-not-first"),
+    ("ApiResponseMiddleware::class при алиасе в bootstrap/app.php", "", ADMIN_ROUTES, "    'api.response',\n",
+     "    \\MPS\\Utils\\Http\\Middleware\\ApiResponseMiddleware::class,\n", "route-middleware-not-aliased"),
+    ("разрешено: алиас ApiResponseMiddleware из bootstrap/app.php первым", "", ADMIN_ROUTES, "    'api.response',\n", "    'api-resp',\n", None),
+    ("разрешено: группа bootstrap/app.php с ApiResponseMiddleware первым", GROUP_FIRST, ADMIN_ROUTES, ADMIN_HEAD, "    'api-stack',", None),
+]
+
 # --base: находка только на добавленных строках (было — в коммите, стало — в рабочем дереве)
 OLD_ID = ("->name('tariffs.view');", "->whereNumber('id')->name('tariffs.view');")
 RENAME = ("->name('parking-tariffs.index');", "->name('parking-tariffs.list');")
@@ -255,6 +278,96 @@ def route_cases() -> int:
     return fails
 
 
+def route_app_cases() -> int:
+    fails = 0
+    for name, group, path, old, new, expect in ROUTE_APP_CASES:
+        with tempfile.TemporaryDirectory() as tmp:
+            sub = Path(tmp) / "parking_app"
+            shutil.copytree(EXAMPLE, sub)
+            (Path(tmp) / "bootstrap").mkdir()
+            (Path(tmp) / "bootstrap" / "app.php").write_text(APP_ALIAS.replace("{group}", group), encoding="utf-8")
+            f = sub / path
+            text = f.read_text(encoding="utf-8")
+            if old not in text:
+                print(f"MISS  {name} (в эталоне нет «{old}» — случай устарел)")
+                fails += 1
+                continue
+            f.write_text(text.replace(old, new, 1), encoding="utf-8")
+            found, _ = php_routes.check(sub, "App\\ParkingApp")
+            msgs = " ".join(m for _, _, m, _ in found)
+            ok = (f"({expect})" in msgs) if expect else not found
+            fails += not ok
+            print(("OK    " if ok else "MISS  ") + name + ("" if ok else "\n" + msgs))
+    return fails
+
+
+def layouts() -> int:
+    """Раскладки доменов на проекте (`php_rules.domain_modules`, `lint.src_domains`): общий модуль `Domains/Shared` и
+    `Domains/Common` — не домен; модули в `Domains/{Домен}/src/Modules` при psr-4 `Domains/{Домен}/src` → `…\\Domains\\{Домен}` —
+    правила модулей, без такого psr-4 — нет (и строка в выводе lint.py)."""
+    import json
+    import lint
+    import php_rules
+    fails = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        proj = Path(tmp)
+        for d in ("Billing/src/Modules/Tariffs", "Billing/src/Modules/Payments", "Billing/src/Common", "Catalog/Modules/Parkings",
+                  "Orders/src/Modules/Carts", "Orders/src/Modules/Items", "Shared/Pagination", "Common/Enums"):
+            (proj / "x" / "Domains" / d).mkdir(parents=True)
+        (proj / "composer.json").write_text(json.dumps({"autoload": {"psr-4": {
+            "App\\X\\": "x/", "App\\X\\Domains\\Billing\\": "x/Domains/Billing/src/"}}}), encoding="utf-8")
+        dom = proj / "x" / "Domains"
+        domains = sorted(p.name for p in dom.iterdir())
+        ok_src, skipped = lint.src_domains(proj, "x", "App\\X", domains)
+        arch = php_rules.render_arch("NS", "App\\X", domains, php_rules.domain_modules(dom, ok_src))
+        sel = "Selector::inNamespace(self::ROOT . '\\Domains\\{}')"
+        for name, ok in [
+            ("раскладка src/Modules с psr-4 — правила модулей домена",
+             "test_billing_tariffs_does_not_know_other_modules" in arch and "test_billing_common_does_not_know_modules" in arch
+             and sel.format("Billing\\Modules\\Payments") in arch),
+            ("раскладка src/Modules без psr-4 — правил модулей нет, домен в выводе", skipped == ["Orders"] and "Domains\\Orders\\Modules" not in arch),
+            ("Domains/Shared и Domains/Common — общий модуль, не домен",
+             "test_shared_does_not_know_other_domains" not in arch and "test_common_does_not_know_other_domains" not in arch
+             and "test_domains_shared_has_no_domain_dependencies" in arch and "test_domains_common_has_no_domain_dependencies" in arch
+             and arch.count(sel.format("Shared")) == 1 and arch.count(sel.format("Common")) == 1),
+        ]:
+            fails += not ok
+            print(("OK    " if ok else "MISS  ") + name)
+    return fails
+
+
+# Конфиг прогона, не правило: `@phpstan-ignore` проекта под его уровень в конфиге lint.py без уровня — не находка
+UNMATCHED_IGNORE = ("lint.py: @phpstan-ignore проекта под проверку уровня — не находка",
+                    f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nfinal class ZzV {{ public function f(int $x): int {{\n"
+                    "// @phpstan-ignore argument.type\nreturn $x + 1; // @phpstan-ignore-line\n} }",
+                    [" [OK] No errors"], ["ignore."])
+LINT_CFG_CASES = [  # (имя, код класса, ожидаемые строки вывода lint.py, запрещённые строки) — конфиг lint.py, не стенда
+    ("фасад DB: use и вызов — одна находка (lint.py)",
+     f"namespace {R}\\Domains\\Billing\\Modules\\Tariffs;\nuse Illuminate\\Support\\Facades\\DB;\nuse Illuminate\\Support\\Facades\\Auth;\n"
+     "final class ZzV { public function f(): void { DB::table('x'); } }",
+     ["🪪 disallowed.class", "Namespace Illuminate\\Support\\Facades\\Auth", " [ERROR] Found 2 errors"],
+     ["Namespace Illuminate\\Support\\Facades\\DB"]),
+]
+
+
+def lint_config() -> int:
+    """Конфиг и вывод `lint.py php` (`phpstan_run`, `phpstan_report`) на стенде: правила стенда, но без уровня и larastan."""
+    import lint
+    fails, work, path = 0, f"{WORKDIR}/lint-cfg", "parking_app/Domains/Billing/Modules/Tariffs/ZzV.php"
+    sh(f"mkdir -p {work}/cache && cp {WORKDIR}/phpstan-rules.neon {work}/rules.neon")
+    neon, cmd = lint.phpstan_run(WORKDIR, "parking_app", work, [f"{WORKDIR}/{path}"], tools=WORKDIR)
+    sh(f"cat > {work}/phpstan.neon", neon)
+    for name, code, want, absent in [UNMATCHED_IGNORE] + LINT_CFG_CASES:
+        sh(f"cat > {WORKDIR}/{path}", "<?php\n\ndeclare(strict_types=1);\n\n" + code + "\n")
+        r = sh(cmd)
+        report, _ = lint.phpstan_report(r.stdout, r.stderr, WORKDIR)
+        ok = all(w in report for w in want) and not any(a in report for a in absent)
+        fails += not ok
+        print(("OK    " if ok else "MISS  ") + name + ("" if ok else "\n" + report))
+        sh(f"rm -f {WORKDIR}/{path}")
+    return fails
+
+
 def large_diff() -> int:
     """lint.py php --base: тысячи изменённых файлов — в parameters.paths конфига, команда от их числа не растёт
     (иначе `docker exec` падает «argument list too long»); без --base в конфиге — весь подпроект."""
@@ -287,7 +400,10 @@ def main():
         print(("OK    " if ok else "MISS  ") + name)
         sh(f"rm -f {full}")
     fails += route_cases()
+    fails += route_app_cases()
     fails += route_base_cases()
+    fails += layouts()
+    fails += lint_config()
     fails += large_diff()
     return 1 if fails else 0
 

@@ -7,10 +7,9 @@ namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories;
 use App\ParkingApp\Domains\Billing\Common\Enums\OutboxTariffEventStatusEnum;
 
 /**
- * Статус доставки событий о тарифе — то, что модулю Tariffs нужно от соседнего модуля OutboxTariffEvents (O-6):
- * интерфейс объявляет потребитель, реализацию соседа связывает DI (`Infrastructure/Postgres/Billing/Providers/definitions.php`).
+ * Статус доставки событий о тарифе.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface TariffEventStatusRepositoryInterface
 {

@@ -11,6 +11,7 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffSortEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffRepositoryInterface;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
@@ -18,14 +19,14 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Тарифы в parking.tariffs: каждый публичный метод — один запрос, скоуп парковок — условием в запросе, а не фильтром после.
+ * Тарифы в parking.tariffs: каждый публичный метод — один запрос, скоуп парковок — условием в запросе.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffRepository extends CRUDRepository implements TariffRepositoryInterface
 {
     /**
-     * Частичный уникальный индекс «у парковки не больше одного тарифа по умолчанию» (миграция 2026_10_20_100000).
+     * Частичный уникальный индекс «у парковки не больше одного тарифа по умолчанию».
      */
     private const DEFAULT_TARIFF_UNIQUE_INDEX = 'tariffs_parking_id_default_unique';
 
@@ -73,15 +74,16 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
             $query->where('status', $filter->getStatus()->value);
         }
 
-        match ($filter->getSort()) {
-            TariffSortEnum::NAME_ASC => $query->orderBy('name'),
-            TariffSortEnum::NAME_DESC => $query->orderByDesc('name'),
-            TariffSortEnum::CREATED_AT_ASC => $query->orderBy('created_at'),
-            TariffSortEnum::CREATED_AT_DESC => $query->orderByDesc('created_at'),
+        [$column, $direction] = match ($filter->getSort()) {
+            TariffSortEnum::NAME_ASC => ['name', 'asc'],
+            TariffSortEnum::NAME_DESC => ['name', 'desc'],
+            TariffSortEnum::CREATED_AT_ASC => ['created_at', 'asc'],
+            TariffSortEnum::CREATED_AT_DESC => ['created_at', 'desc'],
         };
 
-        // Равные name/created_at без id дают плавающий порядок между страницами
-        $query->orderByDesc('id');
+        // id — в том же направлении: равные name/created_at иначе плавают между страницами, а смешанный порядок
+        // индекс (parking_id, колонка, id) целиком не обслуживает
+        $query->orderBy($column, $direction)->orderBy('id', $direction);
 
         return $query
             ->select([
@@ -131,14 +133,15 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
             ->get();
     }
 
-    public function allNotArchivedIdsByParkingId(int $parkingId): array
+    public function allDueScheduledIds(int $limit): array
     {
-        $statuses = TariffStatusEnum::notArchivedValues();
-
         /** @var list<int> */
         return $this->getQuery()
-            ->where('parking_id', $parkingId)
-            ->whereIn('status', $statuses)
+            ->where('status', TariffStatusEnum::SCHEDULED->value)
+            ->where('scheduled_at', '<=', Carbon::now())
+            ->orderBy('scheduled_at')
+            ->orderBy('id')
+            ->limit($limit)
             ->pluck('id')
             ->all();
     }
@@ -147,7 +150,6 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
     {
         /** @var Tariff $tariff */
         $tariff = $this->model->newInstance();
-        // Дата активации пишется только при создании: перенос даты отложенный Job не догонит
         $tariff->fill($this->columns($dto))
             ->initState($dto->getScheduledAt())
             ->save();
@@ -182,7 +184,7 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
      */
     public function setDefault(int $id): bool
     {
-        // Условие Tariff::canBeDefault() — в самом UPDATE: тариф, архивированный параллельно, флаг не получит
+        // Условие canBeDefault() — в самом UPDATE: тариф, архивированный параллельно, флаг не получит
         try {
             $updated = $this->getQuery()
                 ->whereKey($id)
@@ -225,7 +227,7 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
 
     public function archive(int $id): bool
     {
-        // Условие Tariff::canArchive() — в самом UPDATE
+        // Условие canArchive() — в самом UPDATE
         $updated = $this->getQuery()
             ->whereKey($id)
             ->whereIn('status', TariffStatusEnum::notArchivedValues())
@@ -237,14 +239,22 @@ class TariffRepository extends CRUDRepository implements TariffRepositoryInterfa
         return $updated > 0;
     }
 
-    public function archiveNotArchivedByParkingId(int $parkingId): int
+    public function archiveNotArchivedByParkingId(int $parkingId): array
     {
-        $statuses = TariffStatusEnum::notArchivedValues();
+        // RETURNING: id изменённых — тем же запросом; отдельное чтение до UPDATE пропустило бы тариф, созданный между ними
+        [$active, $scheduled] = TariffStatusEnum::notArchivedValues();
 
-        return $this->getQuery()
-            ->where('parking_id', $parkingId)
-            ->whereIn('status', $statuses)
-            ->update(['status' => TariffStatusEnum::ARCHIVED->value]);
+        $rows = $this->model->getConnection()->select(
+            "UPDATE {$this->model->getTable()} SET status = ?
+            WHERE parking_id = ? AND status IN (?, ?) AND deleted_at IS NULL
+            RETURNING id",
+            [TariffStatusEnum::ARCHIVED->value, $parkingId, $active, $scheduled],
+        );
+
+        $ids = array_map(static fn (object $row): int => (int) $row->id, $rows);
+        sort($ids);
+
+        return $ids;
     }
 
     /**

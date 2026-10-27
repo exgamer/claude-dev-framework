@@ -8,7 +8,7 @@ import (
 
 // SetRoutes Пробы без авторизации: их вызывает оркестратор, данных не отдают
 func SetRoutes(a *app.App, router *gin.Engine, handler *Handler) {
-	// Вне схемы /api/<context>/<version>/...: проба оркестратора, не ресурс API — путь задаёт манифест деплоя
+	// Путь пробы задаёт манифест деплоя оркестратора, он вне схемы /api/<context>/<version>/...
 	health := router.Group("/healthcheck")
 	{
 		health.Use(middleware.RequestInfoMiddleware(a))

@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Отключение парковки: её неархивные тарифы — в архив одним условным UPDATE, кеш изменённых сбрасывается, сбой кеша — в Sentry.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class DeactivateParkingTariffsCommandTest extends TestCase
 {
@@ -46,15 +46,10 @@ class DeactivateParkingTariffsCommandTest extends TestCase
     public function test_not_archived_tariffs_are_archived_and_their_cache_forgotten(): void
     {
         $this->repository
-            ->shouldReceive('allNotArchivedIdsByParkingId')
-            ->once()
-            ->with(self::PARKING_ID)
-            ->andReturn([3, 4]);
-        $this->repository
             ->shouldReceive('archiveNotArchivedByParkingId')
             ->once()
             ->with(self::PARKING_ID)
-            ->andReturn(2);
+            ->andReturn([3, 4]);
         $this->cacheRepository->shouldReceive('forget')->once()->with(3);
         $this->cacheRepository->shouldReceive('forget')->once()->with(4);
 
@@ -65,8 +60,7 @@ class DeactivateParkingTariffsCommandTest extends TestCase
     {
         $failure = new OperationFailedAppException('Кеш тарифов недоступен');
 
-        $this->repository->shouldReceive('allNotArchivedIdsByParkingId')->once()->andReturn([3]);
-        $this->repository->shouldReceive('archiveNotArchivedByParkingId')->once()->andReturn(1);
+        $this->repository->shouldReceive('archiveNotArchivedByParkingId')->once()->andReturn([3]);
         $this->cacheRepository->shouldReceive('forget')->once()->with(3)->andThrow($failure);
         $this->exceptionHandler->shouldReceive('report')->once()->with($failure);
 

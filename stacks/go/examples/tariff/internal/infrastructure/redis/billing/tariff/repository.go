@@ -51,7 +51,7 @@ func (r *RedisRepository) Set(ctx context.Context, entity *tariffdomain.Tariff) 
 	return nil
 }
 
-// Invalidate Один UNLINK на все ключи, а не вызов на тариф
+// Invalidate Все ключи одним UNLINK
 func (r *RedisRepository) Invalidate(ctx context.Context, ids ...uint) error {
 	if len(ids) == 0 {
 		return nil

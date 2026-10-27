@@ -21,7 +21,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Тарифы парковки с данными парковки: строки тарифов → ParkingTariffItemsDto, нет парковки — 404 без чтения тарифов.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ListParkingTariffsWorkflowTest extends TestCase
 {

@@ -19,7 +19,7 @@ use Tests\TestCase;
 /**
  * Обработчик handbook.parking.deactivated: архив тарифов, постоянная ошибка — лог, временная — наверх; Tests\TestCase — ради фасада Log.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingDeactivatedHandlerTest extends TestCase
 {
@@ -31,9 +31,8 @@ class ParkingDeactivatedHandlerTest extends TestCase
     {
         parent::setUp();
 
-        // Command — final: настоящий, на мок-репозитории; список ID для сброса кеша — пустой
+        // Command — final: настоящий, на мок-репозитории; изменённых ID нет — кеш не сбрасывается
         $this->repository = Mockery::mock(TariffRepositoryInterface::class);
-        $this->repository->shouldReceive('allNotArchivedIdsByParkingId')->andReturn([])->byDefault();
     }
 
     public function test_tariffs_of_deactivated_parking_are_archived(): void
@@ -42,7 +41,7 @@ class ParkingDeactivatedHandlerTest extends TestCase
             ->shouldReceive('archiveNotArchivedByParkingId')
             ->once()
             ->with(self::PARKING_ID)
-            ->andReturn(2);
+            ->andReturn([]);
         Log::shouldReceive('info')->once();
         Log::shouldReceive('error')->never();
 
@@ -55,7 +54,7 @@ class ParkingDeactivatedHandlerTest extends TestCase
             ->shouldReceive('archiveNotArchivedByParkingId')
             ->once()
             ->with(self::PARKING_ID)
-            ->andReturn(0);
+            ->andReturn([]);
         Log::shouldReceive('info')->once();
 
         $this->process((object) ['parking_id' => self::PARKING_ID]);

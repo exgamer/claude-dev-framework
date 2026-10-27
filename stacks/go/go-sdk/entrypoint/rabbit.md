@@ -28,14 +28,14 @@ type parkingDeactivatedMessage struct {
 	ParkingID uint `json:"parking_id"`
 }
 
-func NewConsumer(tariffService *tariffdomain.Service) *Consumer {
+func NewConsumer(deactivateParkingTariffsCommand *tariffdomain.DeactivateParkingTariffsCommand) *Consumer {
 	return &Consumer{
-		tariffService: tariffService,
+		deactivateParkingTariffsCommand: deactivateParkingTariffsCommand,
 	}
 }
 
 type Consumer struct {
-	tariffService *tariffdomain.Service
+	deactivateParkingTariffsCommand *tariffdomain.DeactivateParkingTariffsCommand
 }
 
 // Consume Битый payload повтором не исправить — в трекер и ACK; временная ошибка — NACK
@@ -58,11 +58,11 @@ func (c *Consumer) Consume(ctx context.Context, msg *message.Message) error {
 		return nil
 	}
 
-	return c.tariffService.DeactivateByParkingID(ctx, payload.ParkingID)
+	return c.deactivateParkingTariffsCommand.Exec(ctx, payload.ParkingID)
 }
 ```
 
-Эталон — `examples/tariff/internal/entrypoints/consumer/rabbit/billing/tariff/tariff_consumer.go` (там же — предел попыток: на последней — в трекер и ACK).
+Переход состояния (отключить тарифы) — своя Command домена (`regulations/entity.md`, «Переход состояния»), не метод сервиса. Эталон — `examples/tariff/internal/entrypoints/consumer/rabbit/billing/tariff/tariff_consumer.go` (там же — предел попыток: на последней — в трекер и ACK).
 
 ## consumer_registry.go
 

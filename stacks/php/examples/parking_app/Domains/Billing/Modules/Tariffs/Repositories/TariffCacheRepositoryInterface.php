@@ -10,7 +10,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 /**
  * Кеш тарифов по ID. Хранит тариф без скоупа: принадлежность парковке сверяет вызывающий после чтения.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface TariffCacheRepositoryInterface
 {

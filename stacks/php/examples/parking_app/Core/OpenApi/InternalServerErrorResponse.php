@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 /**
  * Ответ 500 для Swagger: формат ошибки ApiResponseMiddleware без деталей реализации.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Response(
     response: 'ServerError500',
@@ -32,7 +32,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'status', description: 'HTTP-код', type: 'integer', example: 500),
         new OA\Property(property: 'error', description: 'Тип ошибки', type: 'string', example: 'INTERNAL_SERVER_ERROR'),
         new OA\Property(property: 'app_error_code', description: 'Внутренний код приложения', type: 'integer', example: 0),
-        new OA\Property(property: 'message', description: 'Текст ошибки', type: 'string', example: 'Реестр парковок недоступен'),
+        new OA\Property(property: 'message', description: 'Текст ошибки', type: 'string', example: 'Внутренняя ошибка сервера'),
     ],
     type: 'object'
 )]

@@ -11,7 +11,7 @@ use MPS\Core\DataObjects\DataObjectCollection;
  *
  * @extends DataObjectCollection<ParkingTariffDto>
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class ParkingTariffItemsDto extends DataObjectCollection
 {

@@ -10,7 +10,7 @@ use OpenApi\Attributes as OA;
 /**
  * Список тарифов: items — TariffResponse, блок pagination — из PaginatedResource.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(
     schema: 'TariffPaginatedResponse',

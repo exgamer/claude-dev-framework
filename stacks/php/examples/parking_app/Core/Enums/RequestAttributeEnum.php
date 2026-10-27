@@ -10,7 +10,7 @@ use MPS\Core\Enums\EnumerableTrait;
 /**
  * Ключи атрибутов запроса, которые выставляет middleware подпроекта.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 enum RequestAttributeEnum: string implements Enumerable
 {

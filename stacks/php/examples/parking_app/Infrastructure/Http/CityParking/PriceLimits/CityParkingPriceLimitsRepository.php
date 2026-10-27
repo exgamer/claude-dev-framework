@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Infrastructure\Http\CityParking\PriceLimits;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\PriceLimitRepositoryInterface;
 use App\ParkingApp\Infrastructure\Http\CityParking\DTO\PriceLimitResponseDto;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use MPS\Core\Enums\CurrencyEnum;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Utils\Components\Http\Enums\HttpRequestTypeEnum;
 use MPS\Utils\Components\Http\Factories\HttpClientFactory;
@@ -19,7 +19,7 @@ use MPS\Utils\Components\Http\Interfaces\HttpClientInterface;
 /**
  * Адаптер лимитов цены городского реестра парковок (CityParking).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class CityParkingPriceLimitsRepository implements PriceLimitRepositoryInterface
 {
@@ -28,7 +28,7 @@ class CityParkingPriceLimitsRepository implements PriceLimitRepositoryInterface
     private readonly int $timeoutSeconds;
 
     /**
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function __construct(
         private readonly HttpClientInterface $client,
@@ -37,13 +37,13 @@ class CityParkingPriceLimitsRepository implements PriceLimitRepositoryInterface
         $baseUrl = $config->get('services.city_parking.base_url');
 
         if (! is_string($baseUrl) || $baseUrl === '') {
-            throw new InvalidConfigurationAppException('Не задан CITY_PARKING_BASE_URL');
+            throw new ServerConfigurationException('Не задан CITY_PARKING_BASE_URL');
         }
 
         $timeoutSeconds = $config->get('services.city_parking.timeout');
 
         if (! is_numeric($timeoutSeconds) || (int) $timeoutSeconds <= 0) {
-            throw new InvalidConfigurationAppException('Не задан CITY_PARKING_TIMEOUT');
+            throw new ServerConfigurationException('Не задан CITY_PARKING_TIMEOUT');
         }
 
         $this->baseUrl = rtrim($baseUrl, '/');

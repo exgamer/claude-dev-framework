@@ -23,7 +23,7 @@ use Tests\TestCase;
  * Маршруты Admin тарифов: неверный id пути (0, -1, abc) — 422 из Request, а не 404 маршрута;
  * статический tariffs/default объявлен до tariffs/{id} и не перехватывается им.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffRouteTest extends TestCase
 {

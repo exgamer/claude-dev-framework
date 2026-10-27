@@ -10,7 +10,7 @@ use MPS\Core\DataObjects\DataObject;
 /**
  * Наибольшая разрешённая длительность стоянки на парковке: количество единиц времени (Common — тот же словарь, что у Billing).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingMaxStayDto extends DataObject
 {

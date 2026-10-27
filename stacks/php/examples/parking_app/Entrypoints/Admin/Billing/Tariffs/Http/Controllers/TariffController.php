@@ -6,6 +6,7 @@ namespace App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\ParkingApp\Core\Database\Query\Page;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Core\Http\RequestHelper;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Commands\SetDefaultTariffCommand;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
@@ -23,7 +24,6 @@ use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Responses\TariffPagina
 use App\ParkingApp\Entrypoints\Admin\Billing\Tariffs\Http\Responses\TariffResponse;
 use App\ParkingApp\Workflows\Billing\Tariffs\CreateTariffWorkflow;
 use Illuminate\Http\JsonResponse;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Core\Exceptions\ValidationAppException;
@@ -34,7 +34,7 @@ use Throwable;
 /**
  * HTTP админки: список, карточка, тариф по умолчанию, создание, правка, назначение по умолчанию; скоуп парковок — из middleware, права — на маршрутах.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Tag(name: 'Admin Parking: Тарифы', description: 'Управление тарифами парковок')]
 class TariffController extends Controller
@@ -48,7 +48,7 @@ class TariffController extends Controller
     }
 
     /**
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     #[OA\Get(
         path: '/parking/admin/tariffs',
@@ -91,7 +91,7 @@ class TariffController extends Controller
 
     /**
      * @throws NotFoundAppException
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     #[OA\Get(
         path: '/parking/admin/tariffs/{id}',
@@ -177,7 +177,7 @@ class TariffController extends Controller
     #[OA\Post(
         path: '/parking/admin/tariffs',
         summary: 'Создать тариф',
-        description: 'Цена проверяется по лимиту городского реестра парковок; о новом тарифе уведомляется партнёрский биллинг; parking_id недоступной парковки — 403',
+        description: 'Цена проверяется по лимиту городского реестра парковок, реестр недоступен — 503; о новом тарифе уведомляется партнёрский биллинг; parking_id недоступной парковки — 403',
         security: [['Authorization' => []]],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/TariffCreateRequest')),
         tags: ['Admin Parking: Тарифы'],
@@ -194,6 +194,7 @@ class TariffController extends Controller
             new OA\Response(ref: '#/components/responses/AccessDenied403', response: 403),
             new OA\Response(ref: '#/components/responses/ValidationError422', response: 422),
             new OA\Response(ref: '#/components/responses/ServerError500', response: 500),
+            new OA\Response(ref: '#/components/responses/ServiceUnavailable503', response: 503),
         ]
     )]
     public function create(CreateRequest $request): JsonResponse
@@ -207,7 +208,7 @@ class TariffController extends Controller
     /**
      * @throws NotFoundAppException
      * @throws ValidationAppException
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     #[OA\Put(
         path: '/parking/admin/tariffs/{id}',
@@ -246,7 +247,7 @@ class TariffController extends Controller
     /**
      * @throws NotFoundAppException
      * @throws ValidationAppException
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      * @throws Throwable
      */
     #[OA\Post(

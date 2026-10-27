@@ -7,7 +7,7 @@ namespace App\ParkingApp\Core\Http\Signature;
 /**
  * Подписываемая часть HTTP-запроса машинного вызова.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final readonly class SignedMessage
 {

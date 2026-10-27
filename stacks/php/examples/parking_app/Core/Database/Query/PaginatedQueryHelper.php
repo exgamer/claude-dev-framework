@@ -12,7 +12,7 @@ use MPS\Core\Exceptions\BadRequestAppException;
 /**
  * Поиск формы (1) пагинации: search() CRUD-репозитория ядра → ['items', 'pagination'] — формат ответа списка Go SDK.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class PaginatedQueryHelper
 {
@@ -97,8 +97,7 @@ final class PaginatedQueryHelper
     }
 
     /**
-     * Список без keyBy (у searchByIds() ядра он по умолчанию): карту по ключу собирает потребитель, не хелпер запросов.
-     * Условие по id — в репозитории (allByIds()), хелпер запрос не собирает.
+     * Записи по набору id списком, без ключей по id.
      *
      * @param list<int|string> $ids
      *

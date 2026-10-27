@@ -9,7 +9,7 @@ use App\ParkingApp\Core\Requests\Request;
 /**
  * Тариф по ID: id пути — положительное целое (0 — 422).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ViewRequest extends Request
 {

@@ -10,7 +10,7 @@ use MPS\Core\Enums\CurrencyEnum;
 /**
  * Запрос партнёрскому биллингу о новом тарифе (POST /tariffs): контракт внешней системы, не доменная модель.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PartnerTariffRequestDto extends DataObject
 {

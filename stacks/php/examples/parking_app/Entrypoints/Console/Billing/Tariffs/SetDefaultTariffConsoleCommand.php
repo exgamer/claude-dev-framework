@@ -13,7 +13,7 @@ use Throwable;
 /**
  * Назначение тарифа по умолчанию из консоли — для поддержки, когда админка недоступна.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class SetDefaultTariffConsoleCommand extends Command
 {

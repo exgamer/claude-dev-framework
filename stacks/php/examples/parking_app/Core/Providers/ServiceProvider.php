@@ -9,7 +9,7 @@ use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 /**
  * Предок провайдеров доменов подпроекта: ресурсы модуля рядом с провайдером подключает автозагрузка ModuleServiceProvider ядра.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ServiceProvider extends CoreServiceProvider
 {

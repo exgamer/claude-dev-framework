@@ -17,7 +17,6 @@ return [
         'abstract' => OutboxTariffEventRepositoryInterface::class,
         'concrete' => OutboxTariffEventRepository::class,
     ],
-    // O-6: интерфейс модуля Tariffs — реализация соседнего модуля OutboxTariffEvents
     [
         'abstract' => TariffEventStatusRepositoryInterface::class,
         'concrete' => OutboxTariffEventRepository::class,

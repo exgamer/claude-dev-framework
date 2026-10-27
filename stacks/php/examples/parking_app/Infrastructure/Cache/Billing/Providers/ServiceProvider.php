@@ -9,7 +9,7 @@ use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 /**
  * Подключает definitions.php: кеш тарифов по ID за интерфейсом домена.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ServiceProvider extends CoreServiceProvider
 {

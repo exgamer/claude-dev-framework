@@ -10,7 +10,7 @@ func modelToEntity(model *outboxTariffEvent) *outboxdomain.OutboxTariffEvent {
 		return nil
 	}
 
-	return &outboxdomain.OutboxTariffEvent{
+	return outboxdomain.RestoreOutboxTariffEvent(outboxdomain.OutboxTariffEvent{
 		ID:           model.ID,
 		TariffID:     model.TariffID,
 		ParkingID:    model.ParkingID,
@@ -19,10 +19,9 @@ func modelToEntity(model *outboxTariffEvent) *outboxdomain.OutboxTariffEvent {
 		GraceMinutes: model.GraceMinutes,
 		Price:        model.Price,
 		RoutingKey:   model.RoutingKey,
-		Status:       outboxdomain.Status(model.Status),
 		Attempts:     model.Attempts,
 		PublishedAt:  model.PublishedAt,
-	}
+	}, outboxdomain.Status(model.Status))
 }
 
 func entityToModel(entity *outboxdomain.OutboxTariffEvent) *outboxTariffEvent {
@@ -39,7 +38,7 @@ func entityToModel(entity *outboxdomain.OutboxTariffEvent) *outboxTariffEvent {
 		GraceMinutes: entity.GraceMinutes,
 		Price:        entity.Price,
 		RoutingKey:   entity.RoutingKey,
-		Status:       uint(entity.Status),
+		Status:       uint(entity.Status()),
 		Attempts:     entity.Attempts,
 		PublishedAt:  entity.PublishedAt,
 	}

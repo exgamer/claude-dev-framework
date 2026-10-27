@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Infrastructure\Http\PartnerBilling\Tariffs;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Infrastructure\Http\PartnerBilling\DTO\PartnerTariffRequestDto;
 use App\ParkingApp\Workflows\Billing\Tariffs\TariffNotifierInterface;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Utils\Components\Http\Enums\HttpRequestTypeEnum;
 use MPS\Utils\Components\Http\Factories\HttpClientFactory;
@@ -19,7 +19,7 @@ use MPS\Utils\Components\Http\Interfaces\HttpClientInterface;
 /**
  * Адаптер отправки тарифов в партнёрскую биллинговую систему (PartnerBilling).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PartnerBillingTariffsNotifier implements TariffNotifierInterface
 {
@@ -28,7 +28,7 @@ class PartnerBillingTariffsNotifier implements TariffNotifierInterface
     private readonly int $timeoutSeconds;
 
     /**
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function __construct(
         private readonly HttpClientInterface $client,
@@ -37,13 +37,13 @@ class PartnerBillingTariffsNotifier implements TariffNotifierInterface
         $baseUrl = $config->get('services.partner_billing.base_url');
 
         if (! is_string($baseUrl) || $baseUrl === '') {
-            throw new InvalidConfigurationAppException('Не задан PARTNER_BILLING_BASE_URL');
+            throw new ServerConfigurationException('Не задан PARTNER_BILLING_BASE_URL');
         }
 
         $timeoutSeconds = $config->get('services.partner_billing.timeout');
 
         if (! is_numeric($timeoutSeconds) || (int) $timeoutSeconds <= 0) {
-            throw new InvalidConfigurationAppException('Не задан PARTNER_BILLING_TIMEOUT');
+            throw new ServerConfigurationException('Не задан PARTNER_BILLING_TIMEOUT');
         }
 
         $this->baseUrl = rtrim($baseUrl, '/');

@@ -11,7 +11,7 @@ use MPS\Utils\Components\Queue\RabbitMQ\Consumer\Job as UtilsJob;
 /**
  * Обработчик handbook.parking.deactivated: парковку отключили в справочнике — её тарифы в архив.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingDeactivatedHandler extends UtilsJob
 {

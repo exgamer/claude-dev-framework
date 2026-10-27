@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 /**
  * Ответ 422 для Swagger: формат ошибки ApiResponseMiddleware, ошибки по полям — в details.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Response(
     response: 'ValidationError422',

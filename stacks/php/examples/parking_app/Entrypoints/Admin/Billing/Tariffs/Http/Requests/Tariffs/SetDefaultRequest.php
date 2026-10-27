@@ -9,7 +9,7 @@ use App\ParkingApp\Core\Requests\Request;
 /**
  * Сделать тариф тарифом по умолчанию: id пути — положительное целое (0 — 422).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class SetDefaultRequest extends Request
 {

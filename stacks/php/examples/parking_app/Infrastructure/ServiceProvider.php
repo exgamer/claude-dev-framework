@@ -9,7 +9,7 @@ use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 /**
  * Агрегатор провайдеров Infrastructure: биндинги репозиториев, адаптеров, миграции.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ServiceProvider extends BaseServiceProvider
 {

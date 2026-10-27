@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 /**
  * Описание API подпроекта и схемы авторизации для Swagger.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Info(version: '1.0', title: 'Parking API')]
 #[OA\SecurityScheme(

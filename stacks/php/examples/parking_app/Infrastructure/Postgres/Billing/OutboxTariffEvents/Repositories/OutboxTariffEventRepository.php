@@ -15,9 +15,9 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepository;
 use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
- * Outbox событий о тарифах: строка pending, смена статуса доставки, захват зависших на повтор одним UPDATE с FOR UPDATE SKIP LOCKED.
+ * Outbox событий о тарифах: запись, смена статуса доставки, захват зависших на повтор.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariffEventRepositoryInterface, TariffEventStatusRepositoryInterface
 {
@@ -37,6 +37,7 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
         $event = $this->getQuery()
             ->where('tariff_id', $tariffId)
             ->orderByDesc('id')
+            ->select(['id', 'status'])
             ->first();
 
         return $event?->status;
@@ -54,9 +55,9 @@ class OutboxTariffEventRepository extends CRUDRepository implements OutboxTariff
             'price' => $dto->getPrice(),
             'grace_minutes' => $dto->getGraceMinutes(),
             'routing_key' => $routingKey,
-            'status' => OutboxTariffEventStatusEnum::PENDING,
-            'attempts' => 0,
-        ])->save();
+        ])
+            ->initPending()
+            ->save();
 
         return $event;
     }

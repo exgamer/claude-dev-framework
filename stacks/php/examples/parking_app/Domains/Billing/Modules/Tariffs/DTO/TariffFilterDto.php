@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO;
 
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffSortEnum;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Enums\TariffStatusEnum;
 use MPS\Core\DataObjects\DataObject;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 
 /**
  * Условия списка тарифов: парковка, скоуп парковок администратора (обязателен явно), статус и сортировка.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffFilterDto extends DataObject
 {
@@ -50,12 +50,12 @@ class TariffFilterDto extends DataObject
      *
      * @return ?list<int>
      *
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function getParkingIds(): ?array
     {
         if (! $this->parkingIdsSet) {
-            throw new InvalidConfigurationAppException('Скоуп парковок в TariffFilterDto не выставлен: нужен setParkingIds()');
+            throw new ServerConfigurationException('Скоуп парковок в TariffFilterDto не выставлен: нужен setParkingIds()');
         }
 
         return $this->parkingIds;

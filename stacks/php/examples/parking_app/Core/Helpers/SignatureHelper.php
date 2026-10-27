@@ -11,7 +11,7 @@ use App\ParkingApp\Core\Http\Signature\SignedRequest;
 /**
  * HMAC-подпись машинного вызова: заголовок t=<unix ts>,n=<nonce>,v1=<hex HMAC-SHA256(secret, "{t}\n{n}\n{METHOD}\n{path?query}\n{body}")>.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class SignatureHelper
 {

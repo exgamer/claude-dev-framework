@@ -11,7 +11,7 @@
 
 ## Обработчик RabbitMQ
 
-Общие правила consumer — `approaches/patterns/async.md`, «Consumer». Тонкий, как контроллер: payload → DTO → сервис/workflow. Бизнес-логики нет; доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (`workflow-trusts-transport-request`). Повторная доставка безопасна (`approaches/patterns/idempotency.md`): обработчик проверяет текущий статус записи и выходит, если уже обработано.
+Общие правила consumer — `approaches/patterns/async.md`, «Consumer». Тонкий, как контроллер: payload → DTO → сервис/workflow. Бизнес-логики нет; доменные инварианты проверяет `{E}DtoValidator` в сервисе/workflow (`workflow-trusts-transport-request`). Повторная доставка безопасна (`approaches/patterns/idempotency.md`): обработчик проверяет текущий статус записи и выходит, если уже обработано; сам переход — по `regulations/entity.md`, «Переход состояния».
 
 ```php
 namespace App\YourApp\Entrypoints\Queue\YourDomain\YourModule;
@@ -52,7 +52,7 @@ class YourEventHandler extends UtilsJob
 - **временная** (внешняя система недоступна, сеть) — `OperationFailedAppException` наверх, сообщение уйдёт в повтор;
 - **постоянная** (битый payload, нет обязательного поля, нет конфигурации, запись не найдена и не появится) — зафиксировать (статус записи или `$this->errorLog(...)`) и `return`, без исключения. Своего исключения ядра для «битого payload» нет — не выдумывать.
 
-Почему: `UtilsJob::handle` ловит любое исключение из `process()`, пишет error-лог и Sentry и отправляет сообщение в повтор с задержками из `durability.delayed` конфига очереди, после последней — в failed_jobs. Для постоянной ошибки это N бесполезных попыток и N ошибок в Sentry. Пример: отказ — `markRejected` и `return`, `OperationFailedAppException` — `markFailed` и `throw`.
+Почему: `UtilsJob::handle` ловит любое исключение из `process()`, пишет error-лог и Sentry и отправляет сообщение в повтор с задержками из `durability.delayed` конфига очереди, после последней — в failed_jobs. Для постоянной ошибки это N бесполезных попыток и N ошибок в Sentry. Пример — эталонный `ParkingDeactivatedHandler`: нет `parking_id` — `errorLog` и `return`, сбой БД из Command — наверх, в повтор.
 
 ### Регистрация в `config/queue.php`
 
@@ -74,7 +74,7 @@ class YourEventHandler extends UtilsJob
 ],
 ```
 
-Отправка — `QueueManagerInterface::putInQueue()` (RabbitMQ V2, `rules.md`); после записи и вне транзакции (`../conventions.md` п. 17).
+Отправка — `QueueManagerInterface` (RabbitMQ V2, `rules.md`): `putInQueue()` — в очередь, `putInExchange()` — в exchange; после записи и вне транзакции (`../conventions.md` п. 17). Событие, которое должно уйти вместе с записью, — через outbox (`approaches/patterns/outbox.md`; в эталоне Command outbox публикует через `OutboxTariffEventPublisher` — `putInExchange`).
 
 ## Отложенное действие домена (Laravel Job)
 
@@ -104,7 +104,7 @@ class YourActionJob implements ShouldQueue
 }
 ```
 
-Образец — `stacks/php/examples/parking_app/Domains/Billing/Modules/Tariffs/Jobs/ActivatePlannedTariffJob.php` (Command — `.../Tariffs/Commands/ActivatePlannedTariffCommand.php`). Ставится из сервиса/workflow после коммита: `ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->scheduled_at)` (`../conventions.md` п. 17). В `handle()` — только вызов Command/сервиса своего домена: ни репозитория, ни проверок.
+Образец — `stacks/php/examples/parking_app/Domains/Billing/Modules/Tariffs/Jobs/ActivatePlannedTariffJob.php` (Command — `.../Tariffs/Commands/ActivatePlannedTariffCommand.php`). Ставится из сервиса/workflow сразу после коммита, первым из побочных эффектов: `ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->scheduled_at)`; страховка от потерянной постановки — крон, подбирающий просроченные (`../conventions.md` п. 17). В `handle()` — только вызов Command/сервиса своего домена: ни репозитория, ни проверок.
 
 ## Что куда
 

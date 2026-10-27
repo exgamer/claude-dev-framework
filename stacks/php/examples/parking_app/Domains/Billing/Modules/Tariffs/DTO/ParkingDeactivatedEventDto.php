@@ -9,7 +9,7 @@ use MPS\Core\DataObjects\DataObject;
 /**
  * Событие справочника handbook.parking.deactivated: парковку отключили.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingDeactivatedEventDto extends DataObject
 {

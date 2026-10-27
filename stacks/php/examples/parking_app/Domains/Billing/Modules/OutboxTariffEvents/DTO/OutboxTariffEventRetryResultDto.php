@@ -9,7 +9,7 @@ use MPS\Core\DataObjects\DataObject;
 /**
  * Итог прогона повтора зависших событий.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class OutboxTariffEventRetryResultDto extends DataObject
 {

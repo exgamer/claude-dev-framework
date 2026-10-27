@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Хост-middleware Admin в тесте маршрутов: вместо permission:{право} и resolve.admin.parkings —
  * пропускает запрос как super-admin (парковки без ограничения).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class SuperAdminMiddleware
 {

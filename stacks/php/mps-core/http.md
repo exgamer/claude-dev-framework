@@ -18,7 +18,6 @@
 use App\Http\Controllers\Controller;
 use App\YourApp\Core\Http\RequestHelper;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use MPS\Core\Exceptions\NotFoundAppException;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\Response;
@@ -46,7 +45,7 @@ class TariffController extends Controller
     }
 
     #[OA\Get(path: '/parking/admin/tariffs/{id}', summary: 'Тариф по ID', tags: ['Admin Parking: Тарифы'], /* … */)]
-    public function view(int $id, Request $request): JsonResponse
+    public function view(int $id, ViewRequest $request): JsonResponse   // id пути проверяет Request: abc, 0 — 422 (п. 20)
     {
         $tariff = $this->service->findById($id, RequestHelper::getParkingIds($request));
         if (! $tariff) {
@@ -77,7 +76,7 @@ class TariffController extends Controller
     }
 
     #[OA\Delete(path: '/parking/admin/tariffs/{id}', summary: 'Удаление тарифа', tags: ['Admin Parking: Тарифы'], /* … */)]
-    public function delete(int $id, Request $request): JsonResponse
+    public function delete(int $id, DeleteRequest $request): JsonResponse   // DeleteRequest — то же правило id, что у ViewRequest
     {
         $this->service->deleteById($id, RequestHelper::getParkingIds($request));   // скоуп — аргументом (п. 19a)
 
@@ -136,6 +135,9 @@ class IndexRequest extends Request
         ];
     }
 }
+
+// ViewRequest, DeleteRequest, {Action}Request: id пути — поле Request (базовый Request кладёт параметры пути в данные валидации, п. 20)
+'id' => ['required', 'integer', 'gt:0', 'max:' . self::ID_MAX],
 ```
 
 Query-параметры `IndexRequest` описываются `#[OA\Parameter]` (на классе Request с `parameter:`-именами, ссылки из контроллера — `ref: '#/components/parameters/…'`, как в эталоне).

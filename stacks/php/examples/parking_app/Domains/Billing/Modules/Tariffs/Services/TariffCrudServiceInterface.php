@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Services;
 
 use App\ParkingApp\Core\Database\Query\Page;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\NotFoundAppException;
+use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Core\Exceptions\ValidationAppException;
 
 /**
- * Чтение и изменение тарифов с проверкой скоупа парковок и доменных инвариантов; переходы состояния —
- * Command на каждый (SetDefaultTariffCommand, ActivatePlannedTariffCommand, DeactivateParkingTariffsCommand).
+ * Чтение и изменение тарифов с проверкой скоупа парковок и доменных инвариантов.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface TariffCrudServiceInterface
 {
@@ -32,15 +32,23 @@ interface TariffCrudServiceInterface
     /**
      * Скоуп парковок — полем фильтра (TariffFilterDto::setParkingIds, выставляет контроллер); не выставлен — исключение.
      *
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function paginate(TariffFilterDto $filter, Page $page): LengthAwarePaginator;
 
     /**
-     * С датой активации тариф создаётся запланированным (SCHEDULED), без неё — действующим (ACTIVE); не по умолчанию —
-     * начальное состояние задаёт Tariff::initState().
+     * Доменные инварианты DTO (TariffDtoValidator); нарушены — 422 по полям. Сценарий зовёт до внешних вызовов и транзакции.
      *
      * @throws ValidationAppException
+     */
+    public function assertValid(TariffDto $dto): void;
+
+    /**
+     * С датой активации тариф создаётся запланированным (SCHEDULED), без неё — действующим (ACTIVE); не по умолчанию —
+     * начальное состояние задаёт Tariff::initState(). Возвращает перечитанную запись: колонки с DEFAULT БД заполнены.
+     *
+     * @throws ValidationAppException
+     * @throws OperationFailedAppException созданный тариф не перечитан
      */
     public function create(TariffDto $dto): Tariff;
 

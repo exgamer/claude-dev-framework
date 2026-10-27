@@ -57,8 +57,9 @@ func (r *OutboxTariffEventRepository) FindByID(_ context.Context, id uint) (*out
 func (r *OutboxTariffEventRepository) MarkPublished(_ context.Context, id uint) error {
 	if item, ok := r.Items[id]; ok && item.IsDeliverable() {
 		now := time.Now()
-		item.Status = outboxdomain.StatusPublished
-		item.PublishedAt = &now
+		published := outboxdomain.RestoreOutboxTariffEvent(*item, outboxdomain.StatusPublished)
+		published.PublishedAt = &now
+		r.Items[id] = published
 		r.UpdatedAt[id] = now
 	}
 
@@ -119,7 +120,7 @@ func (r *OutboxTariffEventRepository) MakeStale(id uint, age time.Duration) {
 
 func (r *OutboxTariffEventRepository) setStatus(id uint, status outboxdomain.Status) {
 	if item, ok := r.Items[id]; ok && item.IsDeliverable() {
-		item.Status = status
+		r.Items[id] = outboxdomain.RestoreOutboxTariffEvent(*item, status)
 		r.UpdatedAt[id] = time.Now()
 	}
 }

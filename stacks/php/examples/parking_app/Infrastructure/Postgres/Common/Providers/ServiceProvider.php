@@ -9,7 +9,7 @@ use MPS\Core\Modules\ModuleServiceProvider as CoreServiceProvider;
 /**
  * Подключает миграции схемы parking и функции on_update_current_timestamp и definitions.php менеджера транзакций.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ServiceProvider extends CoreServiceProvider
 {

@@ -12,7 +12,7 @@ use Tests\TestCase;
 /**
  * Границы списка: page 0 — первая страница, глубже 10000 — 422; parking_id — положительный в пределах bigint; per_page ≤ 100.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class IndexRequestTest extends TestCase
 {

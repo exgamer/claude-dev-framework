@@ -10,7 +10,7 @@ use MPS\Core\Components\CRUD\Repositories\Database\Eloquent\CRUDRepositoryInterf
 /**
  * Парковки домена Catalog для workflow Billing: существование (oneById ядра) и наибольшая длительность стоянки.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface ParkingRepositoryInterface extends CRUDRepositoryInterface
 {

@@ -19,7 +19,7 @@ use ReflectionProperty;
  * Переходы — условный UPDATE (0 строк — false); уникальность тарифа по умолчанию: нарушение именно этого индекса
  * (SQLSTATE 23505 + имя) — false, другое — наверх.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffRepositoryTest extends TestCase
 {

@@ -10,7 +10,7 @@ use OpenApi\Attributes as OA;
 /**
  * Query тарифа по умолчанию: parking_id обязателен — у парковки один тариф по умолчанию.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Parameter(
     parameter: 'TariffsViewDefaultRequestParkingId',

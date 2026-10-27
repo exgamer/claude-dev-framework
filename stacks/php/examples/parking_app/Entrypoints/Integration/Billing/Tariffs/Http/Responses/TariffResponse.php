@@ -14,7 +14,7 @@ use OpenApi\Attributes as OA;
  *
  * @property Tariff $resource
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(
     schema: 'IntegrationTariffResponse',

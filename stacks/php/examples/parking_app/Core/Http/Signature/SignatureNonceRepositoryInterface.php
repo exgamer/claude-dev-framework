@@ -7,7 +7,7 @@ namespace App\ParkingApp\Core\Http\Signature;
 /**
  * Использованные nonce подписей машинного вызова.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 interface SignatureNonceRepositoryInterface
 {

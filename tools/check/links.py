@@ -8,6 +8,8 @@
 отбрасываются), от stacks/go, stacks/php, stacks, skills (сокращения go-sdk/…, mps-core/…, dev-go/SKILL.md).
 {a,b} раскрывается в оба варианта. Не проверяются: core/decisions-log.md (история), справочники official/ и
 reference/ (копии чужой документации), пути проекта (docs/, .claude/, internal/ и т. п.) и шаблоны из IGNORE.
+Орфаны: рёбра — как у roles.py (голое имя и хвост пути — через resolve_loose); журналы (JOURNALS) рёбер не дают —
+файл, на который ссылается только журнал, роли не прочтут.
 """
 import itertools
 import os
@@ -19,6 +21,7 @@ ENTRY_DIRS = ("skills/", "agents/")
 ENTRY_FILES = ("README.md",)
 BASES = ("", "stacks/go", "stacks/php", "stacks", "skills")
 SKIP_SOURCES = ("core/decisions-log.md", "CHANGELOG.md")  # история: упоминает и удалённые файлы
+JOURNALS = SKIP_SOURCES + ("core/backlog.md",)  # журналы: роли по ним не ходят — для орфанов рёбер не дают
 SKIP_SOURCE_PARTS = ("/official/", "/reference/")
 # Пути внутри проекта пользователя или вне фреймворка — их в репозитории нет по определению
 PROJECT_PREFIXES = ("docs/", ".claude/", "internal/", "cmd/", "pkg/", "parking_app/", "app/", "App/", "review_result/",
@@ -84,6 +87,8 @@ def resolve_loose(src, token, known, line="", pos=0):
     if near in known:
         return near
     same = sorted(f for f in known if f == bare or f.endswith("/" + bare))
+    if not any(p.strip("/") in bare.split("/") for p in SKIP_SOURCE_PARTS):  # голое имя — не копия чужой документации
+        same = [f for f in same if not any(p in f for p in SKIP_SOURCE_PARTS)] or same
     if len(same) > 1 and not token.startswith(("{DF}/", "~/")):  # одно имя в двух стеках: base-пути resolve выбрали бы Go
         stack = stack_near(src, line, pos)
         pick = [f for f in same if stack and f.startswith(f"stacks/{stack}/")]
@@ -104,16 +109,16 @@ def main():
         for line_no, line in enumerate(text.split("\n"), 1):
             for match in PATH_RE.finditer(line):
                 token = match.group(0)
-                if IGNORE.search(token) or token.startswith(("http", "//")):
+                if IGNORE.search(token) or token.startswith(("http://", "https://", "//")):
                     continue
                 variants = expand(token)
                 resolved = [resolve(doc, v, known) for v in variants]
-                targets.update(r for r in resolved if r)
+                targets.update(r for r in (resolve_loose(doc, v, known, line, match.start()) for v in variants) if r)
                 lost = [v for v, r in zip(variants, resolved) if r is None and "/" in v]
                 lost = [v for v in lost if not v.removeprefix("./").startswith(PROJECT_PREFIXES)]
                 if check and lost:
                     broken.append(f"{doc}:{line_no} → {', '.join(lost)}")
-        edges[doc] = targets
+        edges[doc] = set() if doc in JOURNALS else targets
 
     seen, stack = set(), [d for d in docs if d.startswith(ENTRY_DIRS)] + list(ENTRY_FILES)
     while stack:

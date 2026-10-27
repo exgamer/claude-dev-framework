@@ -14,7 +14,7 @@ use Throwable;
 /**
  * Переход Activate: он становится действующим и тарифом по умолчанию, прежний по умолчанию — в архив.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class ActivatePlannedTariffCommand
 {

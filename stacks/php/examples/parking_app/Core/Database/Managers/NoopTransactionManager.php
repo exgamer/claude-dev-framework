@@ -7,7 +7,7 @@ namespace App\ParkingApp\Core\Database\Managers;
 /**
  * Менеджер транзакций без БД для тестов: callback выполняется сразу.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class NoopTransactionManager implements TransactionManagerInterface
 {

@@ -2,8 +2,7 @@ package tariff
 
 import "example.com/parking-service/internal/common"
 
-// Tariff Тариф парковки. Состояние (по умолчанию, активность) — неэкспортируемое: меняется только методами перехода,
-// из хранилища собирается RestoreTariff
+// Tariff Тариф парковки
 type Tariff struct {
 	ID        uint
 	ParkingID uint

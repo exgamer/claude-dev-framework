@@ -7,7 +7,7 @@ namespace App\ParkingApp\Core\Http\Signature;
 /**
  * Сообщение с меткой времени и nonce отправителя — то, что подписывается.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final readonly class SignedRequest
 {

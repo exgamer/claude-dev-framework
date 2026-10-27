@@ -23,11 +23,12 @@ use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use PDOException;
 use PHPUnit\Framework\TestCase;
+use ValueError;
 
 /**
- * Повтор зависших событий: пачки, сбой одного события — в трекер и дальше, ошибка выборки — наверх.
+ * Повтор зависших событий: пачки, сбой или ошибка одного события — в трекер и дальше, ошибка выборки — наверх.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class RetryOutboxTariffEventsCommandTest extends TestCase
 {
@@ -39,6 +40,9 @@ class RetryOutboxTariffEventsCommandTest extends TestCase
 
     /** Событие, на котором брокер отказывает */
     private const BROKEN_ID = 2;
+
+    /** Событие, на котором публикатор падает не сбоем брокера */
+    public const POISON_ID = 9;
 
     private OutboxTariffEventRepositoryInterface&MockInterface $repository;
 
@@ -77,6 +81,27 @@ class RetryOutboxTariffEventsCommandTest extends TestCase
         $result = $command->execute();
 
         $this->assertSame(2, $result->getPublished());
+        $this->assertSame(1, $result->getFailed());
+    }
+
+    public function test_poison_event_does_not_stop_run(): void
+    {
+        $this->repository
+            ->shouldReceive('claimForRetry')
+            ->twice()
+            ->andReturn([self::POISON_ID, 3], []);
+        $this->repository->shouldReceive('oneById')->once()->with(self::POISON_ID)->andReturn($this->event(self::POISON_ID));
+        $this->repository->shouldReceive('oneById')->once()->with(3)->andReturn($this->event(3));
+        $this->repository->shouldReceive('markPublished')->once()->with(3)->andReturn(true);
+        $this->exceptionHandler
+            ->shouldReceive('report')
+            ->once()
+            ->with(Mockery::type(ValueError::class));
+
+        $command = $this->command();
+        $result = $command->execute();
+
+        $this->assertSame(1, $result->getPublished());
         $this->assertSame(1, $result->getFailed());
     }
 
@@ -128,6 +153,10 @@ class RetryOutboxTariffEventsCommandTest extends TestCase
             {
                 if ($eventId === $this->brokenId) {
                     throw new OperationFailedAppException('RabbitMQ недоступен');
+                }
+
+                if ($eventId === RetryOutboxTariffEventsCommandTest::POISON_ID) {
+                    throw new ValueError('Тело события не сериализуется');
                 }
             }
         };

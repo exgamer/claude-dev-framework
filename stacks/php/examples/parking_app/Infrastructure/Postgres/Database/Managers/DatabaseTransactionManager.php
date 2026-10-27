@@ -11,7 +11,7 @@ use Throwable;
 /**
  * Менеджер транзакций на соединении БД по умолчанию.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class DatabaseTransactionManager implements TransactionManagerInterface
 {

@@ -64,6 +64,9 @@ FOOTER = """    errcheck:
       forbid:
         - pattern: '^context\\.(Background|TODO)$'
           msg: "в бизнес-коде ctx приходит параметром; Background — только в main/console/тестах"
+        # отладочный вывод — во всём коде, включая тесты и точки запуска (debug-output-left, checklist.md п. 52)
+        - pattern: '^(fmt\\.Print(f|ln)?|print|println)$'
+          msg: "отладочный вывод — логгер SDK (logger.*), в тесте — t.Log"
       analyze-types: false
     nlreturn:
       block-size: 1
@@ -79,15 +82,19 @@ FOOTER = """    errcheck:
       # main, cmd/, console, app — точки запуска: корневой ctx создаётся здесь (conventions.md п. 1)
       - path: '(^|/)(main\\.go|cmd/|internal/console/|internal/app/)'
         linters: [forbidigo]
+        text: 'context\\.(Background|TODO)'
       # тесты создают свой ctx — правило о бизнес-коде (conventions.md п. 1)
       - path: '_test\\.go$'
         linters: [forbidigo]
+        text: 'context\\.(Background|TODO)'
       # ctx — правило бизнес-кода (conventions.md п. 1): pkg/ и миграции — не бизнес-код
       - path: '(^|/)(pkg/|internal/migrations/)'
         linters: [forbidigo]
+        text: 'context\\.(Background|TODO)'
       # код тестов вне _test.go (structure.md): e2e-обвязка tests/ и общие фейки internal/testsupport/
       - path: '(^|/)(tests/|internal/testsupport/)'
         linters: [forbidigo]
+        text: 'context\\.(Background|TODO)'
       # var-naming — только аббревиатуры (checklist.md п. 34); ALL_CAPS и подчёркивания правило фреймворка не запрещает
       - linters: [revive]
         text: "(don't use ALL_CAPS|don't use an underscore|don't use underscores|should not use underscores)"
@@ -114,6 +121,9 @@ def module_of(project: Path) -> str:
     return m.group(1)
 
 
+GO_SHARED = ("common", "shared")
+
+
 def domains_of(project: Path):
     root = project / "internal" / "domains"
     return sorted(p.name for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
@@ -121,9 +131,10 @@ def domains_of(project: Path):
 
 def render_go(project: Path) -> str:
     mod, domains = module_of(project), domains_of(project)
-    # internal/domains/common — общий модуль проекта внутри domains (не домен): его знает любой домен, он — ни одного
-    shared = "common" in domains
-    domains = [d for d in domains if d != "common"]
+    # internal/domains/common, internal/domains/shared — общий модуль проекта внутри domains (не домен): его знает любой домен,
+    # он — ни одного
+    shared = [d for d in domains if d in GO_SHARED]
+    domains = [d for d in domains if d not in GO_SHARED]
     out = [HEADER]
     out.append('        domain-no-infra:\n          files:\n            - "**/internal/domains/**"\n'
                '            - "!$test" # правило — о коде пакета, тесты памятка не ограничивает\n          deny:\n')
@@ -153,14 +164,14 @@ def render_go(project: Path) -> str:
             if not others:
                 continue
             desc = ("общее домена модулей не знает" if m == "common"
-                    else f"соседний модуль домена {d} — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/{d}/common")
+                    else f"соседний модуль домена {d} — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/{d}/common")
             out.append(f'        {d}-{m.replace("_", "-")}-no-other-modules:\n          files:\n            - "**/internal/domains/{d}/{m}/**"\n'
                        '            - "!$test"\n          deny:\n')
             for o in others:
                 out.append(deny(f"{mod}/internal/domains/{d}/{o}$", desc))
                 out.append(deny(f"{mod}/internal/domains/{d}/{o}/", desc))
-    if shared and domains:
-        out.append('        domains-common-no-domains:\n          files:\n            - "**/internal/domains/common/**"\n'
+    for s in shared if domains else []:
+        out.append(f'        domains-{s}-no-domains:\n          files:\n            - "**/internal/domains/{s}/**"\n'
                    '            - "!$test"\n          deny:\n')
         for other in domains:
             out.append(deny(f"{mod}/internal/domains/{other}", "общий модуль домены не знает — то же правило, что internal/common (common-with-logic)"))
@@ -242,8 +253,8 @@ def run_go(project: Path, base):
     if base:
         cmd += ["--new-from-rev", base]
     found = domains_of(project)
-    shared = " (internal/domains/common — общий модуль, не домен)" if "common" in found else ""
-    print(f"домены (правила «домен не импортирует другой»): {', '.join(d for d in found if d != 'common') or 'нет internal/domains'}{shared}", flush=True)
+    shared = "".join(f" (internal/domains/{s} — общий модуль, не домен)" for s in found if s in GO_SHARED)
+    print(f"домены (правила «домен не импортирует другой»): {', '.join(d for d in found if d not in GO_SHARED) or 'нет internal/domains'}{shared}", flush=True)
     print(f"конфиг: {cfg}\n$ {' '.join(cmd + ['./...'])}", flush=True)
     env = dict(os.environ, PWD=str(project))  # $PWD — алиас-симлинк проекта даёт ложный «0 issues»
     res = subprocess.run(cmd + ["./..."], cwd=project, env=env, capture_output=True, text=True)
@@ -252,7 +263,36 @@ def run_go(project: Path, base):
     if res.returncode and re.search(r"_test\.go:\d+:\d+: .*\(typecheck\)", out):
         print("тесты проекта не компилируются — анализ без тестов (--tests=false); ошибка тестов — проблема проекта:", flush=True)
         print("\n".join(l for l in out.splitlines() if "_test.go" in l and "(typecheck)" in l), flush=True)
-        res = subprocess.run(cmd + ["--tests=false", "./..."], cwd=project, env=env, capture_output=True, text=True)
+        cmd = cmd + ["--tests=false"]
+        res = subprocess.run(cmd + ["./..."], cwd=project, env=env, capture_output=True, text=True)
+        out = res.stdout + res.stderr
+    # Код проекта (не тесты) не компилируется — golangci выдаёт только typecheck и молча выключает остальные правила и для
+    # собирающихся пакетов: причина — строкой, повтор без сломанных пакетов (и без пакетов, которые от них не собираются)
+    broken: set[str] = set()
+    for _ in range(3):
+        # при ошибке типизации golangci выдаёт только typecheck — каждая строка с позицией в нём относится к ней; сообщение
+        # бывает многострочным (`could not import …` у пакета, который зависит от сломанного)
+        errs = [l for l in out.splitlines() if re.match(r"\S+?\.go:\d+:\d+: ", l) and "_test.go:" not in l.split(": ")[0]] \
+            if "(typecheck)" in out else []
+        new = {os.path.dirname(l.split(":")[0]) or "." for l in errs}
+        if not new - broken:
+            break
+        broken |= new
+        print(f"код проекта не компилируется: {', '.join(sorted(broken))} — проблема проекта; анализ — без них и без пакетов, "
+              "которые их импортируют:", flush=True)
+        print("\n".join("  " + l.removesuffix(" (typecheck)") for l in errs), flush=True)
+        fmt = "{{.Dir}}\t{{.ImportPath}}\t{{join .Deps \" \"}}\t{{join .TestImports \" \"}} {{join .XTestImports \" \"}}"
+        listed = subprocess.run(["go", "list", "-e", "-f", fmt, "./..."], cwd=project, env=env, capture_output=True, text=True).stdout
+        pkgs = [(os.path.relpath(d, project), ip, set(deps.split()), set(tests.split())) for d, ip, deps, tests in
+                (l.split("\t") for l in listed.splitlines() if l.count("\t") == 3)]
+        bad = {ip for rel, ip, _, _ in pkgs if rel in broken}
+        bad |= {ip for _, ip, deps, _ in pkgs if deps & bad}  # импортирует сломанный (и через другие пакеты)
+        rest = sorted("./" + rel for rel, ip, _, tests in pkgs if ip not in bad and not tests & bad)  # тесты — тоже
+        if not rest:
+            print("собирающихся пакетов нет — правила golangci не проверялись", flush=True)
+            out = ""
+            break
+        res = subprocess.run(cmd + rest, cwd=project, env=env, capture_output=True, text=True)
         out = res.stdout + res.stderr
     sys.stdout.write(out)
     # правила без линтера в golangci (имена файлов, теги validate, SetTimeout пагинатора) — свой анализатор по AST
@@ -291,34 +331,97 @@ def container_path(container: str, host: Path) -> str:
     sys.exit(f"проект {host} не смонтирован в контейнер {container}")
 
 
-def php_namespace(project: Path, sub: str) -> str:
+def psr4_of(project: Path) -> dict[str, str]:
+    """psr-4 проекта: каталог (без `/` по краям) → неймспейс (без `\\` в конце)."""
     import json
     psr4 = json.loads((project / "composer.json").read_text(encoding="utf-8")).get("autoload", {}).get("psr-4", {})
-    for ns, path in psr4.items():
-        for p in (path if isinstance(path, list) else [path]):
-            if p.strip("/") == sub.strip("/"):
-                return ns.rstrip("\\")
-    sys.exit(f"нет psr-4 для {sub} в composer.json проекта")
+    return {p.strip("/"): ns.rstrip("\\") for ns, path in psr4.items() for p in (path if isinstance(path, list) else [path])}
 
 
-def phpstan_run(cpath: str, sub: str, work: str, files: list[str]) -> tuple[str, str]:
+def php_namespace(project: Path, sub: str) -> str:
+    ns = psr4_of(project).get(sub.strip("/"))
+    return ns if ns is not None else sys.exit(f"нет psr-4 для {sub} в composer.json проекта")
+
+
+def src_domains(project: Path, sub: str, root: str, domains: list[str]) -> tuple[set[str], list[str]]:
+    """Домены с раскладкой `Domains/{Домен}/src/Modules` и psr-4 `Domains/{Домен}/src` → `{root}\\Domains\\{Домен}` — их модули
+    в том же неймспейсе, что `Domains/{Домен}/Modules/*`; без такого psr-4 неймспейс модуля не известен — правил модулей нет."""
+    psr4, ok, skipped = psr4_of(project), set(), []
+    for d in domains:
+        if not (project / sub / "Domains" / d / "src" / "Modules").is_dir():
+            continue
+        if psr4.get(f"{sub.strip('/')}/Domains/{d}/src") == f"{root}\\Domains\\{d}":
+            ok.add(d)
+        else:
+            skipped.append(d)
+    return ok, skipped
+
+
+def phpstan_run(cpath: str, sub: str, work: str, files: list[str], tools: str = PHP_TOOLS) -> tuple[str, str]:
     """Конфиг phpstan и команда: изменённые файлы (--base) — в parameters.paths конфига, не аргументами командной строки
-    (тысячи путей через `docker exec` — «argument list too long»); без файлов — весь подпроект."""
+    (тысячи путей через `docker exec` — «argument list too long»); без файлов — весь подпроект. `tools` — каталог
+    инструментов в контейнере (доказательство подставляет стенд)."""
     paths = "".join("        - '" + f.replace("'", "''") + "'\n" for f in files) if files else f"        - {cpath}/{sub}\n"
     neon = f"""includes:
-    - {PHP_TOOLS}/vendor/phpat/phpat/extension.neon
-    - {PHP_TOOLS}/vendor/spaze/phpstan-disallowed-calls/extension.neon
+    - {tools}/vendor/phpat/phpat/extension.neon
+    - {tools}/vendor/spaze/phpstan-disallowed-calls/extension.neon
     - rules.neon
 
 parameters:
     customRulesetUsed: true
+    # `@phpstan-ignore` проекта под его проверки уровня здесь «лишний» (уровня нет) — не находка правила фреймворка
+    reportUnmatchedIgnoredErrors: false
     paths:
 {paths}    bootstrapFiles:
         - {cpath}/vendor/autoload.php
     tmpDir: {work}/cache
 """
-    cmd = f"cd {cpath} && php -d memory_limit=2G {PHP_TOOLS}/vendor/bin/phpstan analyse -c {work}/phpstan.neon --no-progress"
+    cmd = f"cd {cpath} && php -d memory_limit=2G {tools}/vendor/bin/phpstan analyse -c {work}/phpstan.neon --no-progress --error-format=json"
     return neon, cmd
+
+
+PHPSTAN_CLASS = re.compile(r"^Class ([\w\\]+) is forbidden")
+PHPSTAN_NAMESPACE = re.compile(r"^Namespace ([\w\\]+) is forbidden")
+
+
+def phpstan_report(stdout: str, stderr: str, cpath: str) -> tuple[str, int | None]:
+    """Вывод phpstan (`--error-format=json`) — строками `файл:строка: сообщение 🪪 identifier` и итогом в виде phpstan
+    (`[OK] No errors` / `[ERROR] Found N errors`); код — 1 при находках, None — json не разобран (вывод как есть).
+    `use` запрещённого класса (disallowed.namespace) при его же вызове в файле (disallowed.class) — одно нарушение: не печатается."""
+    import json
+    noise = lambda l: "Deprecated: PHP Startup" in l or not l.strip()  # noqa: E731
+    data = next((l for l in stdout.splitlines() if l.startswith('{"totals"')), None)
+    try:
+        res = json.loads(data) if data else None
+    except ValueError:
+        res = None
+    if res is None:
+        return "\n".join(l for l in (stdout + stderr).splitlines() if "Deprecated: PHP Startup" not in l) + "\n", None
+    out, n, merged = [], 0, 0
+    files = res.get("files") or {}  # пустой — `{}` (stdClass), на всякий случай и `[]`
+    for path, f in sorted(files.items() if isinstance(files, dict) else []):
+        msgs = f.get("messages", [])
+        called = {m.group(1) for x in msgs if x.get("identifier") == "disallowed.class" and (m := PHPSTAN_CLASS.match(x["message"]))}
+        rel = path[len(cpath) + 1:] if path.startswith(cpath + "/") else path
+        for x in sorted(msgs, key=lambda x: x.get("line") or 0):
+            m = PHPSTAN_NAMESPACE.match(x["message"]) if x.get("identifier") == "disallowed.namespace" else None
+            if m and m.group(1) in called:
+                merged += 1
+                continue
+            n += 1
+            ident = f" 🪪 {x['identifier']}" if x.get("identifier") else ""
+            out.append(f"{rel}:{x.get('line') or 0}: {' '.join(x['message'].split())}{ident}")
+            if x.get("tip"):
+                out.append(f"    💡 {' '.join(x['tip'].split())}")
+    for e in res.get("errors", []):
+        n += 1
+        out.append(f"phpstan: {' '.join(str(e).split())}")
+    out += [l for l in stderr.splitlines() if not noise(l)]
+    if merged:
+        out.append(f"phpstan: use запрещённого класса при его вызове в том же файле — одна находка (disallowed.class), "
+                   f"disallowed.namespace не печатается: {merged}")
+    out.append(f" [ERROR] Found {n} error{'s' if n != 1 else ''}" if n else " [OK] No errors")
+    return "\n".join(out) + "\n", 1 if n else 0
 
 
 def run_php(project: Path, sub: str, container: str, base, no_install=False):
@@ -327,6 +430,7 @@ def run_php(project: Path, sub: str, container: str, base, no_install=False):
     root = php_namespace(project, sub)
     dom_dir = project / sub / "Domains"
     domains = sorted(p.name for p in dom_dir.iterdir() if p.is_dir()) if dom_dir.is_dir() else []
+    src_ok, src_skipped = src_domains(project, sub, root, domains)
     cpath = container_path(container, project)
     tag = hashlib.sha1(str(project).encode()).hexdigest()[:8]
     work = f"{PHP_TOOLS}/{project.name}-{tag}"
@@ -345,7 +449,7 @@ def run_php(project: Path, sub: str, container: str, base, no_install=False):
             return 2
     docker(container, f"mkdir -p {work}/cache")
     docker(container, f"mkdir -p {PHP_TOOLS}/rules/P{tag}")
-    docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/LayersArchitecture.php", php_rules.render_arch(ns, root, domains, php_rules.domain_modules(dom_dir)))
+    docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/LayersArchitecture.php", php_rules.render_arch(ns, root, domains, php_rules.domain_modules(dom_dir, src_ok)))
     for name, code in php_rules.render_own_rules(ns).items():
         docker(container, f"cat > {PHP_TOOLS}/rules/P{tag}/{name}.php", code)
     docker(container, f"cat > {work}/rules.neon", php_rules.render_neon(ns + "\\LayersArchitecture"))
@@ -362,16 +466,20 @@ def run_php(project: Path, sub: str, container: str, base, no_install=False):
             return 0
     neon, cmd = phpstan_run(cpath, sub, work, files)
     docker(container, f"cat > {work}/phpstan.neon", neon)  # через stdin — длина списка файлов не ограничена
-    shared = f" ({sub}/Domains/Common — общий модуль, не домен)" if "Common" in domains else ""
-    print(f"домены (правила «домен не знает другие»): {', '.join(d for d in domains if d != 'Common') or 'нет ' + sub + '/Domains'}{shared}", flush=True)
+    shared = "".join(f" ({sub}/Domains/{s} — общий модуль, не домен)" for s in domains if s in php_rules.SHARED)
+    print(f"домены (правила «домен не знает другие»): {', '.join(d for d in domains if d not in php_rules.SHARED) or 'нет ' + sub + '/Domains'}{shared}", flush=True)
+    if src_skipped:
+        print(f"модули в Domains/{{Домен}}/src/Modules без psr-4 `{sub}/Domains/{{Домен}}/src` → `{root}\\Domains\\{{Домен}}` — "
+              f"правил модулей нет: {', '.join(src_skipped)}", flush=True)
     print(f"правила: {container}:{work}\n$ {cmd}", flush=True)
-    r = docker(container, cmd + " 2>&1")
-    sys.stdout.write("\n".join(l for l in r.stdout.splitlines() if "Deprecated: PHP Startup" not in l) + "\n")
+    r = docker(container, cmd)
+    report, code = phpstan_report(r.stdout, r.stderr, cpath)
+    sys.stdout.write(report)
     # маршруты (api.response первым, id в пути без ограничения, 403 у permission:) — разбором routes.php на хосте, без PHP
     import php_routes
     sys.stdout.flush()
     routes = php_routes.main([str(project / sub), root] + (["--base", base] if base else []))  # с --base — добавленные строки
-    return r.returncode or routes
+    return (r.returncode if code is None else code) or routes
 
 
 RULES_TABLE = Path(__file__).resolve().parent.parent / "check" / "lint-proof" / "RULES.md"
@@ -432,6 +540,9 @@ def main():
         sys.stdout.write("\n" + remainder(stack))
         if "--tests=false" in tee.text():
             sys.stdout.write("тесты проекта не компилируются — прогон шёл без тестов: тесты задачи по правилам списка — глазами целиком\n")
+        if m := re.findall(r"^код проекта не компилируется: (.+?) — проблема проекта", tee.text(), re.M):
+            sys.stdout.write(f"пакеты {m[-1]} не компилируются — golangci не проверял их и пакеты, которые их импортируют: код задачи в них "
+                             "по правилам списка — глазами целиком\n")
     else:
         sys.stdout.write("\nпрогон не дошёл до конца — остатка нет: пункты памятки проверяются целиком\n")
     return code

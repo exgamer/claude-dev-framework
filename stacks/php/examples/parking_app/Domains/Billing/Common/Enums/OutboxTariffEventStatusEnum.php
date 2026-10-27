@@ -11,7 +11,7 @@ use OpenApi\Attributes as OA;
 /**
  * Статус доставки события о тарифе в RabbitMQ.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(schema: 'OutboxTariffEventStatusEnum', type: 'string', enum: [
     OutboxTariffEventStatusEnum::PENDING->value,
@@ -57,10 +57,5 @@ enum OutboxTariffEventStatusEnum: string implements Enumerable
         }
 
         return $values;
-    }
-
-    public function isDeliverable(): bool
-    {
-        return in_array($this, self::deliverable(), true);
     }
 }

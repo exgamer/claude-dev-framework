@@ -71,36 +71,36 @@ linters:
             - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/domains/billing/tariff$"
-              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/billing/common"
             - pkg: "example.com/parking-service/internal/domains/billing/tariff/"
-              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/billing/common"
         billing-tariff-no-other-modules:
           files:
             - "**/internal/domains/billing/tariff/**"
             - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/domains/billing/outbox_tariff_event$"
-              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/billing/common"
             - pkg: "example.com/parking-service/internal/domains/billing/outbox_tariff_event/"
-              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/billing/common"
+              desc: "соседний модуль домена billing — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/billing/common"
         identity-admin-no-other-modules:
           files:
             - "**/internal/domains/identity/admin/**"
             - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/domains/identity/partner$"
-              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/identity/common"
             - pkg: "example.com/parking-service/internal/domains/identity/partner/"
-              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/identity/common"
         identity-partner-no-other-modules:
           files:
             - "**/internal/domains/identity/partner/**"
             - "!$test"
           deny:
             - pkg: "example.com/parking-service/internal/domains/identity/admin$"
-              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/identity/common"
             - pkg: "example.com/parking-service/internal/domains/identity/admin/"
-              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (O-6, modules.go), общее — internal/domains/identity/common"
+              desc: "соседний модуль домена identity — связь через интерфейс модуля-потребителя (modules.go), общее — internal/domains/identity/common"
         workflow-no-workflow:
           files:
             - "**/internal/workflows/**"
@@ -152,6 +152,9 @@ linters:
       forbid:
         - pattern: '^context\.(Background|TODO)$'
           msg: "в бизнес-коде ctx приходит параметром; Background — только в main/console/тестах"
+        # отладочный вывод — во всём коде, включая тесты и точки запуска (debug-output-left, checklist.md п. 52)
+        - pattern: '^(fmt\.Print(f|ln)?|print|println)$'
+          msg: "отладочный вывод — логгер SDK (logger.*), в тесте — t.Log"
       analyze-types: false
     nlreturn:
       block-size: 1
@@ -167,15 +170,19 @@ linters:
       # main, cmd/, console, app — точки запуска: корневой ctx создаётся здесь (conventions.md п. 1)
       - path: '(^|/)(main\.go|cmd/|internal/console/|internal/app/)'
         linters: [forbidigo]
+        text: 'context\.(Background|TODO)'
       # тесты создают свой ctx — правило о бизнес-коде (conventions.md п. 1)
       - path: '_test\.go$'
         linters: [forbidigo]
+        text: 'context\.(Background|TODO)'
       # ctx — правило бизнес-кода (conventions.md п. 1): pkg/ и миграции — не бизнес-код
       - path: '(^|/)(pkg/|internal/migrations/)'
         linters: [forbidigo]
+        text: 'context\.(Background|TODO)'
       # код тестов вне _test.go (structure.md): e2e-обвязка tests/ и общие фейки internal/testsupport/
       - path: '(^|/)(tests/|internal/testsupport/)'
         linters: [forbidigo]
+        text: 'context\.(Background|TODO)'
       # var-naming — только аббревиатуры (checklist.md п. 34); ALL_CAPS и подчёркивания правило фреймворка не запрещает
       - linters: [revive]
         text: "(don't use ALL_CAPS|don't use an underscore|don't use underscores|should not use underscores)"

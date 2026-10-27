@@ -23,7 +23,7 @@ use Tests\TestCase;
  * GET /parking/integration/tariffs/{id}: верная HMAC-подпись — тариф без скоупа, иначе — 401 без вызова сервиса;
  * неверный id пути (0, -1, abc) при верной подписи — 422 из Request, а не 404 маршрута.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffSignatureTest extends TestCase
 {

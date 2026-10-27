@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Блок pagination совпадает с Go SDK (gosdk-db-core 1.0.10, pagination.Pages): те же ключи и значения.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PaginationMetaTest extends TestCase
 {

@@ -33,7 +33,6 @@
 | `deprecated-core-api` | [ОШИБКА] | Устаревшее API ядра в новом коде (`RabbitManager::putIn`, `QueryFilters` V1, `FileManager::upload`, `setMessagePrefix`; `getOrCreate`/`getCacheKeyByParts` — с utils ≥ 2.6.4) | `conventions.md` п. 22 |
 | `dto-suffix-uppercase` | [ВНИМАНИЕ] | Суффикс `DTO` вместо `Dto` в новом PHP-коде (`BuildingDataDTO`) | `style.md`, «Имена» (P-5, P-7) |
 | `di-outside-definitions` | [ОШИБКА] | Биндинг DI не в `definitions.php` из перечня `structure.md` («Биндинги DI»): `$app->singleton()`/`$this->app->bind()` в провайдере (кроме порта подпроекта с переопределением извне), биндинг домена в `config/definitions.php` | `conventions.md` п. 7 |
-| `console-failure-not-reported` | [ОШИБКА] | Fail консольной команды/крона уходит только в `$this->error()`, не в Sentry | `checklist.md` п. 23; `review-findings.md`, «Ошибки, логи, Sentry» |
 | `phpstan-errors` | [ОШИБКА] / [ВНИМАНИЕ] | Ошибки phpstan в файлах дифа: на уровне проекта — [ОШИБКА]; уровня 5 сверх уровня проекта (проект ниже 5) — [ВНИМАНИЕ]; `@phpstan-ignore` в коде вместо `ignoreErrors` для шума mps — [ОШИБКА] | `conventions.md` п. 23 |
 | `response-double-wrap` | [ОШИБКА] | Response-класс/контроллер сам собирает `success/data`, хотя маршрут под `ApiResponseMiddleware` (`api.response`) | `conventions.md` п. 19 |
 | ~~`controller-manual-response-wrapper`~~ | — | не используется — тот же паттерн, что `response-double-wrap` | — |
@@ -44,7 +43,6 @@
 | `controller-missing-swagger` | [ОШИБКА] | Эндпоинт без Swagger-аннотации (нет OpenAPI-атрибутов на методе контроллера); Swagger не совпадает с тем, что отдаёт эндпойнт (пропущенный или лишний код ответа) — `swagger-status-mismatch` | `conventions.md` п. 18; `regulations/rest-api.md`, «Статусы» |
 | `controller-auth-via-facade` | [ОШИБКА] | `Auth::id()`/`auth()` в глубине сервиса вместо `$request->user()` в контроллере | `conventions.md` п. 19a |
 | `env-outside-config` | [ОШИБКА] | `env()` вне `config/*.php` и `config.php` модуля: после `config:cache` возвращает `null` — в коде `config()` | `checklist.md` п. 51 |
-| `debug-output-left` | [ОШИБКА] | Отладочный вывод в коде (`dd()`, `dump()`, `var_dump()`, `ray()`, `->dd()`/`->dump()` у коллекции или запроса) | `checklist.md` п. 52 |
 | ~~`workflow-takes-repository-directly`~~ | — | не используется (O-7): workflow вправе брать репозитории напрямую; для Command/Query домена — `domain-cross-domain-access` | — |
 
 Если ни один тег (здесь, в общем каталоге и в каталоге безопасности) не подходит — новый в этом же формате (`approaches/process/review-tags.md`, вводная).

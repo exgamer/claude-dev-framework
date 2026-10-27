@@ -9,7 +9,7 @@ use App\ParkingApp\Core\Providers\ServiceProvider as Base;
 /**
  * Подключает definitions.php домена (интерфейс сервиса → реализация) автозагрузкой ModuleServiceProvider; своей логики нет.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ServiceProvider extends Base
 {

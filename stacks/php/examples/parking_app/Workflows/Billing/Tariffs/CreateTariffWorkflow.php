@@ -24,7 +24,7 @@ use Throwable;
 /**
  * Создание тарифа парковки с уведомлением партнёрского биллинга и событием tariff.created через outbox.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class CreateTariffWorkflow
 {
@@ -41,8 +41,9 @@ final class CreateTariffWorkflow
     }
 
     /**
-     * Лимит цены реестра, существование парковки и льготный период короче её наибольшей стоянки (Catalog) — до транзакции;
-     * в транзакции тариф и событие outbox; после коммита — уведомление, событие и отложенная активация запланированного тарифа.
+     * До транзакции — от дешёвых проверок к дорогим: инварианты DTO, парковка и льготный период против её наибольшей
+     * стоянки, лимит цены реестра. В транзакции — тариф и событие outbox. После коммита — сначала отложенная активация
+     * запланированного тарифа, затем уведомление партнёра и первая отправка события; сбой постановки Job — report(), не наверх.
      *
      * @throws ValidationAppException
      * @throws OperationFailedAppException реестр лимитов недоступен
@@ -50,13 +51,7 @@ final class CreateTariffWorkflow
      */
     public function execute(TariffDto $dto): Tariff
     {
-        $maxPrice = $this->priceLimitRepository->getMaxPrice($dto->getParkingId(), $dto->getCurrency());
-
-        if ($maxPrice !== null && $dto->getPrice() > $maxPrice) {
-            throw new ValidationAppException('VALIDATION ERROR', [
-                'price' => ['Цена выше лимита городского реестра для этой парковки: ' . $maxPrice],
-            ]);
-        }
+        $this->tariffCrudService->assertValid($dto);
 
         if (! $this->parkingRepository->oneById($dto->getParkingId())) {
             throw new ValidationAppException('VALIDATION ERROR', [
@@ -65,6 +60,7 @@ final class CreateTariffWorkflow
         }
 
         $this->checkGraceShorterThanMaxStay($dto);
+        $this->checkPriceLimit($dto);
 
         // Парковку отключили до коммита — тариф останется активным: риск принят
         /** @var array{Tariff, OutboxTariffEvent} $written */
@@ -79,7 +75,6 @@ final class CreateTariffWorkflow
                 ->setPrice($dto->getPrice())
                 ->setGraceMinutes($dto->getGraceMinutes());
 
-            // Событие — в той же транзакции, что и тариф: нет тарифа без события и события без тарифа
             $event = $this->outboxRepository->createPending($eventDto, OutboxTariffEventRoutingKeyEnum::TARIFF_CREATED);
 
             return [$tariff, $event];
@@ -87,31 +82,50 @@ final class CreateTariffWorkflow
 
         [$tariff, $event] = $written;
 
+        // Первым после коммита: сбой уведомления или отправки не должен оставить тариф без активации
+        if ($tariff->canActivate()) {
+            try {
+                ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->scheduled_at);
+            } catch (Throwable $e) {
+                // Тариф уже записан: не поставился Job — тариф подберёт billing:tariffs:activate-due
+                $this->exceptionHandler->report($e);
+            }
+        }
+
         try {
             $this->tariffNotifier->sendCreated($tariff->id, $dto);
         } catch (OperationFailedAppException $e) {
-            // Тариф уже записан, отказ партнёра его не отменяет. Повтора нет: понадобится гарантия доставки — outbox
+            // Отказ партнёра тариф не отменяет; повтора нет — граница примера (README)
             $this->exceptionHandler->report($e);
         }
 
         try {
-            // Первая попытка — сразу после коммита; сбой не отменяет создание: событие повторит консольная команда
             $this->publishOutboxEventCommand->execute($event->id);
         } catch (OperationFailedAppException $e) {
+            // Событие повторит billing:outbox-tariff-events:retry
             $this->exceptionHandler->report($e);
-        }
-
-        // Запланированный ждёт перехода Activate — его допустимость решает модель
-        if ($tariff->canActivate()) {
-            ActivatePlannedTariffJob::dispatch($tariff->id)->delay($tariff->scheduled_at);
         }
 
         return $tariff;
     }
 
     /**
-     * Льготный период тарифа (Billing, минуты) сверяется с наибольшей стоянкой парковки (Catalog, единицы TimeUnitEnum):
-     * общий словарь — Common, ни один домен не импортирует другой.
+     * @throws ValidationAppException
+     * @throws OperationFailedAppException реестр лимитов недоступен
+     */
+    private function checkPriceLimit(TariffDto $dto): void
+    {
+        $maxPrice = $this->priceLimitRepository->getMaxPrice($dto->getParkingId(), $dto->getCurrency());
+
+        if ($maxPrice !== null && $dto->getPrice() > $maxPrice) {
+            throw new ValidationAppException('VALIDATION ERROR', [
+                'price' => ['Цена выше лимита городского реестра для этой парковки: ' . $maxPrice],
+            ]);
+        }
+    }
+
+    /**
+     * Льготный период тарифа (минуты) короче наибольшей стоянки парковки; у парковки без ограничения — любой.
      *
      * @throws ValidationAppException
      */

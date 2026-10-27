@@ -27,6 +27,8 @@ use ArrayObject;
 use Carbon\Carbon;
 use Illuminate\Config\Repository as Config;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Mockery\MockInterface;
@@ -34,12 +36,14 @@ use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Core\Exceptions\ValidationAppException;
 use MPS\Core\Models\Model;
+use PDOException;
 use Tests\TestCase;
+use TypeError;
 
 /**
- * Сценарий создания тарифа: проверки до транзакции, тариф и outbox в ней, после коммита — отправка, публикация, активация; Tests\TestCase — ради Queue::fake().
+ * Сценарий создания тарифа: проверки до транзакции от дешёвых к реестру, тариф и outbox в ней, после коммита — активация, отправка, публикация; Tests\TestCase — ради Queue::fake().
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class CreateTariffWorkflowTest extends TestCase
 {
@@ -71,11 +75,42 @@ class CreateTariffWorkflowTest extends TestCase
         $this->tariffCrudService = Mockery::mock(TariffCrudServiceInterface::class);
         $this->outboxRepository = Mockery::mock(OutboxTariffEventRepositoryInterface::class);
         $this->exceptionHandler = Mockery::mock(ExceptionHandler::class);
+        $this->tariffCrudService->shouldReceive('assertValid')->byDefault();
+    }
+
+    public function test_invalid_dto_is_rejected_before_external_calls(): void
+    {
+        $this->tariffCrudService
+            ->shouldReceive('assertValid')
+            ->once()
+            ->andThrow(new ValidationAppException('VALIDATION ERROR', ['name' => ['Название не может быть пустым']]));
+        $this->parkingRepository->shouldNotReceive('oneById');
+        $this->tariffCrudService->shouldNotReceive('create');
+
+        $workflow = $this->workflow(maxPrice: 40000, partnerFails: false, brokerFails: false);
+
+        try {
+            $workflow->execute($this->dto(price: 50000));
+            $this->fail('Ожидался ValidationAppException');
+        } catch (ValidationAppException $e) {
+            $this->assertArrayHasKey('name', $e->getDetails());
+        }
+
+        // Реестр не спрошен, транзакция не открыта
+        $this->assertSame([], $this->steps->getArrayCopy());
     }
 
     public function test_price_above_registry_limit_is_rejected_without_write(): void
     {
-        $this->parkingRepository->shouldNotReceive('oneById');
+        $this->parkingRepository
+            ->shouldReceive('oneById')
+            ->once()
+            ->with(self::PARKING_ID)
+            ->andReturnUsing(function (): Model {
+                $this->steps[] = 'parking';
+
+                return Mockery::mock(Model::class);
+            });
         $this->parkingRepository->shouldNotReceive('getMaxStayById');
         $this->tariffCrudService->shouldNotReceive('create');
         $this->outboxRepository->shouldNotReceive('createPending');
@@ -89,7 +124,8 @@ class CreateTariffWorkflowTest extends TestCase
             $this->assertArrayHasKey('price', $e->getDetails());
         }
 
-        $this->assertSame([], $this->steps->getArrayCopy());
+        // Локальные проверки — до реестра, транзакция не открыта
+        $this->assertSame(['parking', 'limit'], $this->steps->getArrayCopy());
     }
 
     public function test_missing_parking_is_rejected_without_write(): void
@@ -182,6 +218,7 @@ class CreateTariffWorkflowTest extends TestCase
         $this->assertSame(self::TARIFF_ID, $tariff->id);
         $this->assertSame([
             'parking',
+            'limit',
             'tx:begin',
             'create',
             'outbox:' . OutboxTariffEventRoutingKeyEnum::TARIFF_CREATED->value . ':' . self::TARIFF_ID,
@@ -255,6 +292,62 @@ class CreateTariffWorkflowTest extends TestCase
         );
     }
 
+    public function test_scheduled_tariff_activation_is_dispatched_before_partner_notification(): void
+    {
+        $scheduledAt = Carbon::now()->addDay()->startOfSecond();
+
+        $this->expectTariffCreated(TariffStatusEnum::SCHEDULED, $scheduledAt);
+        $this->expectOutboxEventWritten();
+        $this->exceptionHandler->shouldNotReceive('report');
+
+        $workflow = $this->workflow(maxPrice: null, partnerFails: false, brokerFails: false, partnerBroken: true);
+        $dto = $this->dto(price: 50000);
+        $dto->setScheduledAt($scheduledAt);
+
+        try {
+            $workflow->execute($dto);
+            $this->fail('Ожидалась ошибка отправки партнёру');
+        } catch (TypeError) {
+            // Непредвиденная ошибка уведомления уходит наверх, но активация уже поставлена
+        }
+
+        Queue::assertPushed(ActivatePlannedTariffJob::class);
+    }
+
+    public function test_activation_dispatch_failure_is_reported_and_tariff_stays_created(): void
+    {
+        $scheduledAt = Carbon::now()->addDay()->startOfSecond();
+
+        $this->expectTariffCreated(TariffStatusEnum::SCHEDULED, $scheduledAt);
+        $this->expectOutboxEventWritten();
+        $this->outboxRepository->shouldReceive('markPublished')->once()->with(self::OUTBOX_ID)->andReturn(true);
+        Bus::shouldReceive('dispatch')
+            ->once()
+            ->andThrow(new QueryException('pgsql', 'insert into jobs', [], new PDOException('Postgres недоступен')));
+        $this->exceptionHandler
+            ->shouldReceive('report')
+            ->once()
+            ->with(Mockery::type(QueryException::class));
+
+        $workflow = $this->workflow(maxPrice: null, partnerFails: false, brokerFails: false);
+        $dto = $this->dto(price: 50000);
+        $dto->setScheduledAt($scheduledAt);
+        $tariff = $workflow->execute($dto);
+
+        // Тариф подберёт billing:tariffs:activate-due; уведомление и отправка выполнены
+        $this->assertSame(self::TARIFF_ID, $tariff->id);
+        $this->assertSame([
+            'parking',
+            'limit',
+            'tx:begin',
+            'create',
+            'outbox:' . OutboxTariffEventRoutingKeyEnum::TARIFF_CREATED->value . ':' . self::TARIFF_ID,
+            'tx:commit',
+            'send:' . self::TARIFF_ID,
+            'publish:' . self::OUTBOX_ID,
+        ], $this->steps->getArrayCopy());
+    }
+
     private function expectTariffCreated(TariffStatusEnum $status, ?Carbon $scheduledAt): void
     {
         $tariff = new Tariff();
@@ -312,7 +405,7 @@ class CreateTariffWorkflowTest extends TestCase
             ->andReturn($event);
     }
 
-    private function workflow(?int $maxPrice, bool $partnerFails, bool $brokerFails): CreateTariffWorkflow
+    private function workflow(?int $maxPrice, bool $partnerFails, bool $brokerFails, bool $partnerBroken = false): CreateTariffWorkflow
     {
         $transactionManager = new class ($this->steps) implements TransactionManagerInterface {
             public function __construct(
@@ -348,29 +441,37 @@ class CreateTariffWorkflowTest extends TestCase
         };
 
         return new CreateTariffWorkflow(
-            new class ($maxPrice) implements PriceLimitRepositoryInterface {
+            new class ($this->steps, $maxPrice) implements PriceLimitRepositoryInterface {
                 public function __construct(
+                    private readonly ArrayObject $steps,
                     private readonly ?int $maxPrice,
                 ) {
                 }
 
                 public function getMaxPrice(int $parkingId, CurrencyEnum $currency): ?int
                 {
+                    $this->steps[] = 'limit';
+
                     return $this->maxPrice;
                 }
             },
             $this->parkingRepository,
             $this->tariffCrudService,
             $transactionManager,
-            new class ($this->steps, $partnerFails) implements TariffNotifierInterface {
+            new class ($this->steps, $partnerFails, $partnerBroken) implements TariffNotifierInterface {
                 public function __construct(
                     private readonly ArrayObject $steps,
                     private readonly bool $fails,
+                    private readonly bool $broken,
                 ) {
                 }
 
                 public function sendCreated(int $tariffId, TariffDto $dto): void
                 {
+                    if ($this->broken) {
+                        throw new TypeError('Тело запроса партнёру не собрано');
+                    }
+
                     if ($this->fails) {
                         throw new OperationFailedAppException('Партнёрский биллинг недоступен');
                     }

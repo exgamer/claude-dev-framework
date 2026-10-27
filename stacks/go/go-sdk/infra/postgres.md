@@ -7,7 +7,7 @@
 
 ## Правила
 
-- Каждый DB-запрос оборачивается в timeout: `ctx, cancel := context.WithTimeout(ctx, 10*time.Second); defer cancel()`; исключение — `NewGormPaginatedHelper` (timeout уже встроен внутри хелпера — 10 с по умолчанию, оборачивать не нужно; свой — `SetTimeout(n)`, где `n` — **число секунд**: хелпер сам умножает его на `time.Second`, поэтому `SetTimeout(10*time.Second)` переполняет int64 и контекст истекает сразу, список всегда 500 — тег `paginator-timeout-units`)
+- Каждый DB-запрос оборачивается в timeout: `ctx, cancel := context.WithTimeout(ctx, 10*time.Second); defer cancel()`; исключение — `NewGormPaginatedHelper` (timeout встроен, оборачивать не нужно; свой — `SetTimeout(n)`, «Пагинация»)
 - `ErrRecordNotFound` → возвращать `nil, nil`, не ошибку
 - модель всегда с маленькой буквы ибо используется только в пакете
 - стандартные методы Create/Update всегда через model
@@ -203,8 +203,8 @@ if errors.Is(err, ErrDefaultTariffTaken) { // параллельную смен�
 
 ## Пагинация
 
-- `SetTimeout(n)` — `n` секунд числом (`SetTimeout(10)`): тип параметра `time.Duration`, но хелпер сам умножает его на `time.Second`, поэтому `10*time.Second` нельзя (см. «Правила»); без вызова — те же 10 с.
-- `per_page` не передан (0) → умолчание хелпера 30 (`regulations/rest-api.md`, «Формат ответа»): `SetPerPage(0)` его затирает, и SDK подставляет 20 — поэтому `SetPerPage` только при `PerPage > 0` (или 30 в маппере запроса). `page` 0/не передан → 1 (SDK; до него — маппер точки входа, `regulations/rest-api.md`, «Валидация входа»).
+- `SetTimeout(n)` — `n` секунд числом (`SetTimeout(10)`): тип параметра `time.Duration`, но хелпер сам умножает его на `time.Second`, поэтому `SetTimeout(10*time.Second)` переполняет int64, контекст истекает сразу и список всегда 500 (тег `paginator-timeout-units`); без вызова — 10 с.
+- `per_page` не передан (0) → умолчание хелпера 30 (`regulations/rest-api.md`, «Формат ответа»): `SetPerPage(0)` его затирает, и SDK подставляет 20 — поэтому `SetPerPage` только при `PerPage > 0` (или 30 в маппере запроса). `page` 0/не передан → 1 приводит маппер точки входа (`regulations/rest-api.md`, «Валидация входа»); хелпер тоже приводит 0 к 1, но смещение считает не только он.
 - Пустой скоуп — явное `WHERE FALSE`, а не `IN ?` с пустым списком.
 
 ```go

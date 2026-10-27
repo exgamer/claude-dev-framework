@@ -13,7 +13,7 @@ use Throwable;
 /**
  * Отложенная активация запланированного тарифа; ставит CreateTariffWorkflow после коммита с задержкой до scheduled_at.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ActivatePlannedTariffJob implements ShouldQueue
 {

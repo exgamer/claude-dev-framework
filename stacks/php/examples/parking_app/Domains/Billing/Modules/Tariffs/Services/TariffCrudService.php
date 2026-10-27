@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\ParkingApp\Domains\Billing\Modules\Tariffs\Services;
 
 use App\ParkingApp\Core\Database\Query\Page;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\DTO\TariffFilterDto;
 use App\ParkingApp\Domains\Billing\Modules\Tariffs\Repositories\TariffCacheRepositoryInterface;
@@ -13,7 +14,6 @@ use App\ParkingApp\Domains\Billing\Modules\Tariffs\Validators\TariffDtoValidator
 use App\ParkingApp\Infrastructure\Postgres\Billing\Tariffs\Models\Tariff;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use MPS\Core\Exceptions\InvalidConfigurationAppException;
 use MPS\Core\Exceptions\NotFoundAppException;
 use MPS\Core\Exceptions\OperationFailedAppException;
 use MPS\Core\Exceptions\ValidationAppException;
@@ -22,7 +22,7 @@ use MPS\Core\Services\Service;
 /**
  * Тариф по ID — кеш, затем БД со скоупом парковок; запись — после доменных инвариантов, со сбросом кеша; недоступный кеш запрос не роняет.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffCrudService extends Service implements TariffCrudServiceInterface
 {
@@ -69,7 +69,7 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
     }
 
     /**
-     * @throws InvalidConfigurationAppException
+     * @throws ServerConfigurationException
      */
     public function paginate(TariffFilterDto $filter, Page $page): LengthAwarePaginator
     {
@@ -78,17 +78,34 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
 
     /**
      * @throws ValidationAppException
+     * @throws OperationFailedAppException созданный тариф не перечитан
      */
     public function create(TariffDto $dto): Tariff
+    {
+        $this->assertValid($dto);
+
+        $created = $this->repository->createFromDto($dto);
+
+        // created_at ставит DEFAULT БД: в модели после save() его нет — ответ строится по перечитанной записи
+        $tariff = $this->repository->getByIdInParkings($created->id, null);
+
+        if (! $tariff) {
+            throw new OperationFailedAppException('Созданный тариф не прочитан', ['tariff_id' => $created->id]);
+        }
+
+        return $tariff;
+    }
+
+    /**
+     * @throws ValidationAppException
+     */
+    public function assertValid(TariffDto $dto): void
     {
         $errors = TariffDtoValidator::validate($dto);
 
         if ($errors) {
             throw new ValidationAppException('VALIDATION ERROR', $errors);
         }
-
-        // Начальный статус задаёт модель (Tariff::initState) по дате активации, не вызывающий
-        return $this->repository->createFromDto($dto);
     }
 
     /**
@@ -103,11 +120,7 @@ class TariffCrudService extends Service implements TariffCrudServiceInterface
             throw new NotFoundAppException('Тариф не найден');
         }
 
-        $errors = TariffDtoValidator::validate($dto);
-
-        if ($errors) {
-            throw new ValidationAppException('VALIDATION ERROR', $errors);
-        }
+        $this->assertValid($dto);
 
         if (! $this->repository->updateFromDto($tariff->id, $dto)) {
             throw new ValidationAppException('VALIDATION ERROR', [

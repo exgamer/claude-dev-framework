@@ -11,9 +11,7 @@ use MPS\Core\Enums\CurrencyEnum;
 use MPS\Core\Models\Model;
 
 /**
- * Строка parking.tariffs: мягкое удаление, статус и валюта — enum, у парковки один тариф по умолчанию (частичный уникальный индекс).
- * Состояние (status, is_default, scheduled_at) не в $fillable: начальное задаёт initState(), смену — Command перехода
- * после проверки can*() этой модели и условный UPDATE метода репозитория этого перехода.
+ * Тариф парковки; у парковки не больше одного тарифа по умолчанию.
  *
  * @property int $id
  * @property int $parking_id
@@ -28,7 +26,7 @@ use MPS\Core\Models\Model;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class Tariff extends Model
 {

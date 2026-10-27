@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * HMAC-подпись машинного вызова: общий с Go-сервисом вектор, отказ на битый формат и на смену секрета, метода, пути или тела.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class SignatureHelperTest extends TestCase
 {

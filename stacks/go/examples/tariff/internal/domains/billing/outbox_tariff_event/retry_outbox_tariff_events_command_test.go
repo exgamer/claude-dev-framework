@@ -21,8 +21,7 @@ func newRetryCommand(repository *billingfakes.OutboxTariffEventRepository, publi
 }
 
 func TestRetryOutboxTariffEventsCommand_PublishesStaleEventsInBatches(t *testing.T) {
-	awaiting := pendingEvent(2)
-	awaiting.Status = outboxdomain.StatusAwaitingRetry
+	awaiting := outboxdomain.RestoreOutboxTariffEvent(*pendingEvent(2), outboxdomain.StatusAwaitingRetry)
 	repository := billingfakes.NewOutboxTariffEventRepository(pendingEvent(1), awaiting, pendingEvent(3), pendingEvent(4))
 
 	for id := uint(1); id <= 3; id++ {
@@ -37,7 +36,7 @@ func TestRetryOutboxTariffEventsCommand_PublishesStaleEventsInBatches(t *testing
 	require.NoError(t, err)
 	assert.Equal(t, uint(3), result.Published)
 	assert.Len(t, publisher.Published, 3)
-	assert.Equal(t, outboxdomain.StatusPending, repository.Items[4].Status, "свежее событие ещё может отправить workflow — не трогается")
+	assert.Equal(t, outboxdomain.StatusPending, repository.Items[4].Status(), "свежее событие ещё может отправить workflow — не трогается")
 }
 
 func TestRetryOutboxTariffEventsCommand_FailureDoesNotStopRun(t *testing.T) {
@@ -57,6 +56,6 @@ func TestRetryOutboxTariffEventsCommand_FailureDoesNotStopRun(t *testing.T) {
 	assert.Equal(t, 3, publisher.Calls, "каждое событие — одна попытка за прогон: взятые скрыты до следующего")
 
 	for id := uint(1); id <= 3; id++ {
-		assert.Equal(t, outboxdomain.StatusAwaitingRetry, repository.Items[id].Status)
+		assert.Equal(t, outboxdomain.StatusAwaitingRetry, repository.Items[id].Status())
 	}
 }

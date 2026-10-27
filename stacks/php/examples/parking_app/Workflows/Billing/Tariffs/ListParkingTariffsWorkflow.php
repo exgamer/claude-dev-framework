@@ -13,7 +13,7 @@ use MPS\Core\Exceptions\NotFoundAppException;
 /**
  * Действующие тарифы парковки (Billing) вместе с данными парковки (Catalog).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class ListParkingTariffsWorkflow
 {

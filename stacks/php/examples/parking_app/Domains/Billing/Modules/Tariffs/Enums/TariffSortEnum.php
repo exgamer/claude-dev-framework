@@ -11,7 +11,7 @@ use OpenApi\Attributes as OA;
 /**
  * Сортировка списка тарифов: минус — по убыванию.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Schema(schema: 'TariffSortEnum', type: 'string', enum: [
     TariffSortEnum::NAME_ASC->value,

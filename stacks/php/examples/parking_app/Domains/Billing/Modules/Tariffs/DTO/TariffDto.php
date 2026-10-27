@@ -11,7 +11,7 @@ use MPS\Core\Enums\CurrencyEnum;
 /**
  * Данные тарифа на запись — от запроса до репозитория (создание и полная замена); цена — в минимальных единицах валюты.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffDto extends DataObject
 {

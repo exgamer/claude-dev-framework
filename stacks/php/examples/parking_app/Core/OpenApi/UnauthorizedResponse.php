@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 /**
  * Ответ 401 для Swagger: формат ошибки ApiResponseMiddleware; нет администратора или подпись машинного вызова не прошла — причина клиенту не раскрывается.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 #[OA\Response(
     response: 'Unauthorized401',

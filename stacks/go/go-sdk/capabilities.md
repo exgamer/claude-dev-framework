@@ -63,7 +63,7 @@
 | Задача | Что взять |
 |---|---|
 | Подключение | `postgres-core/pkg/app.PostgresKernel`; в модуле — `postgres-core/pkg/di.GetDefaultPostgresConnection(container)`; второе соединение — `AddPostgresConnection` / `GetPostgresConnection(name)` |
-| Пагинированный список | `db-core/pkg/query/helpers.NewGormPaginatedHelper[E](ctx, db).SetTimeout(10).SetPerPage(n).Paginated(page, func(db) *gorm.DB)` — `SetTimeout(n)`: `n` — число секунд (тип `time.Duration`, но хелпер умножает на `time.Second` сам; `10*time.Second` — переполнение, список всегда 500), без вызова — 10 с; `SetPerPage` — только при `n > 0` (умолчание 30, `SetPerPage(0)` даёт 20); `page` 0 → 1 (`infra/postgres.md`, «Пагинация») → `pagination.Paginated[E]{Items []*E, Pagination}` |
+| Пагинированный список | `db-core/pkg/query/helpers.NewGormPaginatedHelper[E](ctx, db).SetTimeout(10).SetPerPage(n).Paginated(page, func(db) *gorm.DB)` — единицы `SetTimeout` и когда звать `SetPerPage` — `infra/postgres.md`, «Пагинация»; `page` 0 → 1 — в маппере точки входа (`regulations/rest-api.md`, «Валидация входа») → `pagination.Paginated[E]{Items []*E, Pagination}` |
 | Транзакция на 1–5 репозиториев | `db-core/pkg/transaction.NewManager[R]` … `NewManager5` + `.WithTimeout()`, `Exec(ctx, fn)`; интерфейс `TxManager` объявляет потребитель |
 | Миграции | `db-core/pkg/migration.Migration` (= gormigrate), применение — `postgres-core/pkg/app.NewMigrator(db, migrations...).Up()` / `RollbackLast()` / `RollbackTo(id)` из консольной команды; kernel миграции не катит |
 | Медленные запросы в Sentry | `db-core/pkg/middleware.SlowSqlSentryMiddleware(threshold, service)` (gorm plugin) |
@@ -73,7 +73,7 @@
 | Задача | Что взять |
 |---|---|
 | Клиент | `redis-core/pkg/app.RedisKernel`; в модуле — `redis-core/pkg/di.GetRedisClient(container)` |
-| Структура / массив / строка в кеше | `redis-core/pkg/redis.NewHelper[E](ctx, client)`: `SetStruct/GetStruct`, `SetArray/GetArray`, `SetString/GetString`, пакетно — `MSetStruct/MGetStruct`. Промах — `(nil, nil)` |
+| Структура / массив / строка в кеше | `redis-core/pkg/redis.NewHelper[M](ctx, client)` (`M` — модель кеша, не доменная сущность, `infra/redis.md`): `SetStruct/GetStruct`, `SetArray/GetArray`, `SetString/GetString`, пакетно — `MSetStruct/MGetStruct`. Промах — `(nil, nil)` |
 | Удаление ключей | `client.Unlink(ctx, keys...)` (go-redis напрямую — в SDK обёртки нет) |
 
 ## RabbitMQ

@@ -82,24 +82,32 @@ Mapper инфраструктуры вызывает `Restore*`, никогда 
 - PATCH/PUT статус не меняют (`regulations/rest-api.md`, «Методы»): поле `status` или другого флага состояния в Request изменения, общий эндпоинт смены статуса — `status-in-update-request`.
 
 ```php
-// Модель: допустимость перехода
+// Модель: допустимость перехода; набор статусов — подмножество enum (метод enum)
 public function canArchive(): bool
 {
-    return $this->status === TariffStatusEnum::ACTIVE;
+    return in_array($this->status, TariffStatusEnum::notArchived(), true);
 }
 
-// Репозиторий: запись перехода одним условным UPDATE, false — статус уже сменили
+// Репозиторий: запись перехода одним условным UPDATE (то же условие, что canArchive()), false — статус уже сменили;
+// переход снимает и флаг, который архивному не положен
 public function archive(int $id): bool
 {
     $updated = $this->getQuery()
         ->whereKey($id)
-        ->where('status', TariffStatusEnum::ACTIVE->value)
-        ->update(['status' => TariffStatusEnum::ARCHIVED->value]);
+        ->whereIn('status', TariffStatusEnum::notArchivedValues())
+        ->update([
+            'status' => TariffStatusEnum::ARCHIVED->value,
+            'is_default' => false,
+        ]);
 
-    return $updated === 1;
+    return $updated > 0;
 }
 ```
+
+Эталон — `Tariff::canArchive()` и `TariffRepository::archive()` (`stacks/php/examples/parking_app/`).
 
 ## Когда применять
 
 В существующих проектах сущности анемичные (публичные поля, без `New/Restore`, статус пишется сеттером) — **не переписывать массово**: правила этого файла — для нового кода и новых переходов; правишь переход — переводишь только его. Новый модуль с реальными правилами (деньги, статусы, периоды) — значения входа в валидаторе, состояние в модели с первого дня; неясно, где правило, — вопрос к пользователю (`core/principles.md`, «Пробелы и споры»).
+
+**Сущность только для чтения** — сервис её только читает (справочник чужого домена или сервиса: парковка из справочника, администратор из identity), переходов её состояния в этом сервисе нет — ни метода, ни записи. У такой сущности поле состояния может быть открытым (Go — `IsActive`, `RevokedAt`): защищать нечего, запись идёт в сервисе-владельце. Появился переход в этом сервисе — с него действуют правила «Переход состояния». Сущность, чьё состояние сервис меняет (в том числе outbox со статусами), — не исключение.

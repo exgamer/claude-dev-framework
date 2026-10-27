@@ -56,7 +56,7 @@
 
 ## request.go
 
-Обязателен embed `validation.Request`; все правила — в теге `binding` (валидатор gin, `SetTagName("binding")`; тег `validate` `ValidateRequest*` не читает — правило в нём молча не проверяется, тег находки `validate-tag-ignored`; проверено тестом эталона `TestHandler_Index_PageBound`); границы — по `regulations/rest-api.md`, «Валидация входа»: `*_id` — `gt=0`, строки — `max`, числа — верхняя граница, enum — `oneof`, `page` — `lte=10000` (больше — 422), `per_page` — `lte=100`. `page` 0/не передан → 1 (SDK, `uint` 0 = «не передан»), `per_page` не передан → 30 (`../infra/postgres.md`, «Пагинация»):
+Обязателен embed `validation.Request`; все правила — в теге `binding` (валидатор gin, `SetTagName("binding")`; тег `validate` `ValidateRequest*` не читает — правило в нём молча не проверяется, тег находки `validate-tag-ignored`; проверено тестом эталона `TestHandler_Index_PageBound`); границы — по `regulations/rest-api.md`, «Валидация входа»: `*_id` — `gt=0`, строки — `max`, числа — верхняя граница, enum — `oneof`, `page` — `lte=10000` (больше — 422), `per_page` — `lte=100`. `page` 0/не передан (`uint` 0) → 1 в маппере точки входа, до расчёта смещения (`regulations/rest-api.md`, «Валидация входа», тег `list-params-contract`), `per_page` не передан → 30 (`../infra/postgres.md`, «Пагинация»):
 
 ```go
 // indexRequest Фильтр списка тарифов
@@ -200,6 +200,8 @@ if err != nil {
 ```
 
 > `GetIntQueryParam` несмотря на название читает **path-параметр** через `c.Param(name)` — это корректное использование для маршрутов вида `/:id`.
+
+> Предел `GetIntQueryParam` ниже `bigint` — предел SDK, не находка (`regulations/rest-api.md`, «Валидация входа»): в `gosdk-http-core` 1.0.14 и 1.1.0 (проверка — `regex.StringIsPositiveInt` из `gosdk-core` 1.0.9–1.1.0) пропускает не больше 18 цифр, `id` ≥ 10^18 — ошибка, значит 422; текст ошибки SDK «Max: 2147483647» с проверкой не совпадает — в ответ его не отдавать. В другой версии проекта — сверить по `../reference/` и исходнику версии.
 
 Swaggo-нотация для path-параметров — `:id` (Gin-стиль) или `{id}` в `@Router`, оба формата поддерживаются, не путать с ошибкой. Действие над записью — `POST` на подресурс-глагол (`regulations/rest-api.md`, «Методы»), не `DELETE`:
 ```go

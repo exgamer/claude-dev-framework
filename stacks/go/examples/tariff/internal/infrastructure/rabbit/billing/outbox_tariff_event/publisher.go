@@ -14,11 +14,6 @@ import (
 // publishTimeout Предел ожидания подтверждения брокера: зависший брокер не держит запрос создания и прогон повтора
 const publishTimeout = 5 * time.Second
 
-// metadataPublisher Публикация SDK с метаданными; *rabbitmq.Publisher
-type metadataPublisher interface {
-	PublishWithMetaData(topic string, meta map[string]string, payload any) error
-}
-
 func NewRabbitPublisher(publisher *rabbitmq.Publisher) *RabbitPublisher {
 	return &RabbitPublisher{
 		publisher: publisher,

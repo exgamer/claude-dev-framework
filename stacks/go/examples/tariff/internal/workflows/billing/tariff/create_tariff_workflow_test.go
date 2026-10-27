@@ -292,7 +292,7 @@ func TestCreateTariffWorkflow_WritesOutboxEventInSameTransaction(t *testing.T) {
 		assert.Equal(t, uint(15), event.GraceMinutes)
 		assert.Equal(t, uint(100), event.Price)
 		// Брокер недоступен: тариф создан, событие ждёт повтора консольной командой
-		assert.Equal(t, outboxdomain.StatusAwaitingRetry, event.Status)
+		assert.Equal(t, outboxdomain.StatusAwaitingRetry, event.Status())
 		assert.Equal(t, uint(1), event.Attempts)
 	}
 }
@@ -307,7 +307,7 @@ func TestCreateTariffWorkflow_PublishesOutboxEventAfterCommit(t *testing.T) {
 	assert.Equal(t, tariff.ID, f.publisher.Published[0].TariffID)
 
 	for _, event := range f.outbox.Items {
-		assert.Equal(t, outboxdomain.StatusPublished, event.Status)
+		assert.Equal(t, outboxdomain.StatusPublished, event.Status())
 	}
 }
 

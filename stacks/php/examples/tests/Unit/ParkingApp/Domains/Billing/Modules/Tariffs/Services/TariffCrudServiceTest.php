@@ -20,9 +20,9 @@ use MPS\Core\Exceptions\ValidationAppException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Запись тарифа через TariffCrudService: инварианты, создание без статуса от вызывающего, 404, 422 при переносе тарифа по умолчанию, кеш по ID.
+ * Запись тарифа через TariffCrudService: инварианты, создание без статуса от вызывающего и ответ по перечитанной записи, 404, 422 при переносе тарифа по умолчанию, кеш по ID.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class TariffCrudServiceTest extends TestCase
 {
@@ -51,19 +51,27 @@ class TariffCrudServiceTest extends TestCase
         $this->service = new TariffCrudService($this->repository, $this->cacheRepository, $this->exceptionHandler);
     }
 
-    public function test_created_tariff_gets_initial_state_from_model(): void
+    public function test_created_tariff_is_returned_reread_with_database_defaults(): void
     {
         $dto = $this->dto(name: 'Стандарт')->setScheduledAt(Carbon::now()->addDay());
-        $tariff = new Tariff();
+        // После save() колонок с DEFAULT БД (created_at) в модели нет — ответ строится по перечитанной записи
+        $saved = new Tariff();
+        $saved->id = self::TARIFF_ID;
+        $reread = $this->tariff(parkingId: 15);
 
         // Статус и флаг не передаются: начальное состояние задаёт Tariff::initState() (TariffTest)
         $this->repository
             ->shouldReceive('createFromDto')
             ->once()
             ->with($dto)
-            ->andReturn($tariff);
+            ->andReturn($saved);
+        $this->repository
+            ->shouldReceive('getByIdInParkings')
+            ->once()
+            ->with(self::TARIFF_ID, null)
+            ->andReturn($reread);
 
-        $this->assertSame($tariff, $this->service->create($dto));
+        $this->assertSame($reread, $this->service->create($dto));
     }
 
     public function test_invalid_dto_is_rejected_without_write(): void

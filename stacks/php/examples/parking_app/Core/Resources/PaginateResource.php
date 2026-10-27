@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * Ответ списка формы (1) пагинации: результат PaginatedQueryHelper как есть — items + pagination (схема PaginationMeta), как у Go SDK.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class PaginateResource extends JsonResource
 {

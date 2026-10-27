@@ -12,7 +12,7 @@ use MPS\Core\Exceptions\OperationFailedAppException;
 /**
  * Переход Archive для всех тарифов парковки: парковку отключили — действующие и запланированные тарифы в архив.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class DeactivateParkingTariffsCommand
 {
@@ -24,20 +24,18 @@ final class DeactivateParkingTariffsCommand
     }
 
     /**
-     * Массовый переход — одним условным UPDATE: допустимость Tariff::canArchive() (не в архиве) — условием запроса,
-     * тарифы по одному не читаются. Возвращает число изменённых; повтор безопасен — архивные запрос не выбирает.
-     * Кеш изменённых сбрасывается после записи.
+     * Одним условным UPDATE: допустимость canArchive() — условием запроса, тарифы по одному не читаются. Возвращает
+     * число изменённых; повтор безопасен — архивные запрос не выбирает. Кеш изменённых сбрасывается после записи.
      */
     public function execute(int $parkingId): int
     {
-        $ids = $this->repository->allNotArchivedIdsByParkingId($parkingId);
-        $archived = $this->repository->archiveNotArchivedByParkingId($parkingId);
+        $ids = $this->repository->archiveNotArchivedByParkingId($parkingId);
 
         foreach ($ids as $id) {
             $this->forgetCached($id);
         }
 
-        return $archived;
+        return count($ids);
     }
 
     /**

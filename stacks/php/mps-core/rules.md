@@ -12,29 +12,29 @@ $app->singleton(SomeInterface::class, SomeClass::class);
 return [
     // singleton с маппингом интерфейс → класс
     [
-        'abstract'  => SomeInterface::class,
-        'concrete'  => SomeClass::class,
+        'abstract' => SomeInterface::class,
+        'concrete' => SomeClass::class,
     ],
 
     // с mock-подменой в тестах
     [
-        'abstract'  => SomeInterface::class,
-        'concrete'  => SomeClass::class,
-        'mock'      => MockSomeClass::class,
+        'abstract' => SomeInterface::class,
+        'concrete' => SomeClass::class,
+        'mock' => MockSomeClass::class,
     ],
 
     // bind вместо singleton
     [
-        'bindType'  => 'bind',
-        'abstract'  => SomeInterface::class,
-        'concrete'  => SomeClass::class,
+        'bindType' => 'bind',
+        'abstract' => SomeInterface::class,
+        'concrete' => SomeClass::class,
     ],
 
     // с алиасом
     [
-        'abstract'  => SomeInterface::class,
-        'concrete'  => SomeClass::class,
-        'alias'     => 'some-alias',
+        'abstract' => SomeInterface::class,
+        'concrete' => SomeClass::class,
+        'alias' => 'some-alias',
     ],
 ];
 ```
@@ -91,7 +91,7 @@ use MPS\Utils\Components\QueryFilters\V2\RangeFilter;
 
 ## Запись — `create`/`update`/`updateById` ядра
 
-`CRUDRepository::update()`/`updateById()` пишут query builder-ом: `$casts` не применяются, `$fillable` не проверяется — отсекаются только несуществующие колонки (проверено на core 1.6.0, AINA-2978); `create()` тоже принимает произвольный массив. Поэтому из сервиса/Command/workflow они с массивом не вызываются: запись — методами репозитория с DTO (`conventions.md` п. 11a), внутри — явный список колонок. Вставка — `fill()->save()` у модели с casts; обновление — одним `UPDATE … WHERE` (`architecture/layers.md`, «Метод репозитория — один запрос»), casts при этом не работают — enum и JSON в списке колонок приводятся явно.
+`CRUDRepository::update()`/`updateById()` пишут query builder-ом: `$casts` не применяются, `$fillable` не проверяется — отсекаются только несуществующие колонки (проверено по исходнику core 1.6–1.10.2); `create()` тоже принимает произвольный массив. Поэтому из сервиса/Command/workflow они с массивом не вызываются: запись — методами репозитория с DTO (`conventions.md` п. 11a), внутри — явный список колонок. Вставка — `fill()->save()` у модели с casts; обновление — одним `UPDATE … WHERE` (`architecture/layers.md`, «Метод репозитория — один запрос»), casts при этом не работают — enum и JSON в списке колонок приводятся явно.
 
 ```php
 // плохо: массив из сервиса, json/enum мимо casts, любая колонка таблицы запишется
@@ -135,10 +135,26 @@ try {
 }
 
 if ($cached) {
-    return $cached;                        // запись со скоупом — сверка скоупа после чтения (architecture/layers.md)
+    // кеш хранит запись без скоупа: чужой парковки — null, как из БД (architecture/layers.md, «Кэш по ID»)
+    if ($parkingIds !== null && ! in_array($cached->parking_id, $parkingIds, true)) {
+        return null;
+    }
+
+    return $cached;
 }
 
 $tariff = $this->repository->getByIdInParkings($id, $parkingIds);
+if (! $tariff) {
+    return null;
+}
+
+try {
+    $this->cacheRepository->set($tariff);
+} catch (OperationFailedAppException $e) {
+    $this->exceptionHandler->report($e);
+}
+
+return $tariff;
 ```
 
 API менеджера кеша — по версии `mps/utils` из `composer.lock` (`capabilities.md`, «Кеш и Redis»):

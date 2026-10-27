@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use MPS\Core\Enums\CurrencyEnum;
 
+/**
+ * Таблица тарифов парковок parking.tariffs.
+ */
 return new class () extends Migration {
     private string $tableName = 'parking.tariffs';
 

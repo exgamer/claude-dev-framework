@@ -8,7 +8,7 @@ const (
 	StatusPending Status = iota + 1
 	// StatusPublished Брокер подтвердил публикацию
 	StatusPublished
-	// StatusFailed Попытки исчерпаны — ручной разбор (чем выражается разбор — README)
+	// StatusFailed Попытки исчерпаны — ручной разбор
 	StatusFailed
 	// StatusAwaitingRetry Отправка не удалась; повторит консольная команда по расписанию
 	StatusAwaitingRetry

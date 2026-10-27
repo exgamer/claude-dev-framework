@@ -17,7 +17,7 @@ use Throwable;
 /**
  * Переход SetDefault: действующий тариф становится тарифом по умолчанию, флаг прежнего снимается — у парковки он один.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 final class SetDefaultTariffCommand
 {

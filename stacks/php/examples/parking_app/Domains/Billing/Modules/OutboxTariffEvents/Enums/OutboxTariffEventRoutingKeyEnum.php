@@ -10,7 +10,7 @@ use MPS\Core\Enums\EnumerableTrait;
 /**
  * Тип события о тарифе — он же routing key публикации.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 enum OutboxTariffEventRoutingKeyEnum: string implements Enumerable
 {

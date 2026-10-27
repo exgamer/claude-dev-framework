@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\ParkingApp\Core\Http\Middleware;
 
 use App\ParkingApp\Core\Enums\RequestHeaderEnum;
+use App\ParkingApp\Core\Exceptions\ServerConfigurationException;
 use App\ParkingApp\Core\Helpers\SignatureHelper;
 use App\ParkingApp\Core\Http\Middleware\VerifySignatureMiddleware;
 use App\ParkingApp\Core\Http\Signature\SignatureNonceRepositoryInterface;
@@ -22,9 +23,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Подпись машинного вызова: верная — проходит и занимает nonce, битая/просроченная/повторная — 401, нет секрета — ошибка конфигурации.
+ * Подпись машинного вызова: верная — проходит и занимает nonce, битая/просроченная/повторная — 401, нет секрета или nonce живёт меньше двух окон — ошибка конфигурации (500).
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class VerifySignatureMiddlewareTest extends TestCase
 {
@@ -117,13 +118,26 @@ class VerifySignatureMiddlewareTest extends TestCase
         }
     }
 
-    public function test_missing_secret_is_configuration_error(): void
+    public function test_missing_secret_is_server_configuration_error(): void
     {
-        $this->expectException(InvalidConfigurationAppException::class);
+        $this->expectException(ServerConfigurationException::class);
 
-        new VerifySignatureMiddleware($this->nonceRepository, new Config([
-            'parking-app' => ['integration_signature' => ['secret' => '', 'tolerance_seconds' => 300]],
-        ]));
+        new VerifySignatureMiddleware($this->nonceRepository, $this->config(['secret' => '']));
+    }
+
+    public function test_nonce_ttl_shorter_than_two_windows_is_server_configuration_error(): void
+    {
+        $this->expectException(ServerConfigurationException::class);
+
+        new VerifySignatureMiddleware($this->nonceRepository, $this->config(['nonce_ttl_seconds' => 599]));
+    }
+
+    public function test_server_configuration_error_is_500(): void
+    {
+        $exception = new ServerConfigurationException('Не задан INTEGRATION_SIGNATURE_SECRET');
+
+        $this->assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $exception->getStatusCode());
+        $this->assertInstanceOf(InvalidConfigurationAppException::class, $exception);
     }
 
     private function header(string $secret, int $timestamp, string $target = self::TARGET): string
@@ -136,12 +150,19 @@ class VerifySignatureMiddlewareTest extends TestCase
 
     private function handle(Request $request): Response
     {
-        $config = new Config([
-            'parking-app' => ['integration_signature' => ['secret' => self::SECRET, 'tolerance_seconds' => 300]],
-        ]);
-        $middleware = new VerifySignatureMiddleware($this->nonceRepository, $config);
+        $middleware = new VerifySignatureMiddleware($this->nonceRepository, $this->config([]));
 
         return $middleware->handle($request, static fn (): Response => new Response());
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    private function config(array $overrides): Config
+    {
+        $signature = array_merge(['secret' => self::SECRET, 'tolerance_seconds' => 300, 'nonce_ttl_seconds' => 600], $overrides);
+
+        return new Config(['parking-app' => ['integration_signature' => $signature]]);
     }
 
     private function request(?string $header): Request

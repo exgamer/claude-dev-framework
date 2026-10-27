@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
 /**
  * Действующие тарифы парковки для машинного вызова партнёра.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class ParkingTariffController extends Controller
 {

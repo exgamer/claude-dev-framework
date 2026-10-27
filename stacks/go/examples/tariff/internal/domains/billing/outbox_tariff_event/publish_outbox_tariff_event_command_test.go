@@ -39,14 +39,13 @@ func TestPublishOutboxTariffEventCommand_PublishesAndMarksPublished(t *testing.T
 	require.NoError(t, err)
 	require.Len(t, publisher.Published, 1)
 	assert.Equal(t, outboxdomain.RoutingKeyTariffCreated, publisher.Published[0].RoutingKey)
-	assert.Equal(t, outboxdomain.StatusPublished, repository.Items[1].Status)
+	assert.Equal(t, outboxdomain.StatusPublished, repository.Items[1].Status())
 	assert.NotNil(t, repository.Items[1].PublishedAt)
 	assert.Zero(t, txManager.Calls, "успешная отправка — без транзакции попытки")
 }
 
 func TestPublishOutboxTariffEventCommand_PublishedIsNotSentAgain(t *testing.T) {
-	event := pendingEvent(1)
-	event.Status = outboxdomain.StatusPublished
+	event := outboxdomain.RestoreOutboxTariffEvent(*pendingEvent(1), outboxdomain.StatusPublished)
 	repository := billingfakes.NewOutboxTariffEventRepository(event)
 	publisher := &billingfakes.OutboxTariffEventPublisher{}
 	command, txManager := newPublishCommand(repository, publisher)
@@ -76,14 +75,13 @@ func TestPublishOutboxTariffEventCommand_FailureAwaitsRetry(t *testing.T) {
 	err := command.Exec(context.Background(), 1)
 
 	require.ErrorIs(t, err, publisher.Err)
-	assert.Equal(t, outboxdomain.StatusAwaitingRetry, repository.Items[1].Status)
+	assert.Equal(t, outboxdomain.StatusAwaitingRetry, repository.Items[1].Status())
 	assert.Equal(t, uint(1), repository.Items[1].Attempts)
 	assert.Equal(t, 1, txManager.Calls, "попытка и статус — в одной транзакции")
 }
 
 func TestPublishOutboxTariffEventCommand_LastAttemptFails(t *testing.T) {
-	event := pendingEvent(1)
-	event.Status = outboxdomain.StatusAwaitingRetry
+	event := outboxdomain.RestoreOutboxTariffEvent(*pendingEvent(1), outboxdomain.StatusAwaitingRetry)
 	event.Attempts = 2
 	repository := billingfakes.NewOutboxTariffEventRepository(event)
 	publisher := &billingfakes.OutboxTariffEventPublisher{Err: errors.New("rabbit unavailable")}
@@ -92,7 +90,7 @@ func TestPublishOutboxTariffEventCommand_LastAttemptFails(t *testing.T) {
 	err := command.Exec(context.Background(), 1)
 
 	require.ErrorIs(t, err, publisher.Err)
-	assert.Equal(t, outboxdomain.StatusFailed, repository.Items[1].Status)
+	assert.Equal(t, outboxdomain.StatusFailed, repository.Items[1].Status())
 	assert.Equal(t, uint(3), repository.Items[1].Attempts)
 	assert.Equal(t, 1, txManager.Calls, "попытка и статус — в одной транзакции")
 
@@ -104,12 +102,11 @@ func TestPublishOutboxTariffEventCommand_LastAttemptFails(t *testing.T) {
 }
 
 func TestPublishOutboxTariffEventCommand_LateFailureKeepsPublished(t *testing.T) {
-	event := pendingEvent(1)
-	event.Status = outboxdomain.StatusPublished
+	event := outboxdomain.RestoreOutboxTariffEvent(*pendingEvent(1), outboxdomain.StatusPublished)
 	repository := billingfakes.NewOutboxTariffEventRepository(event)
 
 	require.NoError(t, repository.MarkFailed(context.Background(), 1))
 	require.NoError(t, repository.MarkAwaitingRetry(context.Background(), 1))
 
-	assert.Equal(t, outboxdomain.StatusPublished, repository.Items[1].Status, "опоздавшая неудача параллельной отправки не затирает итог")
+	assert.Equal(t, outboxdomain.StatusPublished, repository.Items[1].Status(), "опоздавшая неудача параллельной отправки не затирает итог")
 }

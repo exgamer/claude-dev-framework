@@ -10,7 +10,7 @@ use MPS\Core\Enums\CurrencyEnum;
 /**
  * Заглушка реестра для тестового окружения: лимит не задан.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class CityParkingPriceLimitsRepositoryMock implements PriceLimitRepositoryInterface
 {

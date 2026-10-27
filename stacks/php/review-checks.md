@@ -10,7 +10,7 @@
 
 | Нарушение | Где искать |
 |---|---|
-| Бизнес-логика в Model или Repository (`if` по статусам, трансформация данных, вызов другого сервиса/репозитория, любое бизнес-исключение, в т.ч. `NotFoundAppException` — репозиторий возвращает `null`, «не найдено» решает вызывающий, `mps-core/repository.md`) | Model, Repository |
+| Бизнес-логика в Model или Repository: в модели — запросы, побочные эффекты, мутаторы с логикой; в репозитории — `if` по статусам, трансформация данных, вызов другого сервиса/репозитория, любое бизнес-исключение, в т.ч. `NotFoundAppException` (репозиторий возвращает `null`, «не найдено» решает вызывающий, `mps-core/repository.md`). Правила состояния своей строки в модели — `init*()`/`can*()` (`mps-core/model.md`, O-26) — не находка | Model, Repository |
 | Толстый контроллер (логика вместо делегирования в Service/Command) | Controller |
 | Прямой запрос к БД вне репозитория: `DB::`, `Model::where`/`query()`/`find`/`all()`, `->get()`/`->first()` по модели (`service-direct-db-query`, `conventions.md` п. 2) | Service, Command, Query, **Workflow** — проверка grep-ом — «Проверки за пределами дифа», п. 0 |
 | Repository вызывает внешний сервис или другой Repository | Repository |
@@ -23,7 +23,7 @@
 | `$this->getLogger()->setMessagePrefix(...)` вместо `->for($this)` | любой слой |
 | Отсутствует `declare(strict_types=1);` | любой PHP-файл |
 | Цикл или обратная зависимость между доменами (см. `architecture/cross-domain.md`) | Domains |
-| Новый HTTP-класс (Controller/Request/Response/Middleware) добавлен в `Domains/` вместо `Entrypoint/` | Domains |
+| Новый HTTP-класс (Controller/Request/Response/Middleware) добавлен в `Domains/` вместо `Entrypoints/` | Domains |
 | `ServiceInterface` сложного сервиса наследует `CRUDServiceInterface` | Services |
 | Больше одного модифицирующего запроса без общей транзакции — тег `multi-write-without-transaction` (O-8, `approaches/patterns/transactions.md`) | Workflow, Command, Service |
 | Своя транзакция вокруг одного модифицирующего запроса без блокировки по `concurrency.md` — тег `needless-transaction` | Workflow, Command, Service |

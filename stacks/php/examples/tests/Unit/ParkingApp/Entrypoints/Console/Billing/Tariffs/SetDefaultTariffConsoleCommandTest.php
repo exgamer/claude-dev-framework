@@ -20,7 +20,7 @@ use Tests\TestCase;
 /**
  * Команда зарегистрирована через commands.php, передаёт ID в Command домена без скоупа парковок.
  *
- * @author Olzhas Kulzhambekov <olzhas.k@mpinnovations.kz>
+ * @author Имя Фамилия <name@example.com>
  */
 class SetDefaultTariffConsoleCommandTest extends TestCase
 {

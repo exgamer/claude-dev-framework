@@ -7,7 +7,7 @@ import (
 	redisDI "git.mpinnovations.kz/mps/go-packages/gosdk-redis-core/pkg/di"
 )
 
-// Module Аутентификация администратора и партнёра; регистрируется до модулей, которые берут её сервисы из DI
+// Module Аутентификация администратора и партнёра
 type Module struct {
 }
 
